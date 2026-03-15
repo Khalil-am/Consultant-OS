@@ -93,8 +93,8 @@ export default function Workspaces() {
     try {
       const [ws, fin, rag] = await Promise.all([
         getWorkspaces(),
-        getWorkspaceFinancials(),
-        getWorkspaceRagStatuses(),
+        getWorkspaceFinancials().catch(() => [] as WorkspaceFinancialRow[]),
+        getWorkspaceRagStatuses().catch(() => [] as WorkspaceRagStatusRow[]),
       ]);
       setWorkspaces(ws);
       setFinancials(fin);

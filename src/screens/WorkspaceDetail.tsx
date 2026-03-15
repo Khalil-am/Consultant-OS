@@ -73,13 +73,13 @@ export default function WorkspaceDetail() {
     try {
       const [ws, fin, rag, docs, meetings, tasks, risks, milestones] = await Promise.all([
         getWorkspace(id),
-        getWorkspaceFinancial(id),
-        getWorkspaceRagStatus(id),
-        getDocuments(id),
-        getMeetings(id),
-        getTasks(id),
-        getRisks(id),
-        getMilestones(id),
+        getWorkspaceFinancial(id).catch(() => null),
+        getWorkspaceRagStatus(id).catch(() => null),
+        getDocuments(id).catch(() => [] as DocumentRow[]),
+        getMeetings(id).catch(() => [] as MeetingRow[]),
+        getTasks(id).catch(() => [] as TaskRow[]),
+        getRisks(id).catch(() => [] as RiskRow[]),
+        getMilestones(id).catch(() => [] as MilestoneRow[]),
       ]);
       if (!ws) { setError('Workspace not found'); return; }
       setData({ ws, fin, rag, docs, meetings, tasks, risks, milestones });
