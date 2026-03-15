@@ -193,7 +193,12 @@ export default function WorkspaceDetail() {
           .from('workspace-docs')
           .upload(path, file, { cacheControl: '3600', upsert: false });
 
-        if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
+        if (uploadError) {
+          if (uploadError.message.toLowerCase().includes('bucket') || uploadError.message.toLowerCase().includes('not found') || uploadError.message.toLowerCase().includes('fetch')) {
+            throw new Error('Storage bucket missing. Go to Supabase → Storage → New bucket → name it "workspace-docs" → enable Public → Save. Then re-run add_document_storage.sql.');
+          }
+          throw new Error(`Upload failed: ${uploadError.message}`);
+        }
         setDocUploadPct(80);
 
         const { data: urlData } = supabase.storage
@@ -226,7 +231,12 @@ export default function WorkspaceDetail() {
       setDocForm({ name: '', type: 'BRD', language: 'EN', status: 'Draft', author: '', pages: '1', summary: '', file: null });
       await loadData(true);
     } catch (e: unknown) {
-      setDocError((e as Error).message ?? 'Failed to add document');
+      const msg = (e as Error).message ?? '';
+      if (msg.includes('fetch') || msg.includes('NetworkError')) {
+        setDocError('Storage bucket missing. Go to Supabase → Storage → New bucket → name it "workspace-docs" → enable Public → Save.');
+      } else {
+        setDocError(msg || 'Failed to add document');
+      }
     } finally { setDocSaving(false); setDocUploadPct(0); }
   };
 
