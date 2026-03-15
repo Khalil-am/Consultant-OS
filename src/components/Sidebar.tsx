@@ -87,13 +87,13 @@ export default function Sidebar() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
           <div style={{
             width: '40px', height: '40px', borderRadius: '10px', flexShrink: 0, overflow: 'hidden',
-            background: '#0D1527', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
             boxShadow: '0 0 14px rgba(0,212,255,0.25)',
           }}>
             <img
               src="/favicon.png"
               alt="Consultant OS icon"
-              style={{ width: '38px', height: '38px', objectFit: 'contain', mixBlendMode: 'multiply' }}
+              style={{ width: '34px', height: '34px', objectFit: 'contain' }}
             />
           </div>
           <div>
