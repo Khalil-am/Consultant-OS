@@ -84,12 +84,22 @@ export default function Sidebar() {
     <aside style={sidebarStyle}>
       {/* Logo */}
       <div style={{ padding: '1.25rem 1rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <img
-            src="/logo.png"
-            alt="Consultant OS"
-            style={{ height: '72px', width: 'auto', objectFit: 'contain', flexShrink: 0 }}
-          />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+          <div style={{
+            width: '40px', height: '40px', borderRadius: '10px', flexShrink: 0, overflow: 'hidden',
+            background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 0 14px rgba(0,212,255,0.25)',
+          }}>
+            <img
+              src="/favicon.png"
+              alt="Consultant OS icon"
+              style={{ width: '34px', height: '34px', objectFit: 'contain' }}
+            />
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#F1F5F9', lineHeight: 1.2 }}>Consultant OS</div>
+            <div style={{ fontSize: '0.65rem', color: '#475569', marginTop: '1px' }}>AI-Powered Workspace</div>
+          </div>
         </div>
         {isTablet && (
           <button
