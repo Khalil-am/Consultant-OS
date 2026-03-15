@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLayout } from '../hooks/useLayout';
 import {
   ArrowLeft, FileText, Video, CheckSquare, AlertTriangle,
   TrendingUp, Plus, ExternalLink, Zap, DollarSign, TrendingDown,
-  RefreshCw, AlertCircle, X,
+  RefreshCw, AlertCircle, X, Upload, Download,
 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 import {
   getWorkspace, getDocuments, getMeetings, getTasks, getRisks,
   getWorkspaceFinancial, getMilestones, getWorkspaceRagStatus,
@@ -55,7 +56,7 @@ interface WorkspaceData {
 }
 
 interface NewTaskForm { title: string; priority: 'High' | 'Medium' | 'Low'; due_date: string; assignee: string; description: string; }
-interface NewDocForm { name: string; type: string; language: 'EN' | 'AR' | 'Bilingual'; status: 'Draft' | 'Approved' | 'Under Review' | 'Final'; author: string; pages: string; summary: string; }
+interface NewDocForm { name: string; type: string; language: 'EN' | 'AR' | 'Bilingual'; status: 'Draft' | 'Approved' | 'Under Review' | 'Final'; author: string; pages: string; summary: string; file: File | null; }
 interface NewMeetingForm { title: string; type: typeof MEETING_TYPES[number]; date: string; time: string; duration: string; participants: string; location: string; }
 interface NewRiskForm { title: string; category: string; probability: string; impact: string; severity: 'Critical' | 'High' | 'Medium' | 'Low'; owner: string; mitigation: string; financial_exposure: string; }
 
@@ -92,9 +93,11 @@ export default function WorkspaceDetail() {
 
   // Document modal
   const [showDocModal, setShowDocModal] = useState(false);
-  const [docForm, setDocForm] = useState<NewDocForm>({ name: '', type: 'BRD', language: 'EN', status: 'Draft', author: '', pages: '1', summary: '' });
+  const [docForm, setDocForm] = useState<NewDocForm>({ name: '', type: 'BRD', language: 'EN', status: 'Draft', author: '', pages: '1', summary: '', file: null });
   const [docSaving, setDocSaving] = useState(false);
   const [docError, setDocError] = useState('');
+  const [docUploadPct, setDocUploadPct] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Meeting modal
   const [showMtgModal, setShowMtgModal] = useState(false);
@@ -174,25 +177,57 @@ export default function WorkspaceDetail() {
       setDocError('Name and author are required.'); return;
     }
     if (!id || !data) return;
-    setDocSaving(true); setDocError('');
+    setDocSaving(true); setDocError(''); setDocUploadPct(0);
     try {
+      let fileUrl: string | null = null;
+      let fileSize = '—';
+
+      // Upload file to Supabase Storage if one was selected
+      if (docForm.file) {
+        const file = docForm.file;
+        const ext = file.name.split('.').pop();
+        const path = `${id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+        setDocUploadPct(10);
+
+        const { error: uploadError } = await supabase.storage
+          .from('workspace-docs')
+          .upload(path, file, { cacheControl: '3600', upsert: false });
+
+        if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
+        setDocUploadPct(80);
+
+        const { data: urlData } = supabase.storage
+          .from('workspace-docs')
+          .getPublicUrl(path);
+        fileUrl = urlData.publicUrl;
+
+        // Human-readable size
+        const bytes = file.size;
+        fileSize = bytes >= 1_048_576 ? `${(bytes / 1_048_576).toFixed(1)} MB`
+          : bytes >= 1024 ? `${(bytes / 1024).toFixed(0)} KB`
+          : `${bytes} B`;
+        setDocUploadPct(90);
+      }
+
       const today = new Date().toISOString().slice(0, 10);
       await upsertDocument({
         id: `doc-${Date.now()}`, name: docForm.name.trim(),
         type: docForm.type, type_color: DOC_TYPE_COLORS[docForm.type] ?? '#94A3B8',
         workspace: data.ws.name, workspace_id: id,
         date: today, language: docForm.language, status: docForm.status,
-        size: '—', author: docForm.author.trim(),
+        size: fileSize, author: docForm.author.trim(),
         pages: parseInt(docForm.pages) || 1,
         summary: docForm.summary.trim(), tags: [],
+        file_url: fileUrl,
       });
       await updateWorkspace(id, { docs_count: data.docs.length + 1, last_activity: 'Just now' });
+      setDocUploadPct(100);
       setShowDocModal(false);
-      setDocForm({ name: '', type: 'BRD', language: 'EN', status: 'Draft', author: '', pages: '1', summary: '' });
+      setDocForm({ name: '', type: 'BRD', language: 'EN', status: 'Draft', author: '', pages: '1', summary: '', file: null });
       await loadData(true);
     } catch (e: unknown) {
-      setDocError((e as Error).message ?? 'Failed to create document');
-    } finally { setDocSaving(false); }
+      setDocError((e as Error).message ?? 'Failed to add document');
+    } finally { setDocSaving(false); setDocUploadPct(0); }
   };
 
   // ── Create Meeting ────────────────────────────────────────────
@@ -455,7 +490,7 @@ export default function WorkspaceDetail() {
               <div>
                 {docs.slice(0, 4).map((doc, i) => (
                   <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1.25rem', borderBottom: i < Math.min(docs.length, 4) - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', cursor: 'pointer' }}
-                    onClick={() => navigate(`/documents/${doc.id}`)}
+                    onClick={() => { if (doc.file_url) window.open(doc.file_url, '_blank'); else navigate(`/documents/${doc.id}`); }}
                     onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
@@ -464,7 +499,10 @@ export default function WorkspaceDetail() {
                       <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F1F5F9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.name}</div>
                       <div style={{ fontSize: '0.7rem', color: '#475569' }}>{doc.date} · {doc.pages} pages</div>
                     </div>
-                    <span className={`status-${doc.status === 'Approved' ? 'approved' : doc.status === 'Under Review' ? 'review' : 'draft'}`} style={{ fontSize: '0.65rem' }}>{doc.status}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                      <span className={`status-${doc.status === 'Approved' ? 'approved' : doc.status === 'Under Review' ? 'review' : 'draft'}`} style={{ fontSize: '0.65rem' }}>{doc.status}</span>
+                      {doc.file_url && <Download size={12} style={{ color: '#38BDF8' }} />}
+                    </div>
                   </div>
                 ))}
                 {docs.length === 0 && <div style={{ padding: '2rem', textAlign: 'center', color: '#334155', fontSize: '0.8rem' }}>No documents yet</div>}
@@ -558,7 +596,8 @@ export default function WorkspaceDetail() {
               <thead><tr><th>Document</th><th>Type</th><th>Date</th><th>Language</th><th>Status</th><th>Pages</th><th></th></tr></thead>
               <tbody>
                 {docs.map(doc => (
-                  <tr key={doc.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/documents/${doc.id}`)}>
+                  <tr key={doc.id} style={{ cursor: doc.file_url ? 'default' : 'pointer' }}
+                    onClick={() => { if (!doc.file_url) navigate(`/documents/${doc.id}`); }}>
                     <td>
                       <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F1F5F9' }}>{doc.name}</div>
                       <div style={{ fontSize: '0.7rem', color: '#475569' }}>{doc.author} · {doc.size}</div>
@@ -568,7 +607,17 @@ export default function WorkspaceDetail() {
                     <td><span style={{ fontSize: '0.72rem', color: '#38BDF8' }}>{doc.language}</span></td>
                     <td><span className={`status-${doc.status === 'Approved' ? 'approved' : doc.status === 'Under Review' ? 'review' : 'draft'}`} style={{ fontSize: '0.65rem' }}>{doc.status}</span></td>
                     <td style={{ fontSize: '0.78rem' }}>{doc.pages}</td>
-                    <td><ExternalLink size={13} style={{ color: '#334155' }} /></td>
+                    <td>
+                      {doc.file_url ? (
+                        <a href={doc.file_url} target="_blank" rel="noopener noreferrer"
+                          onClick={e => e.stopPropagation()}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: '#38BDF8', textDecoration: 'none', padding: '2px 8px', borderRadius: '4px', background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.2)' }}>
+                          <Download size={11} /> Open
+                        </a>
+                      ) : (
+                        <ExternalLink size={13} style={{ color: '#334155' }} />
+                      )}
+                    </td>
                   </tr>
                 ))}
                 {docs.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: '#334155' }}>No documents yet — add the first one</td></tr>}
@@ -759,9 +808,67 @@ export default function WorkspaceDetail() {
 
       {/* ── NEW DOCUMENT MODAL ── */}
       {showDocModal && (
-        <Modal title="Add Document" onClose={() => { closeModal(setShowDocModal); setDocError(''); }}>
+        <Modal title="Add Document" onClose={() => { closeModal(setShowDocModal); setDocError(''); setDocForm({ name: '', type: 'BRD', language: 'EN', status: 'Draft', author: '', pages: '1', summary: '', file: null }); }}>
           {docError && <ErrorBanner msg={docError} />}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+
+            {/* File drop zone */}
+            <div
+              style={{ border: `2px dashed ${docForm.file ? '#10B981' : 'rgba(255,255,255,0.12)'}`, borderRadius: '0.75rem', padding: '1.25rem', textAlign: 'center', cursor: 'pointer', background: docForm.file ? 'rgba(16,185,129,0.05)' : 'rgba(255,255,255,0.02)', transition: 'all 0.2s' }}
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={e => { e.preventDefault(); }}
+              onDrop={e => {
+                e.preventDefault();
+                const file = e.dataTransfer.files[0];
+                if (file) {
+                  setDocForm(f => ({ ...f, file, name: f.name || file.name.replace(/\.[^.]+$/, '') }));
+                }
+              }}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                style={{ display: 'none' }}
+                accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.md,.png,.jpg,.jpeg"
+                onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (file) setDocForm(f => ({ ...f, file, name: f.name || file.name.replace(/\.[^.]+$/, '') }));
+                }}
+              />
+              {docForm.file ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.625rem' }}>
+                  <FileText size={20} style={{ color: '#10B981' }} />
+                  <div style={{ textAlign: 'left' }}>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#F1F5F9' }}>{docForm.file.name}</div>
+                    <div style={{ fontSize: '0.72rem', color: '#475569' }}>
+                      {docForm.file.size >= 1_048_576 ? `${(docForm.file.size / 1_048_576).toFixed(1)} MB` : `${(docForm.file.size / 1024).toFixed(0)} KB`}
+                      {' · '}
+                      <span style={{ color: '#10B981', cursor: 'pointer' }} onClick={e => { e.stopPropagation(); setDocForm(f => ({ ...f, file: null })); }}>Remove</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <Upload size={24} style={{ color: '#475569', marginBottom: '0.5rem' }} />
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#94A3B8' }}>Click or drag & drop a file</div>
+                  <div style={{ fontSize: '0.72rem', color: '#334155', marginTop: '0.25rem' }}>PDF, Word, PowerPoint, Excel, images (optional)</div>
+                </div>
+              )}
+            </div>
+
+            {/* Upload progress */}
+            {docSaving && docUploadPct > 0 && docUploadPct < 100 && (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '0.72rem', color: '#475569' }}>Uploading…</span>
+                  <span style={{ fontSize: '0.72rem', color: '#38BDF8' }}>{docUploadPct}%</span>
+                </div>
+                <div style={{ height: '4px', borderRadius: '9999px', background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${docUploadPct}%`, background: 'linear-gradient(90deg, #0EA5E9, #00D4FF)', borderRadius: '9999px', transition: 'width 0.3s ease' }} />
+                </div>
+              </div>
+            )}
+
             <Field label="Document Name *">
               <input style={inputStyle} type="text" value={docForm.name} onChange={e => setDocForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Phase 1 BRD v1.0" />
             </Field>
@@ -791,7 +898,7 @@ export default function WorkspaceDetail() {
             <Field label="Summary">
               <textarea style={{ ...inputStyle, resize: 'vertical' }} value={docForm.summary} onChange={e => setDocForm(f => ({ ...f, summary: e.target.value }))} placeholder="Brief description…" rows={2} />
             </Field>
-            <ModalFooter onCancel={() => { closeModal(setShowDocModal); setDocError(''); }} onConfirm={handleCreateDoc} saving={docSaving} label="Add Document" />
+            <ModalFooter onCancel={() => { closeModal(setShowDocModal); setDocError(''); setDocForm({ name: '', type: 'BRD', language: 'EN', status: 'Draft', author: '', pages: '1', summary: '', file: null }); }} onConfirm={handleCreateDoc} saving={docSaving} label={docForm.file ? 'Upload & Save' : 'Save Document'} />
           </div>
         </Modal>
       )}

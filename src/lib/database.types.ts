@@ -77,6 +77,7 @@ export interface DocumentRow {
   pages: number;
   summary: string;
   tags: string[];
+  file_url: string | null;
   created_at: string;
   updated_at: string;
 }
