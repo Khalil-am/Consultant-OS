@@ -9,7 +9,8 @@ import {
 import {
   getWorkspace, getDocuments, getMeetings, getTasks, getRisks,
   getWorkspaceFinancial, getMilestones, getWorkspaceRagStatus,
-  upsertTask, updateTask,
+  upsertTask, updateTask, upsertDocument, upsertMeeting, upsertRisk,
+  updateWorkspace,
   type WorkspaceRow, type WorkspaceFinancialRow, type WorkspaceRagStatusRow,
   type MilestoneRow, type DocumentRow, type MeetingRow, type TaskRow, type RiskRow,
 } from '../lib/db';
@@ -33,6 +34,15 @@ const meetingTypeColors: Record<string, string> = {
   Review: '#10B981', Kickoff: '#EC4899', Standup: '#06B6D4',
 };
 
+const DOC_TYPES = ['BRD', 'Report', 'Architecture', 'Technical Spec', 'Policy', 'Charter', 'Assessment', 'Project Plan', 'Presentation', 'Other'];
+const DOC_TYPE_COLORS: Record<string, string> = {
+  BRD: '#0EA5E9', Report: '#10B981', Architecture: '#8B5CF6', 'Technical Spec': '#F59E0B',
+  Policy: '#10B981', Charter: '#8B5CF6', Assessment: '#F59E0B', 'Project Plan': '#0EA5E9',
+  Presentation: '#EC4899', Other: '#94A3B8',
+};
+const MEETING_TYPES = ['Workshop', 'Committee', 'Steering', 'Review', 'Kickoff', 'Standup'] as const;
+const RISK_CATEGORIES = ['Governance', 'Technical', 'Procurement', 'Delivery', 'Financial', 'Vendor', 'Compliance', 'Other'];
+
 interface WorkspaceData {
   ws: WorkspaceRow;
   fin: WorkspaceFinancialRow | null;
@@ -45,6 +55,22 @@ interface WorkspaceData {
 }
 
 interface NewTaskForm { title: string; priority: 'High' | 'Medium' | 'Low'; due_date: string; assignee: string; description: string; }
+interface NewDocForm { name: string; type: string; language: 'EN' | 'AR' | 'Bilingual'; status: 'Draft' | 'Approved' | 'Under Review' | 'Final'; author: string; pages: string; summary: string; }
+interface NewMeetingForm { title: string; type: typeof MEETING_TYPES[number]; date: string; time: string; duration: string; participants: string; location: string; }
+interface NewRiskForm { title: string; category: string; probability: string; impact: string; severity: 'Critical' | 'High' | 'Medium' | 'Low'; owner: string; mitigation: string; financial_exposure: string; }
+
+const inputStyle: React.CSSProperties = {
+  width: '100%', padding: '0.625rem 0.75rem',
+  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+  borderRadius: '0.5rem', color: '#F1F5F9', fontSize: '0.85rem',
+  fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
+};
+const selectStyle: React.CSSProperties = {
+  ...inputStyle, background: '#0A0F1E',
+};
+const labelStyle: React.CSSProperties = {
+  fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', display: 'block', marginBottom: '0.375rem',
+};
 
 export default function WorkspaceDetail() {
   const { width, isMobile, isTablet } = useLayout();
@@ -57,14 +83,30 @@ export default function WorkspaceDetail() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Task modal state
+  // Task modal
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [taskForm, setTaskForm] = useState<NewTaskForm>({ title: '', priority: 'Medium', due_date: '', assignee: '', description: '' });
   const [taskSaving, setTaskSaving] = useState(false);
   const [taskError, setTaskError] = useState('');
-
-  // Task status update
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
+
+  // Document modal
+  const [showDocModal, setShowDocModal] = useState(false);
+  const [docForm, setDocForm] = useState<NewDocForm>({ name: '', type: 'BRD', language: 'EN', status: 'Draft', author: '', pages: '1', summary: '' });
+  const [docSaving, setDocSaving] = useState(false);
+  const [docError, setDocError] = useState('');
+
+  // Meeting modal
+  const [showMtgModal, setShowMtgModal] = useState(false);
+  const [mtgForm, setMtgForm] = useState<NewMeetingForm>({ title: '', type: 'Review', date: '', time: '10:00', duration: '1h', participants: '', location: '' });
+  const [mtgSaving, setMtgSaving] = useState(false);
+  const [mtgError, setMtgError] = useState('');
+
+  // Risk modal
+  const [showRiskModal, setShowRiskModal] = useState(false);
+  const [riskForm, setRiskForm] = useState<NewRiskForm>({ title: '', category: 'Governance', probability: '3', impact: '3', severity: 'High', owner: '', mitigation: '', financial_exposure: '' });
+  const [riskSaving, setRiskSaving] = useState(false);
+  const [riskError, setRiskError] = useState('');
 
   const loadData = useCallback(async (isRefresh = false) => {
     if (!id) return;
@@ -93,6 +135,7 @@ export default function WorkspaceDetail() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  // ── Create Task ──────────────────────────────────────────────
   const handleCreateTask = async () => {
     if (!taskForm.title.trim() || !taskForm.due_date || !taskForm.assignee.trim()) {
       setTaskError('Title, due date and assignee are required.'); return;
@@ -107,14 +150,13 @@ export default function WorkspaceDetail() {
         due_date: taskForm.due_date, assignee: taskForm.assignee.trim(),
         linked_doc: null, linked_meeting: null, description: taskForm.description.trim(),
       });
+      await updateWorkspace(id, { tasks_count: data.tasks.length + 1, last_activity: 'Just now' });
       setShowTaskModal(false);
       setTaskForm({ title: '', priority: 'Medium', due_date: '', assignee: '', description: '' });
       await loadData(true);
     } catch (e: unknown) {
       setTaskError((e as Error).message ?? 'Failed to create task');
-    } finally {
-      setTaskSaving(false);
-    }
+    } finally { setTaskSaving(false); }
   };
 
   const handleUpdateTaskStatus = async (taskId: string, newStatus: TaskRow['status']) => {
@@ -125,6 +167,91 @@ export default function WorkspaceDetail() {
     } catch (_) { /* ignore */ }
     finally { setUpdatingTaskId(null); }
   };
+
+  // ── Create Document ──────────────────────────────────────────
+  const handleCreateDoc = async () => {
+    if (!docForm.name.trim() || !docForm.author.trim()) {
+      setDocError('Name and author are required.'); return;
+    }
+    if (!id || !data) return;
+    setDocSaving(true); setDocError('');
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      await upsertDocument({
+        id: `doc-${Date.now()}`, name: docForm.name.trim(),
+        type: docForm.type, type_color: DOC_TYPE_COLORS[docForm.type] ?? '#94A3B8',
+        workspace: data.ws.name, workspace_id: id,
+        date: today, language: docForm.language, status: docForm.status,
+        size: '—', author: docForm.author.trim(),
+        pages: parseInt(docForm.pages) || 1,
+        summary: docForm.summary.trim(), tags: [],
+      });
+      await updateWorkspace(id, { docs_count: data.docs.length + 1, last_activity: 'Just now' });
+      setShowDocModal(false);
+      setDocForm({ name: '', type: 'BRD', language: 'EN', status: 'Draft', author: '', pages: '1', summary: '' });
+      await loadData(true);
+    } catch (e: unknown) {
+      setDocError((e as Error).message ?? 'Failed to create document');
+    } finally { setDocSaving(false); }
+  };
+
+  // ── Create Meeting ────────────────────────────────────────────
+  const handleCreateMeeting = async () => {
+    if (!mtgForm.title.trim() || !mtgForm.date || !mtgForm.time) {
+      setMtgError('Title, date and time are required.'); return;
+    }
+    if (!id || !data) return;
+    setMtgSaving(true); setMtgError('');
+    try {
+      const participants = mtgForm.participants.split(',').map(p => p.trim()).filter(Boolean);
+      await upsertMeeting({
+        id: `mtg-${Date.now()}`, title: mtgForm.title.trim(),
+        date: mtgForm.date, time: mtgForm.time, duration: mtgForm.duration || '1h',
+        type: mtgForm.type, status: 'Upcoming',
+        participants, workspace: data.ws.name, workspace_id: id,
+        minutes_generated: false, actions_extracted: 0, decisions_logged: 0,
+        location: mtgForm.location.trim() || null,
+        agenda: null, quorum_status: null,
+      });
+      await updateWorkspace(id, { meetings_count: data.meetings.length + 1, last_activity: 'Just now' });
+      setShowMtgModal(false);
+      setMtgForm({ title: '', type: 'Review', date: '', time: '10:00', duration: '1h', participants: '', location: '' });
+      await loadData(true);
+    } catch (e: unknown) {
+      setMtgError((e as Error).message ?? 'Failed to create meeting');
+    } finally { setMtgSaving(false); }
+  };
+
+  // ── Create Risk ───────────────────────────────────────────────
+  const handleCreateRisk = async () => {
+    if (!riskForm.title.trim() || !riskForm.owner.trim()) {
+      setRiskError('Title and owner are required.'); return;
+    }
+    if (!id || !data) return;
+    setRiskSaving(true); setRiskError('');
+    try {
+      const prob = parseInt(riskForm.probability) || 3;
+      const imp = parseInt(riskForm.impact) || 3;
+      const today = new Date().toISOString().slice(0, 10);
+      await upsertRisk({
+        id: `rsk-${Date.now()}`, title: riskForm.title.trim(),
+        workspace: data.ws.name, workspace_id: id,
+        probability: prob, impact: imp, severity: riskForm.severity,
+        status: 'Open', owner: riskForm.owner.trim(),
+        mitigation: riskForm.mitigation.trim(),
+        date_identified: today, category: riskForm.category,
+        financial_exposure: riskForm.financial_exposure ? parseFloat(riskForm.financial_exposure) : null,
+      });
+      setShowRiskModal(false);
+      setRiskForm({ title: '', category: 'Governance', probability: '3', impact: '3', severity: 'High', owner: '', mitigation: '', financial_exposure: '' });
+      await loadData(true);
+    } catch (e: unknown) {
+      setRiskError((e as Error).message ?? 'Failed to create risk');
+    } finally { setRiskSaving(false); }
+  };
+
+  // ── Render helpers ────────────────────────────────────────────
+  const closeModal = (setter: (v: boolean) => void) => setter(false);
 
   if (loading) {
     return (
@@ -178,7 +305,6 @@ export default function WorkspaceDetail() {
       {/* Banner */}
       <div style={{ padding: isMobile ? '1.25rem' : '1.75rem', borderRadius: '0.875rem', background: 'linear-gradient(135deg, #0D1527 0%, #111B35 60%, #0D1B3E 100%)', border: '1px solid rgba(255,255,255,0.08)', borderLeft: `4px solid ${ws.sector_color}`, position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: 0, right: 0, width: '300px', height: '100%', background: `radial-gradient(ellipse at right, ${ws.sector_color}10 0%, transparent 70%)` }} />
-
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
@@ -205,8 +331,6 @@ export default function WorkspaceDetail() {
             <button className="btn-primary" style={{ fontSize: '0.8rem' }} onClick={() => { setShowTaskModal(true); setActiveTab('Tasks'); }}><Plus size={14} /> Add Task</button>
           </div>
         </div>
-
-        {/* Quick Stats */}
         <div style={{ display: 'flex', gap: isMobile ? '1rem' : '2rem', marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap' }}>
           {[
             { icon: <FileText size={13} />, value: docs.length || ws.docs_count, label: 'Documents', onClick: () => setActiveTab('Documents') },
@@ -427,7 +551,7 @@ export default function WorkspaceDetail() {
         <div className="section-card">
           <div className="section-card-header">
             <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>All Documents ({docs.length})</span>
-            <button className="btn-primary" style={{ fontSize: '0.8rem' }}><Plus size={13} /> Upload Document</button>
+            <button className="btn-primary" style={{ fontSize: '0.8rem' }} onClick={() => setShowDocModal(true)}><Plus size={13} /> Add Document</button>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
@@ -447,7 +571,7 @@ export default function WorkspaceDetail() {
                     <td><ExternalLink size={13} style={{ color: '#334155' }} /></td>
                   </tr>
                 ))}
-                {docs.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: '#334155' }}>No documents uploaded yet</td></tr>}
+                {docs.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: '#334155' }}>No documents yet — add the first one</td></tr>}
               </tbody>
             </table>
           </div>
@@ -459,7 +583,7 @@ export default function WorkspaceDetail() {
         <div className="section-card">
           <div className="section-card-header">
             <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Meetings ({meetings.length})</span>
-            <button className="btn-primary" style={{ fontSize: '0.8rem' }}><Plus size={13} /> Schedule Meeting</button>
+            <button className="btn-primary" style={{ fontSize: '0.8rem' }} onClick={() => setShowMtgModal(true)}><Plus size={13} /> Schedule Meeting</button>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table" style={{ minWidth: '640px' }}>
@@ -494,7 +618,7 @@ export default function WorkspaceDetail() {
                     </tr>
                   );
                 })}
-                {meetings.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: '#334155' }}>No meetings scheduled</td></tr>}
+                {meetings.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: '#334155' }}>No meetings yet — schedule one</td></tr>}
               </tbody>
             </table>
           </div>
@@ -531,20 +655,33 @@ export default function WorkspaceDetail() {
                     <td style={{ fontSize: '0.78rem', color: task.status === 'Overdue' ? '#FCA5A5' : '#94A3B8' }}>{task.due_date}</td>
                     <td><div className="avatar" style={{ width: '24px', height: '24px', fontSize: '0.62rem' }}>{task.assignee.slice(0, 2).toUpperCase()}</div></td>
                     <td>
-                      {task.status !== 'Completed' && (
-                        <button
-                          className="btn-ghost"
-                          style={{ fontSize: '0.68rem', padding: '2px 8px', height: 'auto', opacity: updatingTaskId === task.id ? 0.5 : 1 }}
-                          disabled={updatingTaskId === task.id}
-                          onClick={() => handleUpdateTaskStatus(task.id, task.status === 'Backlog' ? 'In Progress' : task.status === 'In Progress' ? 'Completed' : 'Completed')}
-                        >
-                          {updatingTaskId === task.id ? '…' : task.status === 'Backlog' ? '▶ Start' : '✓ Complete'}
-                        </button>
-                      )}
+                      <div style={{ display: 'flex', gap: '0.375rem' }}>
+                        {task.status !== 'Completed' && (
+                          <button
+                            className="btn-ghost"
+                            style={{ fontSize: '0.68rem', padding: '2px 8px', height: 'auto', opacity: updatingTaskId === task.id ? 0.5 : 1 }}
+                            disabled={updatingTaskId === task.id}
+                            onClick={() => handleUpdateTaskStatus(
+                              task.id,
+                              task.status === 'Backlog' ? 'In Progress'
+                              : task.status === 'In Progress' ? 'In Review'
+                              : 'Completed'
+                            )}
+                          >
+                            {updatingTaskId === task.id ? '…'
+                              : task.status === 'Backlog' ? '▶ Start'
+                              : task.status === 'In Progress' ? '⟳ Review'
+                              : '✓ Complete'}
+                          </button>
+                        )}
+                        {task.status === 'Completed' && (
+                          <span style={{ fontSize: '0.68rem', color: '#34D399' }}>✓ Done</span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
-                {tasks.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', padding: '2rem', color: '#334155' }}>No tasks yet</td></tr>}
+                {tasks.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', padding: '2rem', color: '#334155' }}>No tasks yet — create the first one</td></tr>}
               </tbody>
             </table>
           </div>
@@ -556,6 +693,7 @@ export default function WorkspaceDetail() {
         <div className="section-card">
           <div className="section-card-header">
             <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Risk Register ({risks.length})</span>
+            <button className="btn-primary" style={{ fontSize: '0.8rem' }} onClick={() => setShowRiskModal(true)}><Plus size={13} /> Log Risk</button>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
@@ -583,61 +721,200 @@ export default function WorkspaceDetail() {
                     {!isMobile && <td style={{ fontSize: '0.78rem', color: '#F59E0B', fontWeight: 600 }}>{risk.financial_exposure ? fmtSAR(risk.financial_exposure) : '—'}</td>}
                   </tr>
                 ))}
-                {risks.length === 0 && <tr><td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: '#334155' }}>No risks logged</td></tr>}
+                {risks.length === 0 && <tr><td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: '#334155' }}>No risks logged yet</td></tr>}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
-      {/* New Task Modal */}
+      {/* ── NEW TASK MODAL ── */}
       {showTaskModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
-          onClick={e => { if (e.target === e.currentTarget) setShowTaskModal(false); }}>
-          <div style={{ background: '#0D1527', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', padding: '1.75rem', width: '100%', maxWidth: '480px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <div style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9' }}>New Task</div>
-              <button onClick={() => setShowTaskModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569' }}><X size={18} /></button>
+        <Modal title="New Task" onClose={() => { closeModal(setShowTaskModal); setTaskError(''); }}>
+          {taskError && <ErrorBanner msg={taskError} />}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+            <Field label="Task Title *">
+              <input style={inputStyle} type="text" value={taskForm.title} onChange={e => setTaskForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Complete stakeholder analysis" />
+            </Field>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <Field label="Priority">
+                <select style={selectStyle} value={taskForm.priority} onChange={e => setTaskForm(f => ({ ...f, priority: e.target.value as 'High' | 'Medium' | 'Low' }))}>
+                  <option>High</option><option>Medium</option><option>Low</option>
+                </select>
+              </Field>
+              <Field label="Due Date *">
+                <input style={selectStyle} type="date" value={taskForm.due_date} onChange={e => setTaskForm(f => ({ ...f, due_date: e.target.value }))} />
+              </Field>
             </div>
-            {taskError && <div style={{ padding: '0.75rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', color: '#FCA5A5', fontSize: '0.8rem', marginBottom: '1rem' }}>{taskError}</div>}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
-              <div>
-                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', display: 'block', marginBottom: '0.375rem' }}>Task Title *</label>
-                <input type="text" value={taskForm.title} onChange={e => setTaskForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Complete stakeholder analysis"
-                  style={{ width: '100%', padding: '0.625rem 0.75rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '0.5rem', color: '#F1F5F9', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', display: 'block', marginBottom: '0.375rem' }}>Priority</label>
-                  <select value={taskForm.priority} onChange={e => setTaskForm(f => ({ ...f, priority: e.target.value as 'High' | 'Medium' | 'Low' }))}
-                    style={{ width: '100%', padding: '0.625rem 0.75rem', background: '#0A0F1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '0.5rem', color: '#F1F5F9', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none' }}>
-                    <option>High</option><option>Medium</option><option>Low</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', display: 'block', marginBottom: '0.375rem' }}>Due Date *</label>
-                  <input type="date" value={taskForm.due_date} onChange={e => setTaskForm(f => ({ ...f, due_date: e.target.value }))}
-                    style={{ width: '100%', padding: '0.625rem 0.75rem', background: '#0A0F1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '0.5rem', color: '#F1F5F9', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
-                </div>
-              </div>
-              <div>
-                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', display: 'block', marginBottom: '0.375rem' }}>Assignee *</label>
-                <input type="text" value={taskForm.assignee} onChange={e => setTaskForm(f => ({ ...f, assignee: e.target.value }))} placeholder="e.g. AM"
-                  style={{ width: '100%', padding: '0.625rem 0.75rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '0.5rem', color: '#F1F5F9', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', display: 'block', marginBottom: '0.375rem' }}>Description</label>
-                <textarea value={taskForm.description} onChange={e => setTaskForm(f => ({ ...f, description: e.target.value }))} placeholder="Optional task description…" rows={2}
-                  style={{ width: '100%', padding: '0.625rem 0.75rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '0.5rem', color: '#F1F5F9', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }} />
-              </div>
-              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', paddingTop: '0.25rem' }}>
-                <button className="btn-ghost" onClick={() => setShowTaskModal(false)}>Cancel</button>
-                <button className="btn-primary" onClick={handleCreateTask} disabled={taskSaving}>{taskSaving ? 'Saving…' : 'Create Task'}</button>
-              </div>
-            </div>
+            <Field label="Assignee *">
+              <input style={inputStyle} type="text" value={taskForm.assignee} onChange={e => setTaskForm(f => ({ ...f, assignee: e.target.value }))} placeholder="e.g. AM" />
+            </Field>
+            <Field label="Description">
+              <textarea style={{ ...inputStyle, resize: 'vertical' }} value={taskForm.description} onChange={e => setTaskForm(f => ({ ...f, description: e.target.value }))} placeholder="Optional…" rows={2} />
+            </Field>
+            <ModalFooter onCancel={() => { closeModal(setShowTaskModal); setTaskError(''); }} onConfirm={handleCreateTask} saving={taskSaving} label="Create Task" />
           </div>
-        </div>
+        </Modal>
       )}
+
+      {/* ── NEW DOCUMENT MODAL ── */}
+      {showDocModal && (
+        <Modal title="Add Document" onClose={() => { closeModal(setShowDocModal); setDocError(''); }}>
+          {docError && <ErrorBanner msg={docError} />}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+            <Field label="Document Name *">
+              <input style={inputStyle} type="text" value={docForm.name} onChange={e => setDocForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Phase 1 BRD v1.0" />
+            </Field>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <Field label="Type">
+                <select style={selectStyle} value={docForm.type} onChange={e => setDocForm(f => ({ ...f, type: e.target.value }))}>
+                  {DOC_TYPES.map(t => <option key={t}>{t}</option>)}
+                </select>
+              </Field>
+              <Field label="Status">
+                <select style={selectStyle} value={docForm.status} onChange={e => setDocForm(f => ({ ...f, status: e.target.value as NewDocForm['status'] }))}>
+                  <option>Draft</option><option>Under Review</option><option>Approved</option><option>Final</option>
+                </select>
+              </Field>
+              <Field label="Language">
+                <select style={selectStyle} value={docForm.language} onChange={e => setDocForm(f => ({ ...f, language: e.target.value as NewDocForm['language'] }))}>
+                  <option>EN</option><option>AR</option><option>Bilingual</option>
+                </select>
+              </Field>
+              <Field label="Pages">
+                <input style={selectStyle} type="number" min="1" value={docForm.pages} onChange={e => setDocForm(f => ({ ...f, pages: e.target.value }))} />
+              </Field>
+            </div>
+            <Field label="Author *">
+              <input style={inputStyle} type="text" value={docForm.author} onChange={e => setDocForm(f => ({ ...f, author: e.target.value }))} placeholder="e.g. Ahmed Al-Mahmoud" />
+            </Field>
+            <Field label="Summary">
+              <textarea style={{ ...inputStyle, resize: 'vertical' }} value={docForm.summary} onChange={e => setDocForm(f => ({ ...f, summary: e.target.value }))} placeholder="Brief description…" rows={2} />
+            </Field>
+            <ModalFooter onCancel={() => { closeModal(setShowDocModal); setDocError(''); }} onConfirm={handleCreateDoc} saving={docSaving} label="Add Document" />
+          </div>
+        </Modal>
+      )}
+
+      {/* ── NEW MEETING MODAL ── */}
+      {showMtgModal && (
+        <Modal title="Schedule Meeting" onClose={() => { closeModal(setShowMtgModal); setMtgError(''); }}>
+          {mtgError && <ErrorBanner msg={mtgError} />}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+            <Field label="Meeting Title *">
+              <input style={inputStyle} type="text" value={mtgForm.title} onChange={e => setMtgForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Steering Committee Review" />
+            </Field>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <Field label="Type">
+                <select style={selectStyle} value={mtgForm.type} onChange={e => setMtgForm(f => ({ ...f, type: e.target.value as NewMeetingForm['type'] }))}>
+                  {MEETING_TYPES.map(t => <option key={t}>{t}</option>)}
+                </select>
+              </Field>
+              <Field label="Date *">
+                <input style={selectStyle} type="date" value={mtgForm.date} onChange={e => setMtgForm(f => ({ ...f, date: e.target.value }))} />
+              </Field>
+              <Field label="Time *">
+                <input style={selectStyle} type="time" value={mtgForm.time} onChange={e => setMtgForm(f => ({ ...f, time: e.target.value }))} />
+              </Field>
+              <Field label="Duration">
+                <input style={inputStyle} type="text" value={mtgForm.duration} onChange={e => setMtgForm(f => ({ ...f, duration: e.target.value }))} placeholder="e.g. 1h, 90m, 2h" />
+              </Field>
+            </div>
+            <Field label="Location">
+              <input style={inputStyle} type="text" value={mtgForm.location} onChange={e => setMtgForm(f => ({ ...f, location: e.target.value }))} placeholder="e.g. HQ Boardroom A, Virtual – Teams" />
+            </Field>
+            <Field label="Participants (comma-separated)">
+              <input style={inputStyle} type="text" value={mtgForm.participants} onChange={e => setMtgForm(f => ({ ...f, participants: e.target.value }))} placeholder="e.g. AM, SK, Client-CEO" />
+            </Field>
+            <ModalFooter onCancel={() => { closeModal(setShowMtgModal); setMtgError(''); }} onConfirm={handleCreateMeeting} saving={mtgSaving} label="Schedule Meeting" />
+          </div>
+        </Modal>
+      )}
+
+      {/* ── NEW RISK MODAL ── */}
+      {showRiskModal && (
+        <Modal title="Log Risk" onClose={() => { closeModal(setShowRiskModal); setRiskError(''); }}>
+          {riskError && <ErrorBanner msg={riskError} />}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+            <Field label="Risk Title *">
+              <input style={inputStyle} type="text" value={riskForm.title} onChange={e => setRiskForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Key stakeholder unavailability" />
+            </Field>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <Field label="Category">
+                <select style={selectStyle} value={riskForm.category} onChange={e => setRiskForm(f => ({ ...f, category: e.target.value }))}>
+                  {RISK_CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                </select>
+              </Field>
+              <Field label="Severity">
+                <select style={selectStyle} value={riskForm.severity} onChange={e => setRiskForm(f => ({ ...f, severity: e.target.value as NewRiskForm['severity'] }))}>
+                  <option>Critical</option><option>High</option><option>Medium</option><option>Low</option>
+                </select>
+              </Field>
+              <Field label="Probability (1–5)">
+                <select style={selectStyle} value={riskForm.probability} onChange={e => setRiskForm(f => ({ ...f, probability: e.target.value }))}>
+                  {['1','2','3','4','5'].map(n => <option key={n}>{n}</option>)}
+                </select>
+              </Field>
+              <Field label="Impact (1–5)">
+                <select style={selectStyle} value={riskForm.impact} onChange={e => setRiskForm(f => ({ ...f, impact: e.target.value }))}>
+                  {['1','2','3','4','5'].map(n => <option key={n}>{n}</option>)}
+                </select>
+              </Field>
+            </div>
+            <Field label="Owner *">
+              <input style={inputStyle} type="text" value={riskForm.owner} onChange={e => setRiskForm(f => ({ ...f, owner: e.target.value }))} placeholder="e.g. AM" />
+            </Field>
+            <Field label="Mitigation Plan">
+              <textarea style={{ ...inputStyle, resize: 'vertical' }} value={riskForm.mitigation} onChange={e => setRiskForm(f => ({ ...f, mitigation: e.target.value }))} placeholder="Describe mitigation actions…" rows={2} />
+            </Field>
+            <Field label="Financial Exposure (SAR)">
+              <input style={inputStyle} type="number" min="0" value={riskForm.financial_exposure} onChange={e => setRiskForm(f => ({ ...f, financial_exposure: e.target.value }))} placeholder="e.g. 500000" />
+            </Field>
+            <ModalFooter onCancel={() => { closeModal(setShowRiskModal); setRiskError(''); }} onConfirm={handleCreateRisk} saving={riskSaving} label="Log Risk" />
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ── Shared modal sub-components ──────────────────────────────
+
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{ background: '#0D1527', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', padding: '1.75rem', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <div style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9' }}>{title}</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><X size={18} /></button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label style={labelStyle}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function ErrorBanner({ msg }: { msg: string }) {
+  return (
+    <div style={{ padding: '0.75rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', color: '#FCA5A5', fontSize: '0.8rem', marginBottom: '1rem' }}>{msg}</div>
+  );
+}
+
+function ModalFooter({ onCancel, onConfirm, saving, label }: { onCancel: () => void; onConfirm: () => void; saving: boolean; label: string }) {
+  return (
+    <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', paddingTop: '0.25rem' }}>
+      <button className="btn-ghost" onClick={onCancel}>Cancel</button>
+      <button className="btn-primary" onClick={onConfirm} disabled={saving}>{saving ? 'Saving…' : label}</button>
     </div>
   );
 }
