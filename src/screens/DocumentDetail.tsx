@@ -400,10 +400,95 @@ export default function DocumentDetail() {
           </div>
         )}
 
-        {/* Placeholder tabs */}
-        {!['Overview', 'Extracted Fields', 'Versions', 'AI Chat', 'Full Text'].includes(activeTab) && (
-          <div className="section-card" style={{ padding: '3rem', textAlign: 'center' }}>
-            <div style={{ color: '#475569', fontSize: '0.875rem' }}>{activeTab} content for {doc.name}</div>
+        {/* Summary Tab */}
+        {activeTab === 'Summary' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div className="section-card">
+              <div className="section-card-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Sparkles size={14} style={{ color: '#8B5CF6' }} />
+                  <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>AI-Generated Executive Summary</span>
+                </div>
+                <span style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '9999px', background: 'rgba(139,92,246,0.15)', color: '#C4B5FD', border: '1px solid rgba(139,92,246,0.25)' }}>Generated 12 Mar 2026</span>
+              </div>
+              <div style={{ padding: '1.25rem' }}>
+                {[
+                  { heading: 'Document Purpose', text: `This Business Requirements Document defines the functional and non-functional requirements for the ${doc.workspace} initiative. It serves as the formal agreement between the client organisation and the delivery team on the scope of the system to be built.` },
+                  { heading: 'Key Objectives', text: 'The programme aims to modernise core enterprise systems, introduce unified API management, implement an enterprise document management platform with Arabic OCR support, and establish an automated reporting layer for senior leadership visibility.' },
+                  { heading: 'Scope Summary', text: 'Scope covers 312 requirements across 8 functional modules. Integration with 14 existing enterprise systems is required. The system must support 5,000+ concurrent users with 99.9% SLA. Arabic-English bilingual support is mandatory throughout.' },
+                  { heading: 'Key Risks Identified', text: '3 critical risks identified at time of BRD completion: (1) ERP vendor timeline dependency, (2) Data migration complexity from legacy Oracle system, (3) Security compliance approval timeline. All have proposed mitigations documented in the Risk Register.' },
+                  { heading: 'Recommended Next Steps', text: 'Obtain formal sign-off from NCA CTO and Programme Director. Initiate FRD development in parallel. Schedule architecture review workshop with technical stakeholders within 14 days.' },
+                ].map((section, i) => (
+                  <div key={i} style={{ marginBottom: '1.25rem', paddingBottom: '1.25rem', borderBottom: i < 4 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#38BDF8', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{section.heading}</div>
+                    <p style={{ fontSize: '0.82rem', color: '#94A3B8', lineHeight: 1.7, margin: 0 }}>{section.text}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Requirements Tab */}
+        {activeTab === 'Requirements' && (
+          <div className="section-card">
+            <div className="section-card-header">
+              <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Linked Requirements</span>
+              <span style={{ fontSize: '0.7rem', color: '#475569' }}>5 of 312 shown</span>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
+                <thead>
+                  <tr>
+                    {['Req ID', 'Requirement Statement', 'Priority', 'Status'].map(h => (
+                      <th key={h} style={{ padding: '0.625rem 1rem', textAlign: 'left', fontSize: '0.68rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid rgba(255,255,255,0.06)', whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {linkedRequirements.map((req, i) => (
+                    <tr key={req.id} style={{ cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                      <td style={{ padding: '0.75rem 1rem', fontSize: '0.78rem', fontWeight: 700, color: '#0EA5E9', borderBottom: '1px solid rgba(255,255,255,0.04)', whiteSpace: 'nowrap' }}>{req.id}</td>
+                      <td style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', color: '#F1F5F9', borderBottom: '1px solid rgba(255,255,255,0.04)', maxWidth: '380px' }}>{req.text}</td>
+                      <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: 'rgba(239,68,68,0.1)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.2)' }}>{req.priority}</span>
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: req.status === 'Approved' ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', color: req.status === 'Approved' ? '#34D399' : '#FCD34D', border: `1px solid ${req.status === 'Approved' ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.2)'}` }}>{req.status}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Tasks Tab */}
+        {activeTab === 'Tasks' && (
+          <div className="section-card">
+            <div className="section-card-header">
+              <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Linked Tasks</span>
+              <button className="btn-primary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.72rem', height: '28px' }}>+ Link Task</button>
+            </div>
+            <div style={{ padding: '0.375rem 0' }}>
+              {[
+                { id: 'TSK-042', title: 'Obtain NCA CTO sign-off on BRD v2.3', owner: 'AM', due: '20 Mar 2026', priority: 'High', status: 'Open' },
+                { id: 'TSK-047', title: 'Schedule architecture review workshop', owner: 'SK', due: '22 Mar 2026', priority: 'Medium', status: 'Open' },
+                { id: 'TSK-031', title: 'Distribute BRD to steering committee', owner: 'AM', due: '19 Mar 2026', priority: 'High', status: 'Completed' },
+                { id: 'TSK-055', title: 'Update requirements traceability matrix', owner: 'RT', due: '28 Mar 2026', priority: 'Medium', status: 'In Progress' },
+              ].map((task, i) => (
+                <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem 1.25rem', borderBottom: i < 3 ? '1px solid rgba(255,255,255,0.04)' : 'none', cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#475569', minWidth: '60px' }}>{task.id}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F1F5F9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</div>
+                    <div style={{ fontSize: '0.7rem', color: '#475569' }}>{task.owner} · Due {task.due}</div>
+                  </div>
+                  <span style={{ fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', background: task.priority === 'High' ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)', color: task.priority === 'High' ? '#FCA5A5' : '#FCD34D', flexShrink: 0 }}>{task.priority}</span>
+                  <span style={{ fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', background: task.status === 'Completed' ? 'rgba(16,185,129,0.1)' : task.status === 'In Progress' ? 'rgba(14,165,233,0.1)' : 'rgba(148,163,184,0.07)', color: task.status === 'Completed' ? '#34D399' : task.status === 'In Progress' ? '#38BDF8' : '#94A3B8', flexShrink: 0 }}>{task.status}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

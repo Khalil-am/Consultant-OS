@@ -1422,3 +1422,116 @@ export const workspaceProgressData = workspaces.map(ws => ({
   progress: ws.progress,
   docs: ws.docsCount,
 }));
+
+
+// ============================================================
+// BOARD-LEVEL FINANCIAL & PORTFOLIO DATA
+// ============================================================
+
+export interface WorkspaceFinancials {
+  workspaceId: string;
+  contractValue: number;
+  spent: number;
+  forecast: number;
+  variance: number;
+  currency: string;
+  billingModel: string;
+  lastInvoice: string;
+  nextMilestoneValue: number;
+}
+
+export const workspaceFinancials: WorkspaceFinancials[] = [
+  { workspaceId: 'ws-001', contractValue: 4200000, spent: 2856000, forecast: 4150000, variance: -50000, currency: 'AED', billingModel: 'Fixed Fee', lastInvoice: '15 Feb 2026', nextMilestoneValue: 840000 },
+  { workspaceId: 'ws-002', contractValue: 3500000, spent: 1575000, forecast: 3650000, variance: 150000, currency: 'AED', billingModel: 'Time & Material', lastInvoice: '01 Mar 2026', nextMilestoneValue: 700000 },
+  { workspaceId: 'ws-003', contractValue: 2800000, spent: 2576000, forecast: 2820000, variance: 20000, currency: 'AED', billingModel: 'Fixed Fee', lastInvoice: '28 Feb 2026', nextMilestoneValue: 224000 },
+  { workspaceId: 'ws-004', contractValue: 1950000, spent: 877500, forecast: 1930000, variance: -20000, currency: 'AED', billingModel: 'Retainer', lastInvoice: '01 Mar 2026', nextMilestoneValue: 390000 },
+  { workspaceId: 'ws-005', contractValue: 6800000, spent: 3060000, forecast: 7100000, variance: 300000, currency: 'AED', billingModel: 'Fixed Fee', lastInvoice: '10 Mar 2026', nextMilestoneValue: 1360000 },
+  { workspaceId: 'ws-006', contractValue: 1200000, spent: 1080000, forecast: 1250000, variance: 50000, currency: 'AED', billingModel: 'Fixed Fee', lastInvoice: '05 Mar 2026', nextMilestoneValue: 120000 },
+  { workspaceId: 'ws-007', contractValue: 890000, spent: 445000, forecast: 870000, variance: -20000, currency: 'AED', billingModel: 'T&M', lastInvoice: '01 Mar 2026', nextMilestoneValue: 178000 },
+  { workspaceId: 'ws-008', contractValue: 2100000, spent: 840000, forecast: 2100000, variance: 0, currency: 'AED', billingModel: 'Fixed Fee', lastInvoice: '20 Feb 2026', nextMilestoneValue: 525000 },
+];
+
+export interface Milestone {
+  id: string;
+  workspaceId: string;
+  title: string;
+  dueDate: string;
+  status: 'Completed' | 'On Track' | 'At Risk' | 'Delayed' | 'Upcoming';
+  value: number;
+  owner: string;
+  completionPct: number;
+}
+
+export const milestones: Milestone[] = [
+  { id: 'ms-001', workspaceId: 'ws-001', title: 'Phase 1: Requirements Finalization', dueDate: '15 Jan 2026', status: 'Completed', value: 840000, owner: 'AM', completionPct: 100 },
+  { id: 'ms-002', workspaceId: 'ws-001', title: 'Phase 2: Architecture Design Delivery', dueDate: '28 Feb 2026', status: 'Completed', value: 1050000, owner: 'AM', completionPct: 100 },
+  { id: 'ms-003', workspaceId: 'ws-001', title: 'Phase 3: Pilot Implementation', dueDate: '15 Apr 2026', status: 'On Track', value: 1260000, owner: 'SK', completionPct: 62 },
+  { id: 'ms-004', workspaceId: 'ws-001', title: 'Phase 4: Full Rollout & Go-Live', dueDate: '30 Jun 2026', status: 'Upcoming', value: 1050000, owner: 'AM', completionPct: 0 },
+  { id: 'ms-005', workspaceId: 'ws-003', title: 'ENB Core Banking Go-Live', dueDate: '01 Apr 2026', status: 'On Track', value: 1120000, owner: 'DN', completionPct: 91 },
+  { id: 'ms-006', workspaceId: 'ws-003', title: 'UAT Signoff & User Training', dueDate: '15 Mar 2026', status: 'At Risk', value: 560000, owner: 'DN', completionPct: 75 },
+  { id: 'ms-007', workspaceId: 'ws-005', title: 'Smart City Package 1 Delivery', dueDate: '31 Mar 2026', status: 'On Track', value: 2040000, owner: 'JL', completionPct: 78 },
+  { id: 'ms-008', workspaceId: 'ws-005', title: 'Smart City Package 3 Commencement', dueDate: '01 May 2026', status: 'At Risk', value: 1360000, owner: 'JL', completionPct: 15 },
+  { id: 'ms-009', workspaceId: 'ws-002', title: 'Supply Chain Process Design', dueDate: '30 Apr 2026', status: 'On Track', value: 1050000, owner: 'RT', completionPct: 45 },
+  { id: 'ms-010', workspaceId: 'ws-004', title: 'Q1 Procurement Advisory Retainer', dueDate: '31 Mar 2026', status: 'Completed', value: 487500, owner: 'FH', completionPct: 100 },
+];
+
+export interface PortfolioKPI {
+  label: string;
+  value: string;
+  subValue: string;
+  trend: string;
+  trendUp: boolean;
+  color: string;
+  icon: string;
+}
+
+export const portfolioKPIs: PortfolioKPI[] = [
+  { label: 'Total Portfolio Value', value: 'AED 23.4M', subValue: '8 active engagements', trend: '+12%', trendUp: true, color: '#00D4FF', icon: 'portfolio' },
+  { label: 'Revenue Recognized', value: 'AED 13.3M', subValue: '57% of portfolio', trend: '+8%', trendUp: true, color: '#10B981', icon: 'revenue' },
+  { label: 'Budget at Risk', value: 'AED 540K', subValue: '2 engagements over forecast', trend: '+AED 150K', trendUp: false, color: '#EF4444', icon: 'risk' },
+  { label: 'Milestones Due (30d)', value: '6', subValue: '4 on track - 2 at risk', trend: '2 at risk', trendUp: false, color: '#F59E0B', icon: 'milestone' },
+  { label: 'On-Time Delivery Rate', value: '87%', subValue: 'vs 82% last quarter', trend: '+5pp', trendUp: true, color: '#8B5CF6', icon: 'delivery' },
+  { label: 'Client Satisfaction', value: '4.6/5', subValue: 'NPS +62 across 6 clients', trend: '+0.2', trendUp: true, color: '#EC4899', icon: 'satisfaction' },
+];
+
+export interface BoardDecision {
+  id: string;
+  title: string;
+  committee: string;
+  date: string;
+  status: 'Closed' | 'Pending Implementation' | 'Deferred' | 'In Progress';
+  owner: string;
+  dueDate: string;
+  workspaceId: string;
+  priority: 'Critical' | 'High' | 'Medium';
+}
+
+export const boardDecisions: BoardDecision[] = [
+  { id: 'BD-001', title: 'Approve NCA Phase 3 scope extension and AED 420K supplementary budget', committee: 'Steering Committee', date: '10 Mar 2026', status: 'Pending Implementation', owner: 'AM', dueDate: '20 Mar 2026', workspaceId: 'ws-001', priority: 'Critical' },
+  { id: 'BD-002', title: 'Award ADNOC ERP integration contract to Vendor B', committee: 'Procurement Committee', date: '05 Mar 2026', status: 'In Progress', owner: 'RT', dueDate: '15 Mar 2026', workspaceId: 'ws-002', priority: 'High' },
+  { id: 'BD-003', title: 'Approve Smart City Package 3 mobilization plan and contractor change', committee: 'PMO Board', date: '28 Feb 2026', status: 'In Progress', owner: 'JL', dueDate: '01 Apr 2026', workspaceId: 'ws-005', priority: 'Critical' },
+  { id: 'BD-004', title: 'Sign-off ENB UAT results and proceed to production deployment', committee: 'Steering Committee', date: '12 Mar 2026', status: 'Pending Implementation', owner: 'DN', dueDate: '25 Mar 2026', workspaceId: 'ws-003', priority: 'High' },
+  { id: 'BD-005', title: 'Approve Healthcare Digital Strategy Phase 2 commencement', committee: 'Executive Committee', date: '01 Mar 2026', status: 'Deferred', owner: 'SK', dueDate: '31 Mar 2026', workspaceId: 'ws-008', priority: 'Medium' },
+  { id: 'BD-006', title: 'Ratify MOCI vendor evaluation results and issue award letter', committee: 'Procurement Committee', date: '20 Feb 2026', status: 'Closed', owner: 'FH', dueDate: '01 Mar 2026', workspaceId: 'ws-004', priority: 'High' },
+];
+
+export const ragStatusData = [
+  { workspace: 'NCA Digital Transformation', rag: 'Green' as const, budget: 'Green' as const, schedule: 'Green' as const, risk: 'Amber' as const, lastUpdated: '12 Mar 2026' },
+  { workspace: 'ADNOC Supply Chain', rag: 'Amber' as const, budget: 'Amber' as const, schedule: 'Green' as const, risk: 'Amber' as const, lastUpdated: '10 Mar 2026' },
+  { workspace: 'Banking Core Transformation', rag: 'Green' as const, budget: 'Green' as const, schedule: 'Amber' as const, risk: 'Green' as const, lastUpdated: '12 Mar 2026' },
+  { workspace: 'MOCI Procurement Reform', rag: 'Green' as const, budget: 'Amber' as const, schedule: 'Green' as const, risk: 'Green' as const, lastUpdated: '11 Mar 2026' },
+  { workspace: 'Smart City Infrastructure PMO', rag: 'Amber' as const, budget: 'Red' as const, schedule: 'Amber' as const, risk: 'Red' as const, lastUpdated: '13 Mar 2026' },
+  { workspace: 'Healthcare Digital Strategy', rag: 'Green' as const, budget: 'Green' as const, schedule: 'Green' as const, risk: 'Green' as const, lastUpdated: '09 Mar 2026' },
+  { workspace: 'NCBE Regulatory Compliance', rag: 'Green' as const, budget: 'Green' as const, schedule: 'Green' as const, risk: 'Green' as const, lastUpdated: '10 Mar 2026' },
+  { workspace: 'Ministry Digital Services', rag: 'Green' as const, budget: 'Green' as const, schedule: 'Green' as const, risk: 'Amber' as const, lastUpdated: '12 Mar 2026' },
+];
+
+export const deliveryTrendData = [
+  { month: 'Sep', onTime: 6, delayed: 2, atRisk: 1, value: 3.2 },
+  { month: 'Oct', onTime: 7, delayed: 1, atRisk: 2, value: 3.8 },
+  { month: 'Nov', onTime: 8, delayed: 2, atRisk: 1, value: 4.1 },
+  { month: 'Dec', onTime: 5, delayed: 3, atRisk: 2, value: 2.9 },
+  { month: 'Jan', onTime: 9, delayed: 1, atRisk: 1, value: 4.8 },
+  { month: 'Feb', onTime: 8, delayed: 2, atRisk: 2, value: 4.3 },
+  { month: 'Mar', onTime: 7, delayed: 1, atRisk: 2, value: 4.6 },
+];

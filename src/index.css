@@ -672,4 +672,112 @@
       min-height: 40px;
     }
   }
+
+  /* ── RAG Status Indicators ── */
+  .rag-green {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #10B981;
+    box-shadow: 0 0 6px rgba(16,185,129,0.5);
+  }
+  .rag-amber {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #F59E0B;
+    box-shadow: 0 0 6px rgba(245,158,11,0.5);
+  }
+  .rag-red {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #EF4444;
+    box-shadow: 0 0 6px rgba(239,68,68,0.5);
+  }
+
+  /* ── Risk Heatmap Cell Colors ── */
+  .heatmap-low { background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.2); }
+  .heatmap-medium { background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.2); }
+  .heatmap-high { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.2); }
+  .heatmap-critical { background: rgba(239,68,68,0.25); border: 1px solid rgba(239,68,68,0.35); }
+
+  /* ── Board Pack Card ── */
+  .board-pack-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 1.25rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .board-pack-card:hover {
+    background: rgba(14,165,233,0.06);
+    border-color: rgba(14,165,233,0.25);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  }
+
+  /* ── Financial Badge ── */
+  .financial-positive { color: #34D399; font-weight: 700; }
+  .financial-negative { color: #FCA5A5; font-weight: 700; }
+  .financial-neutral { color: #94A3B8; font-weight: 600; }
+
+  /* ── Governance Metric Card ── */
+  .governance-metric {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    text-align: center;
+  }
+
+  /* ── Portfolio Banner ── */
+  .portfolio-banner {
+    background: linear-gradient(135deg, #0D1B3E 0%, #0A0F1E 50%, #0D1527 100%);
+    border: 1px solid rgba(14,165,233,0.15);
+    border-radius: 12px;
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .portfolio-banner::before {
+    content: '';
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 200px; height: 200px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,212,255,0.08) 0%, transparent 70%);
+  }
+
+  /* ── Premium Hero Number ── */
+  .hero-number {
+    font-size: 2rem;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+  .hero-number-lg {
+    font-size: 2.5rem;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: -0.03em;
+  }
+
+  /* ── Milestone Progress ── */
+  .milestone-bar {
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.07);
+    overflow: hidden;
+    margin-top: 4px;
+  }
+  .milestone-fill-green { background: linear-gradient(90deg, #10B981, #34D399); }
+  .milestone-fill-amber { background: linear-gradient(90deg, #F59E0B, #FCD34D); }
+  .milestone-fill-red { background: linear-gradient(90deg, #EF4444, #FCA5A5); }
+  .milestone-fill-blue { background: linear-gradient(90deg, #0EA5E9, #00D4FF); }
+
+  /* ── Card Hover ── */
+  .card-hover {
+    transition: all 0.2s;
+  }
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    border-color: rgba(255,255,255,0.12) !important;
+  }
 }

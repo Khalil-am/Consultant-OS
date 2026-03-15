@@ -398,10 +398,71 @@ export default function MeetingDetail() {
         </div>
       )}
 
-      {/* Placeholder tabs */}
-      {!['Meeting Info', 'Agenda', 'Decisions', 'Action Items', 'Notes'].includes(activeTab) && (
-        <div className="section-card" style={{ padding: '3rem', textAlign: 'center' }}>
-          <div style={{ color: '#475569', fontSize: '0.875rem' }}>{activeTab} for {meeting.title}</div>
+      {/* Attachments Tab */}
+      {activeTab === 'Attachments' && (
+        <div className="section-card">
+          <div className="section-card-header">
+            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Meeting Attachments</span>
+            <button className="btn-ghost" style={{ padding: '0.25rem 0.75rem', fontSize: '0.72rem', height: '28px', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+              <FileText size={12} /> Upload
+            </button>
+          </div>
+          <div style={{ padding: '0.5rem 0' }}>
+            {[
+              { name: 'NCA Enterprise Architecture BRD v2.3.pdf', size: '4.2 MB', type: 'PDF', uploaded: '12 Mar 2026', uploader: 'AM' },
+              { name: 'SC-09 Meeting Minutes APPROVED.docx', size: '1.1 MB', type: 'DOCX', uploaded: '11 Mar 2026', uploader: 'DN' },
+              { name: 'Phase 2 Architecture Slides.pptx', size: '8.7 MB', type: 'PPTX', uploaded: '12 Mar 2026', uploader: 'SK' },
+              { name: 'Budget Variance Analysis Q1.xlsx', size: '0.9 MB', type: 'XLSX', uploaded: '10 Mar 2026', uploader: 'RT' },
+            ].map((file, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem 1.25rem', borderBottom: i < 3 ? '1px solid rgba(255,255,255,0.04)' : 'none', cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                <div style={{ padding: '0.5rem', borderRadius: '6px', background: file.type === 'PDF' ? 'rgba(239,68,68,0.1)' : file.type === 'PPTX' ? 'rgba(245,158,11,0.1)' : file.type === 'XLSX' ? 'rgba(16,185,129,0.1)' : 'rgba(14,165,233,0.1)', color: file.type === 'PDF' ? '#FCA5A5' : file.type === 'PPTX' ? '#FCD34D' : file.type === 'XLSX' ? '#34D399' : '#38BDF8', flexShrink: 0, fontSize: '0.6rem', fontWeight: 700 }}>
+                  {file.type}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F1F5F9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</div>
+                  <div style={{ fontSize: '0.7rem', color: '#475569' }}>{file.size} · Uploaded {file.uploaded} by {file.uploader}</div>
+                </div>
+                <button style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.2)', borderRadius: '6px', padding: '0.25rem 0.625rem', color: '#38BDF8', fontSize: '0.72rem', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>Download</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Generated Outputs Tab */}
+      {activeTab === 'Generated Outputs' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="section-card">
+            <div className="section-card-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Sparkles size={14} style={{ color: '#8B5CF6' }} />
+                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>AI-Generated Outputs</span>
+              </div>
+              <button className="btn-ai" style={{ padding: '0.25rem 0.875rem', fontSize: '0.72rem', height: '28px', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                <Sparkles size={11} /> Regenerate
+              </button>
+            </div>
+            <div style={{ padding: '0.5rem 0' }}>
+              {[
+                { name: 'SC-09 Meeting Minutes – Final.docx', type: 'Minutes', status: 'Ready', generated: '12 Mar 2026 14:32', pages: 8, color: '#10B981' },
+                { name: 'Action Items Register – SC-09.xlsx', type: 'Action Items', status: 'Ready', generated: '12 Mar 2026 14:33', pages: 2, color: '#0EA5E9' },
+                { name: 'Decision Log Update – March 2026.docx', type: 'Decision Log', status: 'Ready', generated: '12 Mar 2026 14:34', pages: 4, color: '#8B5CF6' },
+                { name: 'SC-09 Executive Summary.pdf', type: 'Executive Summary', status: 'Draft', generated: '12 Mar 2026 14:35', pages: 3, color: '#F59E0B' },
+              ].map((output, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.875rem 1.25rem', borderBottom: i < 3 ? '1px solid rgba(255,255,255,0.04)' : 'none', cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                  <div style={{ padding: '0.375rem', borderRadius: '6px', background: `${output.color}15`, color: output.color, flexShrink: 0 }}>
+                    <FileText size={14} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#F1F5F9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{output.name}</div>
+                    <div style={{ fontSize: '0.7rem', color: '#475569' }}>{output.pages} pages · Generated {output.generated}</div>
+                  </div>
+                  <span style={{ fontSize: '0.65rem', padding: '2px 7px', borderRadius: '4px', background: output.status === 'Ready' ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', color: output.status === 'Ready' ? '#34D399' : '#FCD34D', border: `1px solid ${output.status === 'Ready' ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.2)'}`, flexShrink: 0 }}>{output.status}</span>
+                  <button style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.2)', borderRadius: '6px', padding: '0.25rem 0.625rem', color: '#38BDF8', fontSize: '0.72rem', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>Download</button>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>

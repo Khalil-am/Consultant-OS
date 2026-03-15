@@ -364,20 +364,169 @@ export default function Admin() {
           </div>
         )}
 
-        {/* Placeholder sections */}
-        {!['users', 'integrations', 'ai', 'audit'].includes(activeSection) && (
+        {/* Workspaces Section */}
+        {activeSection === 'workspaces' && (
           <div>
-            <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9', margin: 0, marginBottom: '1.25rem' }}>
-              {adminSections.find(s => s.id === activeSection)?.label}
-            </h2>
-            <div className="section-card" style={{ padding: '3rem', textAlign: 'center' }}>
-              <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>⚙️</div>
-              <div style={{ color: '#475569', fontSize: '0.875rem' }}>
-                {adminSections.find(s => s.id === activeSection)?.label} configuration panel
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+              <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9', margin: 0 }}>Workspace Configuration</h2>
+              <button className="btn-primary" style={{ height: '34px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}><Plus size={14} /> New Workspace</button>
+            </div>
+            <div className="section-card">
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
+                  <thead>
+                    <tr>
+                      {['Workspace Name', 'Type', 'Members', 'Language', 'Confidentiality', 'Status', 'Actions'].map(h => (
+                        <th key={h} style={{ padding: '0.625rem 1rem', textAlign: 'left', fontSize: '0.65rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid rgba(255,255,255,0.06)', whiteSpace: 'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { name: 'NCA Digital Transformation', type: 'Client', members: 4, lang: 'Bilingual', conf: 'Confidential', status: 'Active' },
+                      { name: 'ADNOC Supply Chain', type: 'Client', members: 3, lang: 'EN', conf: 'Restricted', status: 'Active' },
+                      { name: 'Banking Core Transformation', type: 'Client', members: 5, lang: 'EN', conf: 'Confidential', status: 'Active' },
+                      { name: 'Smart City Infrastructure PMO', type: 'Project', members: 6, lang: 'AR', conf: 'Public', status: 'Active' },
+                      { name: 'Internal Templates', type: 'Internal', members: 10, lang: 'Bilingual', conf: 'Internal', status: 'Active' },
+                    ].map((ws, i) => (
+                      <tr key={i} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', fontWeight: 500, color: '#F1F5F9', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>{ws.name}</td>
+                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', color: '#94A3B8', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>{ws.type}</td>
+                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', color: '#94A3B8', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>{ws.members}</td>
+                        <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}><span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: 'rgba(14,165,233,0.1)', color: '#38BDF8', border: '1px solid rgba(14,165,233,0.2)' }}>{ws.lang}</span></td>
+                        <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}><span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: ws.conf === 'Confidential' ? 'rgba(239,68,68,0.1)' : ws.conf === 'Restricted' ? 'rgba(245,158,11,0.1)' : 'rgba(148,163,184,0.07)', color: ws.conf === 'Confidential' ? '#FCA5A5' : ws.conf === 'Restricted' ? '#FCD34D' : '#94A3B8' }}>{ws.conf}</span></td>
+                        <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}><span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: 'rgba(16,185,129,0.1)', color: '#34D399' }}>Active</span></td>
+                        <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                          <button style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '3px 8px', fontSize: '0.68rem', color: '#94A3B8', cursor: 'pointer', fontFamily: 'inherit' }}>Configure</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              <div style={{ color: '#334155', fontSize: '0.78rem', marginTop: '0.375rem' }}>
-                Settings for this section are available here
-              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Prompt Library Section */}
+        {activeSection === 'prompts' && (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+              <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9', margin: 0 }}>Prompt Library</h2>
+              <button className="btn-ai" style={{ height: '34px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}><Plus size={14} /> New Prompt</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {[
+                { name: 'BRD Section Extractor', category: 'BA & Requirements', model: 'Claude Opus 4', tokens: '2,400', lastUsed: '2h ago', uses: 284 },
+                { name: 'Meeting Minutes Generator', category: 'Meetings', model: 'Claude Sonnet 4', tokens: '3,100', lastUsed: '3h ago', uses: 512 },
+                { name: 'Executive Summary Writer', category: 'Reporting', model: 'Claude Opus 4', tokens: '1,800', lastUsed: '1d ago', uses: 98 },
+                { name: 'Risk Register Analyzer', category: 'PMO', model: 'Claude Sonnet 4', tokens: '2,200', lastUsed: '1d ago', uses: 147 },
+                { name: 'Procurement Comparison Engine', category: 'Procurement', model: 'Claude Opus 4', tokens: '4,500', lastUsed: '2d ago', uses: 63 },
+                { name: 'Arabic-English Terminology Mapper', category: 'Knowledge', model: 'Claude Sonnet 4', tokens: '1,200', lastUsed: '5h ago', uses: 331 },
+              ].map((prompt, i) => (
+                <div key={i} className="section-card" style={{ padding: '0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.875rem 1.125rem', cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                    <div style={{ padding: '0.5rem', borderRadius: '8px', background: 'rgba(139,92,246,0.1)', color: '#A78BFA', flexShrink: 0 }}>
+                      <FileText size={15} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#F1F5F9' }}>{prompt.name}</div>
+                      <div style={{ fontSize: '0.72rem', color: '#475569' }}>{prompt.category} · {prompt.model} · ~{prompt.tokens} tokens</div>
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 600 }}>{prompt.uses} uses</div>
+                      <div style={{ fontSize: '0.65rem', color: '#334155' }}>{prompt.lastUsed}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.375rem', flexShrink: 0 }}>
+                      <button style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '3px 8px', fontSize: '0.68rem', color: '#94A3B8', cursor: 'pointer', fontFamily: 'inherit' }}>Edit</button>
+                      <button style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.2)', borderRadius: '4px', padding: '3px 8px', fontSize: '0.68rem', color: '#38BDF8', cursor: 'pointer', fontFamily: 'inherit' }}>Test</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Notifications Section */}
+        {activeSection === 'notifications' && (
+          <div>
+            <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9', margin: 0, marginBottom: '1.25rem' }}>Notification Rules</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {[
+                { event: 'Automation completed successfully', channels: ['In-App', 'Email'], enabled: true },
+                { event: 'Automation failed or errored', channels: ['In-App', 'Email', 'Slack'], enabled: true },
+                { event: 'Document requires approval', channels: ['In-App', 'Email'], enabled: true },
+                { event: 'Task overdue (>1 day)', channels: ['In-App', 'Email'], enabled: true },
+                { event: 'New critical risk identified', channels: ['In-App', 'Email', 'Slack'], enabled: true },
+                { event: 'Meeting minutes generated', channels: ['In-App'], enabled: true },
+                { event: 'Board decision requires sign-off', channels: ['In-App', 'Email'], enabled: true },
+                { event: 'Weekly digest (every Monday 8am)', channels: ['Email'], enabled: false },
+              ].map((rule, i) => (
+                <div key={i} className="section-card" style={{ padding: '0.875rem 1.125rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 500, color: '#F1F5F9' }}>{rule.event}</div>
+                      <div style={{ display: 'flex', gap: '0.375rem', marginTop: '0.375rem' }}>
+                        {rule.channels.map(ch => (
+                          <span key={ch} style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(14,165,233,0.1)', color: '#38BDF8', border: '1px solid rgba(14,165,233,0.15)' }}>{ch}</span>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+                      <span style={{ fontSize: '0.72rem', color: rule.enabled ? '#34D399' : '#475569' }}>{rule.enabled ? 'Enabled' : 'Disabled'}</span>
+                      <div style={{ width: '36px', height: '20px', borderRadius: '10px', background: rule.enabled ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.08)', cursor: 'pointer', position: 'relative', border: `1px solid ${rule.enabled ? 'rgba(16,185,129,0.5)' : 'rgba(255,255,255,0.1)'}` }}>
+                        <div style={{ position: 'absolute', top: '3px', left: rule.enabled ? '18px' : '3px', width: '12px', height: '12px', borderRadius: '50%', background: rule.enabled ? '#10B981' : '#475569', transition: 'left 0.2s ease' }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Approval Rules Section */}
+        {activeSection === 'approvals' && (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+              <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9', margin: 0 }}>Approval Workflow Rules</h2>
+              <button className="btn-primary" style={{ height: '34px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}><Plus size={14} /> New Rule</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {[
+                { trigger: 'Document marked "Final"', approvers: ['Workspace Admin', 'Client Contact'], sla: '48h', escalation: 'Programme Director', status: 'Active' },
+                { trigger: 'AI-generated report published', approvers: ['Consultant', 'Manager'], sla: '24h', escalation: 'Team Lead', status: 'Active' },
+                { trigger: 'Budget variance > AED 100K', approvers: ['PMO Director', 'Finance'], sla: '12h', escalation: 'Managing Partner', status: 'Active' },
+                { trigger: 'New vendor awarded (procurement)', approvers: ['Committee Chair', 'Legal'], sla: '72h', escalation: 'Board', status: 'Active' },
+                { trigger: 'Risk severity upgraded to Critical', approvers: ['Risk Owner', 'Programme Director'], sla: '6h', escalation: 'Board', status: 'Active' },
+              ].map((rule, i) => (
+                <div key={i} className="section-card" style={{ padding: '0.875rem 1.125rem' }}>
+                  <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    <div style={{ flex: 1, minWidth: '200px' }}>
+                      <div style={{ fontSize: '0.68rem', color: '#475569', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Trigger</div>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#F1F5F9' }}>{rule.trigger}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.68rem', color: '#475569', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Approvers</div>
+                      <div style={{ display: 'flex', gap: '0.375rem', flexWrap: 'wrap' }}>
+                        {rule.approvers.map(a => <span key={a} style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: 'rgba(139,92,246,0.1)', color: '#C4B5FD', border: '1px solid rgba(139,92,246,0.2)' }}>{a}</span>)}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.68rem', color: '#475569', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>SLA</div>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#FCD34D' }}>{rule.sla}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.68rem', color: '#475569', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Escalation</div>
+                      <div style={{ fontSize: '0.78rem', color: '#FCA5A5' }}>{rule.escalation}</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: '4px', background: 'rgba(16,185,129,0.1)', color: '#34D399', border: '1px solid rgba(16,185,129,0.2)' }}>Active</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
