@@ -174,10 +174,10 @@ export default function Dashboard() {
               Board Overview · 15 March 2026
             </div>
             <h1 style={{ margin: 0, fontSize: isMobile ? '1.25rem' : '1.5rem', fontWeight: 900, color: '#F1F5F9', letterSpacing: '-0.02em' }}>
-              Portfolio Command Center
+              Client Command Center
             </h1>
             <p style={{ margin: 0, fontSize: '0.8rem', color: '#475569', marginTop: '0.25rem' }}>
-              8 active engagements · AED 23.4M total portfolio · Last updated 13 Mar 2026
+              8 active clients · AED 23.4M total engagement value · Last updated 13 Mar 2026
             </p>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -256,7 +256,7 @@ export default function Dashboard() {
           <div className="section-card-header">
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Activity size={14} style={{ color: '#00D4FF' }} />
-              <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Portfolio Health Matrix</span>
+              <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Client Health Matrix</span>
             </div>
             <button className="btn-ghost" style={{ padding: '0.25rem 0.625rem', fontSize: '0.72rem' }} onClick={() => navigate('/workspaces')}>
               All Workspaces
@@ -436,7 +436,7 @@ export default function Dashboard() {
               <TrendingUp size={14} style={{ color: '#10B981' }} />
               <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Delivery Performance Trend</span>
             </div>
-            <span style={{ fontSize: '0.7rem', color: '#475569' }}>7-month portfolio delivery trend</span>
+            <span style={{ fontSize: '0.7rem', color: '#475569' }}>7-month client delivery trend</span>
           </div>
           <div style={{ padding: '0.75rem 0.25rem 0.5rem' }}>
             <div style={{ display: 'flex', gap: '1.25rem', padding: '0 1rem', marginBottom: '0.75rem' }}>
