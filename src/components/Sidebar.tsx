@@ -88,7 +88,7 @@ export default function Sidebar() {
           <img
             src="/logo.png"
             alt="Consultant OS"
-            style={{ height: '36px', width: 'auto', objectFit: 'contain', flexShrink: 0 }}
+            style={{ height: '72px', width: 'auto', objectFit: 'contain', flexShrink: 0 }}
           />
         </div>
         {isTablet && (
