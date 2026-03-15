@@ -21,6 +21,46 @@ export interface WorkspaceRow {
   updated_at: string;
 }
 
+export interface WorkspaceFinancialRow {
+  id: string;
+  workspace_id: string;
+  contract_value: number;
+  spent: number;
+  forecast: number;
+  variance: number;
+  currency: string;
+  billing_model: string;
+  last_invoice: string;
+  next_milestone_value: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkspaceRagStatusRow {
+  id: string;
+  workspace_id: string;
+  rag: 'Green' | 'Amber' | 'Red';
+  budget: 'Green' | 'Amber' | 'Red';
+  schedule: 'Green' | 'Amber' | 'Red';
+  risk: 'Green' | 'Amber' | 'Red';
+  last_updated: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MilestoneRow {
+  id: string;
+  workspace_id: string;
+  title: string;
+  due_date: string;
+  status: 'Completed' | 'On Track' | 'At Risk' | 'Delayed' | 'Upcoming';
+  value: number;
+  owner: string;
+  completion_pct: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface DocumentRow {
   id: string;
   name: string;
@@ -81,6 +121,7 @@ export interface RiskRow {
   id: string;
   title: string;
   workspace: string;
+  workspace_id: string;
   probability: number;
   impact: number;
   severity: 'Critical' | 'High' | 'Medium' | 'Low';
@@ -100,6 +141,7 @@ export interface ReportRow {
   type: string;
   type_color: string;
   workspace: string;
+  workspace_id: string | null;
   date: string;
   status: 'Generated' | 'Scheduled' | 'Draft';
   pages: number;
@@ -115,55 +157,20 @@ export interface ActivityRow {
   action: string;
   target: string;
   workspace: string | null;
+  workspace_id: string | null;
   time: string;
   type: string;
   created_at: string;
 }
 
-export interface WorkspaceFinancialRow {
-  id: string;
-  workspace_id: string;
-  workspace_name: string;
-  contract_value: number;
-  invoiced: number;
-  collected: number;
-  outstanding: number;
-  budget_spent: number;
-  budget_total: number;
-  forecast_completion: number;
-  rag_status: 'Green' | 'Amber' | 'Red';
-  created_at: string;
-  updated_at: string;
-}
-
-// ── Insert types (omit server-generated fields) ──────────────
+// ── Insert types ─────────────────────────────────────────────
 export type WorkspaceInsert = Omit<WorkspaceRow, 'created_at' | 'updated_at'>;
+export type WorkspaceFinancialInsert = Omit<WorkspaceFinancialRow, 'created_at' | 'updated_at'>;
+export type WorkspaceRagStatusInsert = Omit<WorkspaceRagStatusRow, 'created_at' | 'updated_at'>;
+export type MilestoneInsert = Omit<MilestoneRow, 'created_at' | 'updated_at'>;
 export type DocumentInsert = Omit<DocumentRow, 'created_at' | 'updated_at'>;
 export type MeetingInsert = Omit<MeetingRow, 'created_at' | 'updated_at'>;
 export type TaskInsert = Omit<TaskRow, 'created_at' | 'updated_at'>;
-export type RiskInsert = Omit<RiskRow, 'created_at' | 'updated_at'>;
-export type ReportInsert = Omit<ReportRow, 'created_at' | 'updated_at'>;
-export type ActivityInsert = Omit<ActivityRow, 'created_at'>;
-export type WorkspaceFinancialInsert = Omit<WorkspaceFinancialRow, 'created_at' | 'updated_at'>;
-
-// ── Update types ─────────────────────────────────────────────
 export type TaskUpdate = Partial<TaskInsert>;
-
-// ── Database interface for createClient<Database> ────────────
-export interface Database {
-  public: {
-    Tables: {
-      workspaces: { Row: WorkspaceRow; Insert: WorkspaceInsert; Update: Partial<WorkspaceInsert> };
-      documents: { Row: DocumentRow; Insert: DocumentInsert; Update: Partial<DocumentInsert> };
-      meetings: { Row: MeetingRow; Insert: MeetingInsert; Update: Partial<MeetingInsert> };
-      tasks: { Row: TaskRow; Insert: TaskInsert; Update: Partial<TaskInsert> };
-      risks: { Row: RiskRow; Insert: RiskInsert; Update: Partial<RiskInsert> };
-      reports: { Row: ReportRow; Insert: ReportInsert; Update: Partial<ReportInsert> };
-      activities: { Row: ActivityRow; Insert: ActivityInsert; Update: Partial<ActivityInsert> };
-      workspace_financials: { Row: WorkspaceFinancialRow; Insert: WorkspaceFinancialInsert; Update: Partial<WorkspaceFinancialInsert> };
-    };
-    Views: Record<string, never>;
-    Functions: Record<string, never>;
-    Enums: Record<string, never>;
-  };
-}
+export type RiskInsert = Omit<RiskRow, 'created_at' | 'updated_at'>;
+export type ActivityInsert = Omit<ActivityRow, 'created_at'>;

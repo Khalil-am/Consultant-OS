@@ -1,9 +1,8 @@
 -- ============================================================
--- CONSULTANT OS – Supabase Schema
+-- CONSULTANT OS – Supabase Schema (v2)
 -- Run this in the Supabase SQL Editor
 -- ============================================================
 
--- Enable UUID extension
 create extension if not exists "uuid-ossp";
 
 -- ============================================================
@@ -25,6 +24,55 @@ create table if not exists workspaces (
   contributors text[] not null default '{}',
   last_activity text not null default 'Just now',
   description text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- ============================================================
+-- WORKSPACE FINANCIALS
+-- ============================================================
+create table if not exists workspace_financials (
+  id text primary key,
+  workspace_id text not null references workspaces(id) on delete cascade,
+  contract_value numeric not null default 0,
+  spent numeric not null default 0,
+  forecast numeric not null default 0,
+  variance numeric not null default 0,
+  currency text not null default 'AED',
+  billing_model text not null default 'Fixed Fee',
+  last_invoice text not null default '',
+  next_milestone_value numeric not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- ============================================================
+-- WORKSPACE RAG STATUS
+-- ============================================================
+create table if not exists workspace_rag_status (
+  id text primary key,
+  workspace_id text not null unique references workspaces(id) on delete cascade,
+  rag text not null check (rag in ('Green', 'Amber', 'Red')) default 'Green',
+  budget text not null check (budget in ('Green', 'Amber', 'Red')) default 'Green',
+  schedule text not null check (schedule in ('Green', 'Amber', 'Red')) default 'Green',
+  risk text not null check (risk in ('Green', 'Amber', 'Red')) default 'Green',
+  last_updated text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- ============================================================
+-- MILESTONES
+-- ============================================================
+create table if not exists milestones (
+  id text primary key,
+  workspace_id text not null references workspaces(id) on delete cascade,
+  title text not null,
+  due_date text not null,
+  status text not null check (status in ('Completed', 'On Track', 'At Risk', 'Delayed', 'Upcoming')) default 'Upcoming',
+  value numeric not null default 0,
+  owner text not null default '',
+  completion_pct integer not null default 0 check (completion_pct >= 0 and completion_pct <= 100),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -101,6 +149,7 @@ create table if not exists risks (
   id text primary key,
   title text not null,
   workspace text not null,
+  workspace_id text not null references workspaces(id) on delete cascade,
   probability integer not null check (probability >= 1 and probability <= 5),
   impact integer not null check (impact >= 1 and impact <= 5),
   severity text not null check (severity in ('Critical', 'High', 'Medium', 'Low')),
@@ -123,6 +172,7 @@ create table if not exists reports (
   type text not null,
   type_color text not null default '#0EA5E9',
   workspace text not null,
+  workspace_id text references workspaces(id) on delete set null,
   date text not null,
   status text not null check (status in ('Generated', 'Scheduled', 'Draft')) default 'Draft',
   pages integer not null default 1,
@@ -141,77 +191,43 @@ create table if not exists activities (
   action text not null,
   target text not null,
   workspace text,
+  workspace_id text references workspaces(id) on delete set null,
   time text not null,
   type text not null,
   created_at timestamptz not null default now()
 );
 
 -- ============================================================
--- WORKSPACE FINANCIALS
--- ============================================================
-create table if not exists workspace_financials (
-  id text primary key,
-  workspace_id text not null references workspaces(id) on delete cascade,
-  workspace_name text not null,
-  contract_value numeric not null default 0,
-  invoiced numeric not null default 0,
-  collected numeric not null default 0,
-  outstanding numeric not null default 0,
-  budget_spent numeric not null default 0,
-  budget_total numeric not null default 0,
-  forecast_completion numeric not null default 0,
-  rag_status text not null check (rag_status in ('Green', 'Amber', 'Red')) default 'Green',
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
--- ============================================================
--- ROW LEVEL SECURITY (open read for anon, restrict writes)
+-- ROW LEVEL SECURITY
 -- ============================================================
 alter table workspaces enable row level security;
+alter table workspace_financials enable row level security;
+alter table workspace_rag_status enable row level security;
+alter table milestones enable row level security;
 alter table documents enable row level security;
 alter table meetings enable row level security;
 alter table tasks enable row level security;
 alter table risks enable row level security;
 alter table reports enable row level security;
 alter table activities enable row level security;
-alter table workspace_financials enable row level security;
 
--- Allow anon read access to all tables
-create policy "Allow anon read workspaces" on workspaces for select using (true);
-create policy "Allow anon read documents" on documents for select using (true);
-create policy "Allow anon read meetings" on meetings for select using (true);
-create policy "Allow anon read tasks" on tasks for select using (true);
-create policy "Allow anon read risks" on risks for select using (true);
-create policy "Allow anon read reports" on reports for select using (true);
-create policy "Allow anon read activities" on activities for select using (true);
-create policy "Allow anon read workspace_financials" on workspace_financials for select using (true);
-
--- Allow anon insert/update/delete (remove in production, add auth)
-create policy "Allow anon write workspaces" on workspaces for all using (true);
-create policy "Allow anon write documents" on documents for all using (true);
-create policy "Allow anon write meetings" on meetings for all using (true);
-create policy "Allow anon write tasks" on tasks for all using (true);
-create policy "Allow anon write risks" on risks for all using (true);
-create policy "Allow anon write reports" on reports for all using (true);
-create policy "Allow anon write activities" on activities for all using (true);
-create policy "Allow anon write workspace_financials" on workspace_financials for all using (true);
+-- Allow full access (update to auth-based policies in production)
+do $$ declare t text; begin
+  foreach t in array array['workspaces','workspace_financials','workspace_rag_status','milestones','documents','meetings','tasks','risks','reports','activities'] loop
+    execute format('create policy "anon_all_%s" on %s for all using (true) with check (true)', t, t);
+  end loop;
+end $$;
 
 -- ============================================================
 -- UPDATED_AT TRIGGER
 -- ============================================================
 create or replace function update_updated_at()
 returns trigger as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
+begin new.updated_at = now(); return new; end;
 $$ language plpgsql;
 
-create trigger set_updated_at before update on workspaces for each row execute function update_updated_at();
-create trigger set_updated_at before update on documents for each row execute function update_updated_at();
-create trigger set_updated_at before update on meetings for each row execute function update_updated_at();
-create trigger set_updated_at before update on tasks for each row execute function update_updated_at();
-create trigger set_updated_at before update on risks for each row execute function update_updated_at();
-create trigger set_updated_at before update on reports for each row execute function update_updated_at();
-create trigger set_updated_at before update on workspace_financials for each row execute function update_updated_at();
+do $$ declare t text; begin
+  foreach t in array array['workspaces','workspace_financials','workspace_rag_status','milestones','documents','meetings','tasks','risks','reports'] loop
+    execute format('create trigger set_updated_at before update on %s for each row execute function update_updated_at()', t);
+  end loop;
+end $$;
