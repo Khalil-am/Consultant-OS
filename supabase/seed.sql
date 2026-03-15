@@ -32,8 +32,9 @@ insert into workspace_financials (id, workspace_id, workspace_name, contract_val
 ('fin-007','ws-007','Internal Quality Framework',890000,445000,870000,-20000,'SAR','T&M','01 Mar 2026',178000),
 ('fin-008','ws-008','Retail Digital Commerce',2100000,840000,2100000,0,'SAR','Fixed Fee','20 Feb 2026',525000)
 on conflict (id) do update set
+  workspace_name = excluded.workspace_name,
   contract_value = excluded.contract_value, spent = excluded.spent, forecast = excluded.forecast,
-  variance = excluded.variance, billing_model = excluded.billing_model,
+  variance = excluded.variance, currency = excluded.currency, billing_model = excluded.billing_model,
   last_invoice = excluded.last_invoice, next_milestone_value = excluded.next_milestone_value,
   updated_at = now();
 
