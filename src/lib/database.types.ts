@@ -24,6 +24,7 @@ export interface WorkspaceRow {
 export interface WorkspaceFinancialRow {
   id: string;
   workspace_id: string;
+  workspace_name: string;
   contract_value: number;
   spent: number;
   forecast: number;
