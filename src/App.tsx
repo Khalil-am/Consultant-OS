@@ -1,4 +1,5 @@
 import { HashRouter, Routes, Route } from 'react-router-dom';
+import { LayoutProvider, useLayout } from './hooks/useLayout';
 import Sidebar from './components/Sidebar';
 import TopBar from './components/TopBar';
 import Dashboard from './screens/Dashboard';
@@ -17,25 +18,26 @@ import Templates from './screens/Templates';
 import Admin from './screens/Admin';
 
 function AppShell() {
+  const { sidebarOpen, setSidebarOpen, isTablet } = useLayout();
+
   return (
-    <div
-      style={{
-        display: 'flex',
-        height: '100vh',
-        overflow: 'hidden',
-        background: '#0A0F1E',
-      }}
-    >
-      <Sidebar />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <TopBar />
-        <main
+    <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden', background: '#0A0F1E', position: 'relative' }}>
+      {/* Mobile overlay */}
+      {isTablet && sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
           style={{
-            flex: 1,
-            overflowY: 'auto',
-            background: '#0A0F1E',
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+            zIndex: 49, backdropFilter: 'blur(2px)',
           }}
-        >
+        />
+      )}
+
+      <Sidebar />
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+        <TopBar />
+        <main style={{ flex: 1, overflowY: 'auto', background: '#0A0F1E' }}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/workspaces" element={<Workspaces />} />
@@ -61,7 +63,9 @@ function AppShell() {
 export default function App() {
   return (
     <HashRouter>
-      <AppShell />
+      <LayoutProvider>
+        <AppShell />
+      </LayoutProvider>
     </HashRouter>
   );
 }

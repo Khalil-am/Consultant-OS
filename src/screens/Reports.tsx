@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLayout } from '../hooks/useLayout';
 import {
   BarChart3, Download, Share, Eye, Plus, Calendar,
   TrendingUp, AlertTriangle, CheckCircle, Sparkles
@@ -48,6 +49,7 @@ const reportVolumeData = [
 ];
 
 export default function Reports() {
+  const { width, isMobile, isTablet } = useLayout();
   const [activeCategory, setActiveCategory] = useState('All Reports');
   const [reportType, setReportType] = useState('Weekly Status Report');
   const [selectedWorkspace, setSelectedWorkspace] = useState('All Workspaces');
@@ -63,9 +65,9 @@ export default function Reports() {
   });
 
   return (
-    <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div style={{ padding: isMobile ? '0.875rem' : '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.875rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 768 ? 4 : 2}, 1fr)`, gap: '0.875rem' }}>
         {[
           { label: 'Reports This Month', value: '8', color: '#0EA5E9' },
           { label: 'Scheduled Reports', value: '3', color: '#8B5CF6' },
@@ -94,10 +96,10 @@ export default function Reports() {
       </div>
 
       {/* Main Layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '1.25rem', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isTablet ? '1fr' : '1fr 320px', gap: '1.25rem', alignItems: 'start' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           {/* Reports Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.875rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 1100 ? 3 : width >= 640 ? 2 : 1}, 1fr)`, gap: '0.875rem' }}>
             {filtered.map(report => (
               <div
                 key={report.id}

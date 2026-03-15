@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useLayout } from '../hooks/useLayout';
 import {
   Search, Upload, GitCompare, FileText, Download, Filter,
   ChevronRight, ExternalLink, Sparkles, Eye
@@ -24,6 +25,7 @@ const statusFilters = ['All', 'Draft', 'Under Review', 'Approved', 'Final'];
 
 export default function Documents() {
   const navigate = useNavigate();
+  const { width, isMobile, isTablet } = useLayout();
   const [activeFolder, setActiveFolder] = useState('All Documents');
   const [activeStatus, setActiveStatus] = useState('All');
   const [search, setSearch] = useState('');
@@ -44,7 +46,7 @@ export default function Documents() {
       {/* Left sidebar - Folders */}
       <div style={{
         width: '200px', minWidth: '200px', borderRight: '1px solid rgba(255,255,255,0.06)',
-        display: 'flex', flexDirection: 'column', overflowY: 'auto', background: '#0D1527',
+        display: isTablet ? 'none' : 'flex', flexDirection: 'column', overflowY: 'auto', background: '#0D1527',
         padding: '1rem 0.75rem',
       }}>
         <div style={{ fontSize: '0.68rem', color: '#334155', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.625rem', paddingLeft: '0.25rem' }}>
@@ -75,7 +77,7 @@ export default function Documents() {
       </div>
 
       {/* Main area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
         {/* Toolbar */}
         <div style={{
           padding: '0.875rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.06)',

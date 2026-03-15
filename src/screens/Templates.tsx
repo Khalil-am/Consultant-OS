@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLayout } from '../hooks/useLayout';
 import {
   Search, Eye, Plus, Star, FileText, BarChart3, Users,
   BookOpen, Table, AlertTriangle, CheckSquare, Globe
@@ -41,6 +42,7 @@ const formatColors: Record<string, { bg: string; text: string }> = {
 };
 
 export default function Templates() {
+  const { width, isMobile, isTablet } = useLayout();
   const [activeFilter, setActiveFilter] = useState('All');
   const [search, setSearch] = useState('');
   const [starred, setStarred] = useState<Set<string>>(new Set(templates.filter(t => t.featured).map(t => t.id)));
@@ -55,9 +57,9 @@ export default function Templates() {
   const featured = templates.filter(t => t.featured);
 
   return (
-    <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div style={{ padding: isMobile ? '0.875rem' : '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.875rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 1100 ? 4 : width >= 768 ? 3 : width >= 500 ? 2 : 1}, 1fr)`, gap: '0.875rem' }}>
         {[
           { label: 'Total Templates', value: templates.length, color: '#0EA5E9' },
           { label: 'Featured', value: templates.filter(t => t.featured).length, color: '#F59E0B' },
@@ -79,7 +81,7 @@ export default function Templates() {
             <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#F1F5F9' }}>Featured Templates</span>
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.875rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 1100 ? 4 : width >= 768 ? 3 : width >= 500 ? 2 : 1}, 1fr)`, gap: '0.875rem' }}>
           {featured.slice(0, 4).map(tpl => {
             const color = categoryColors[tpl.category] || '#0EA5E9';
             return (
@@ -163,7 +165,7 @@ export default function Templates() {
       </div>
 
       {/* All Templates Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.875rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 900 ? 3 : width >= 600 ? 2 : 1}, 1fr)`, gap: '0.875rem' }}>
         {filtered.map(tpl => {
           const color = categoryColors[tpl.category] || '#0EA5E9';
           const isStarred = starred.has(tpl.id);

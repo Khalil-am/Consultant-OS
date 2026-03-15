@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useLayout } from '../hooks/useLayout';
 import {
   Search, Star, Play, Settings, TrendingUp, Clock, Zap, CheckCircle
 } from 'lucide-react';
@@ -20,6 +21,7 @@ const categoryIcons: Record<string, string> = {
 
 export default function Automations() {
   const navigate = useNavigate();
+  const { width, isMobile, isTablet } = useLayout();
   const [activeCategory, setActiveCategory] = useState('All');
   const [search, setSearch] = useState('');
   const [starred, setStarred] = useState<Set<string>>(new Set(automations.filter(a => a.starred).map(a => a.id)));
@@ -42,9 +44,9 @@ export default function Automations() {
   };
 
   return (
-    <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div style={{ padding: isMobile ? '0.875rem' : '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.875rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 768 ? 4 : 2}, 1fr)`, gap: '0.875rem' }}>
         {[
           { label: 'Total Automations', value: '14', icon: <Zap size={16} />, color: '#00D4FF' },
           { label: 'Runs This Month', value: '1,284', icon: <Play size={16} />, color: '#10B981' },
@@ -94,7 +96,7 @@ export default function Automations() {
       </div>
 
       {/* Automation Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 1100 ? 3 : width >= 640 ? 2 : 1}, 1fr)`, gap: '1rem' }}>
         {filtered.map(auto => (
           <div
             key={auto.id}

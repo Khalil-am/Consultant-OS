@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLayout } from '../hooks/useLayout';
 import {
   Users, Briefcase, Zap, Brain, FileText, Bell, Shield,
   List, Check, X, Settings, Plus, RefreshCw, ExternalLink
@@ -58,6 +59,7 @@ const rolePermissions = [
 ];
 
 export default function Admin() {
+  const { width, isMobile, isTablet } = useLayout();
   const [activeSection, setActiveSection] = useState('users');
 
   return (
@@ -83,7 +85,7 @@ export default function Admin() {
       </div>
 
       {/* Main Content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '0.875rem' : '1.5rem' }}>
         {/* Users & Roles */}
         {activeSection === 'users' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -99,6 +101,7 @@ export default function Admin() {
 
             {/* Users Table */}
             <div className="section-card">
+              <div style={{ overflowX: 'auto' }}>
               <table className="data-table">
                 <thead>
                   <tr>
@@ -163,6 +166,7 @@ export default function Admin() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
 
             {/* Role Permissions Matrix */}
@@ -229,7 +233,7 @@ export default function Admin() {
               return (
                 <div key={category} style={{ marginBottom: '1.5rem' }}>
                   <div style={{ fontSize: '0.72rem', color: '#334155', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.75rem' }}>{category}</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 900 ? 3 : width >= 600 ? 2 : 1}, 1fr)`, gap: '0.75rem' }}>
                     {catItems.map(integration => (
                       <div key={integration.name} className="elevated-card" style={{ padding: '1rem' }}>
                         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.625rem' }}>
@@ -330,6 +334,7 @@ export default function Admin() {
               </button>
             </div>
             <div className="section-card">
+              <div style={{ overflowX: 'auto' }}>
               <table className="data-table">
                 <thead>
                   <tr>
@@ -354,6 +359,7 @@ export default function Admin() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           </div>
         )}

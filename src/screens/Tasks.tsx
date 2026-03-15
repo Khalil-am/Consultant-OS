@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLayout } from '../hooks/useLayout';
 import {
   AlertTriangle, CheckSquare, Clock, TrendingUp, Plus, Filter
 } from 'lucide-react';
@@ -19,14 +20,15 @@ const priorityColors: Record<string, string> = {
 };
 
 export default function Tasks() {
+  const { width, isMobile, isTablet } = useLayout();
   const [activeView, setActiveView] = useState<'Tasks' | 'Risks'>('Tasks');
 
   const tasksByStatus = (status: string) => tasks.filter(t => t.status === status);
 
   return (
-    <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div style={{ padding: isMobile ? '0.875rem' : '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       {/* Summary Metrics */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.875rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 768 ? 4 : 2}, 1fr)`, gap: '0.875rem' }}>
         {[
           { label: 'Total Tasks', value: tasks.length, icon: <CheckSquare size={16} />, color: '#0EA5E9' },
           { label: 'Overdue', value: tasks.filter(t => t.status === 'Overdue').length, icon: <Clock size={16} />, color: '#EF4444' },
@@ -167,7 +169,7 @@ export default function Tasks() {
       {activeView === 'Risks' && (
         <div>
           {/* Risk Summary Bar */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', marginBottom: '1.25rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 768 ? 4 : 2}, 1fr)`, gap: '0.75rem', marginBottom: '1.25rem' }}>
             {[
               { label: 'Critical', count: risks.filter(r => r.severity === 'Critical').length, color: '#EF4444', bg: 'rgba(239,68,68,0.1)' },
               { label: 'High', count: risks.filter(r => r.severity === 'High').length, color: '#F59E0B', bg: 'rgba(245,158,11,0.1)' },
@@ -190,6 +192,7 @@ export default function Tasks() {
               <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Risk Register</span>
               <span style={{ fontSize: '0.75rem', color: '#475569' }}>{risks.length} risks across 8 workspaces</span>
             </div>
+            <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
               <thead>
                 <tr>
@@ -266,6 +269,7 @@ export default function Tasks() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}

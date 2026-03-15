@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useLayout } from '../hooks/useLayout';
 import {
   ArrowLeft, FileText, Video, CheckSquare, AlertTriangle,
   Calendar, Users, TrendingUp, MoreHorizontal, Plus, ExternalLink,
@@ -10,6 +11,7 @@ import { workspaces, documents, meetings, tasks, risks } from '../data/mockData'
 const tabs = ['Overview', 'Documents', 'Requirements', 'Meetings', 'Decisions', 'Tasks', 'Risks', 'Reports', 'Automations'];
 
 export default function WorkspaceDetail() {
+  const { width, isMobile, isTablet } = useLayout();
   const { id } = useParams();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('Overview');
@@ -36,7 +38,7 @@ export default function WorkspaceDetail() {
   ];
 
   return (
-    <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div style={{ padding: isMobile ? '0.875rem' : '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       {/* Back + Header */}
       <div>
         <button
@@ -109,7 +111,7 @@ export default function WorkspaceDetail() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid rgba(255,255,255,0.06)', overflowX: 'auto' }}>
         {tabs.map(tab => (
           <button
             key={tab}
@@ -151,7 +153,7 @@ export default function WorkspaceDetail() {
           </div>
 
           {/* 2-col layout */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isTablet ? '1fr' : '1fr 1fr', gap: '1rem' }}>
             {/* Recent Documents */}
             <div className="section-card">
               <div className="section-card-header">
@@ -237,7 +239,7 @@ export default function WorkspaceDetail() {
           </div>
 
           {/* Decisions + Upcoming Meetings */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isTablet ? '1fr' : '1fr 1fr', gap: '1rem' }}>
             {/* Recent Decisions */}
             <div className="section-card">
               <div className="section-card-header">
@@ -318,6 +320,7 @@ export default function WorkspaceDetail() {
               <Plus size={13} /> Upload Document
             </button>
           </div>
+          <div style={{ overflowX: 'auto' }}>
           <table className="data-table">
             <thead>
               <tr>
@@ -355,6 +358,7 @@ export default function WorkspaceDetail() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -367,6 +371,7 @@ export default function WorkspaceDetail() {
               <Plus size={13} /> New Task
             </button>
           </div>
+          <div style={{ overflowX: 'auto' }}>
           <table className="data-table">
             <thead>
               <tr>
@@ -406,6 +411,7 @@ export default function WorkspaceDetail() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -415,6 +421,7 @@ export default function WorkspaceDetail() {
           <div className="section-card-header">
             <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Risk Register ({wsRisks.length})</span>
           </div>
+          <div style={{ overflowX: 'auto' }}>
           <table className="data-table">
             <thead>
               <tr>
@@ -451,6 +458,7 @@ export default function WorkspaceDetail() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

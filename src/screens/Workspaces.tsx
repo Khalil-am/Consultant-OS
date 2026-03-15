@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Plus, Grid3X3, List, FileText, Video, CheckSquare, ChevronRight } from 'lucide-react';
 import { workspaces } from '../data/mockData';
+import { useLayout } from '../hooks/useLayout';
 
 const filterTabs = ['All', 'Client', 'Project', 'Internal', 'Procurement', 'Committee'];
 
@@ -31,6 +32,7 @@ const avatarColors = [
 
 export default function Workspaces() {
   const navigate = useNavigate();
+  const { width, isMobile } = useLayout();
   const [activeFilter, setActiveFilter] = useState('All');
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -42,10 +44,13 @@ export default function Workspaces() {
     return matchFilter && matchSearch;
   });
 
+  const statCols = width >= 768 ? 4 : 2;
+  const gridCols = width >= 1100 ? 3 : width >= 700 ? 2 : 1;
+
   return (
-    <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div style={{ padding: isMobile ? '0.875rem' : '1.5rem', display: 'flex', flexDirection: 'column', gap: isMobile ? '0.875rem' : '1.25rem' }}>
       {/* Header Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.875rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${statCols}, 1fr)`, gap: '0.875rem' }}>
         {[
           { label: 'Total Workspaces', value: '8', color: '#0EA5E9' },
           { label: 'Active Clients', value: '6', color: '#10B981' },
@@ -128,7 +133,7 @@ export default function Workspaces() {
       {/* Grid */}
       <div style={{
         display: viewMode === 'grid' ? 'grid' : 'flex',
-        gridTemplateColumns: viewMode === 'grid' ? 'repeat(3, 1fr)' : undefined,
+        gridTemplateColumns: viewMode === 'grid' ? `repeat(${gridCols}, 1fr)` : undefined,
         flexDirection: viewMode === 'list' ? 'column' : undefined,
         gap: '1rem',
       }}>

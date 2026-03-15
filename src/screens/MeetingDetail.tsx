@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useLayout } from '../hooks/useLayout';
 import {
   ArrowLeft, Video, Users, Clock, MapPin, Calendar,
   Sparkles, CheckSquare, FileText, Plus, Check, AlertCircle
@@ -34,6 +35,7 @@ const sampleAgenda = [
 ];
 
 export default function MeetingDetail() {
+  const { width, isMobile, isTablet } = useLayout();
   const { id } = useParams();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('Meeting Info');
@@ -42,7 +44,7 @@ export default function MeetingDetail() {
   const isCommittee = meeting.type === 'Committee' || meeting.type === 'Steering';
 
   return (
-    <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div style={{ padding: isMobile ? '0.875rem' : '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       {/* Back */}
       <div>
         <button
@@ -155,7 +157,7 @@ export default function MeetingDetail() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.06)', overflowX: 'auto' }}>
         {tabs.map(tab => (
           <button
             key={tab}
@@ -170,7 +172,7 @@ export default function MeetingDetail() {
 
       {/* Meeting Info */}
       {activeTab === 'Meeting Info' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.25rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isTablet ? '1fr' : '2fr 1fr', gap: '1.25rem' }}>
           <div className="section-card">
             <div className="section-card-header">
               <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Meeting Details</span>
@@ -235,6 +237,7 @@ export default function MeetingDetail() {
               <Plus size={12} /> Add Item
             </button>
           </div>
+          <div style={{ overflowX: 'auto' }}>
           <table className="data-table">
             <thead>
               <tr>
@@ -259,6 +262,7 @@ export default function MeetingDetail() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -271,6 +275,7 @@ export default function MeetingDetail() {
               <Sparkles size={12} /> AI Extract Decisions
             </button>
           </div>
+          <div style={{ overflowX: 'auto' }}>
           <table className="data-table">
             <thead>
               <tr>
@@ -301,6 +306,7 @@ export default function MeetingDetail() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -318,6 +324,7 @@ export default function MeetingDetail() {
               </button>
             </div>
           </div>
+          <div style={{ overflowX: 'auto' }}>
           <table className="data-table">
             <thead>
               <tr>
@@ -358,6 +365,7 @@ export default function MeetingDetail() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

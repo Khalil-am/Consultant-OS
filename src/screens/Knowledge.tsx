@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLayout } from '../hooks/useLayout';
 import {
   Search, Sparkles, ExternalLink, TrendingUp, Filter,
   FileText, Video, CheckSquare, Brain, ArrowRight, Send
@@ -95,6 +96,7 @@ const filters = [
 ];
 
 export default function Knowledge() {
+  const { width, isMobile, isTablet } = useLayout();
   const [query, setQuery] = useState('integration requirements NCA ADNOC');
   const [hasResults, setHasResults] = useState(true);
   const [chatInput, setChatInput] = useState('');
@@ -103,7 +105,9 @@ export default function Knowledge() {
     <div style={{ display: 'flex', height: 'calc(100vh - 64px)', overflow: 'hidden' }}>
       {/* Left Filter Panel */}
       <div style={{
-        width: '220px', minWidth: '220px', borderRight: '1px solid rgba(255,255,255,0.06)',
+        width: isTablet ? '100%' : '220px', minWidth: isTablet ? undefined : '220px',
+        borderRight: isTablet ? 'none' : '1px solid rgba(255,255,255,0.06)',
+        display: isTablet ? 'none' : 'block',
         padding: '1rem 0.875rem', overflowY: 'auto', background: '#0D1527',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
@@ -242,8 +246,9 @@ export default function Knowledge() {
 
       {/* Right AI Answer Panel */}
       <div style={{
-        width: '320px', minWidth: '320px', borderLeft: '1px solid rgba(255,255,255,0.06)',
-        display: 'flex', flexDirection: 'column', overflowY: 'auto', background: '#0D1527',
+        width: isTablet ? '100%' : '320px', minWidth: isTablet ? undefined : '320px',
+        borderLeft: isTablet ? 'none' : '1px solid rgba(255,255,255,0.06)',
+        display: isTablet ? 'none' : 'flex', flexDirection: 'column', overflowY: 'auto', background: '#0D1527',
       }}>
         {/* AI Answer */}
         <div style={{

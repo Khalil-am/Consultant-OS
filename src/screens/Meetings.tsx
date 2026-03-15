@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useLayout } from '../hooks/useLayout';
 import {
   Plus, Video, Users, Clock, CheckCircle, FileText,
   ChevronRight, Calendar, MapPin, Filter
@@ -33,6 +34,7 @@ const meetingDates = new Set(['14', '15', '18', '20', '22']);
 
 export default function Meetings() {
   const navigate = useNavigate();
+  const { width, isMobile, isTablet } = useLayout();
   const [activeFilter, setActiveFilter] = useState('All');
 
   const filtered = meetings.filter(m => {
@@ -42,11 +44,11 @@ export default function Meetings() {
   });
 
   return (
-    <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div style={{ padding: isMobile ? '0.875rem' : '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       {/* Header Row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.25rem' }}>
         {/* Stats */}
-        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.875rem' }}>
+        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: `repeat(${width >= 768 ? 4 : 2}, 1fr)`, gap: '0.875rem' }}>
           {[
             { label: 'Total Meetings', value: meetings.length.toString(), color: '#8B5CF6' },
             { label: 'Upcoming', value: meetings.filter(m => m.status === 'Upcoming').length.toString(), color: '#0EA5E9' },
@@ -62,7 +64,7 @@ export default function Meetings() {
       </div>
 
       {/* Main Content */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 220px', gap: '1.25rem', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isTablet ? '1fr' : '1fr 220px', gap: '1.25rem', alignItems: 'start' }}>
         <div>
           {/* Toolbar */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
