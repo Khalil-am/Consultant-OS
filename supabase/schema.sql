@@ -228,6 +228,7 @@ $$ language plpgsql;
 
 do $$ declare t text; begin
   foreach t in array array['workspaces','workspace_financials','workspace_rag_status','milestones','documents','meetings','tasks','risks','reports'] loop
+    execute format('drop trigger if exists set_updated_at on %s', t);
     execute format('create trigger set_updated_at before update on %s for each row execute function update_updated_at()', t);
   end loop;
 end $$;
