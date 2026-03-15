@@ -18,10 +18,10 @@ const tabs = ['Overview', 'Documents', 'Meetings', 'Tasks', 'Risks'];
 
 const RAG_COLORS: Record<string, string> = { Green: '#10B981', Amber: '#F59E0B', Red: '#EF4444' };
 
-function fmtAED(val: number): string {
-  if (val >= 1_000_000) return `AED ${(val / 1_000_000).toFixed(1)}M`;
-  if (val >= 1_000) return `AED ${(val / 1_000).toFixed(0)}K`;
-  return `AED ${val.toLocaleString()}`;
+function fmtSAR(val: number): string {
+  if (val >= 1_000_000) return `⃁${(val / 1_000_000).toFixed(1)}M`;
+  if (val >= 1_000) return `⃁${(val / 1_000).toFixed(0)}K`;
+  return `⃁${val.toLocaleString()}`;
 }
 
 const milestoneStatusColor: Record<string, string> = {
@@ -255,10 +255,10 @@ export default function WorkspaceDetail() {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 768 ? 4 : 2}, 1fr)`, gap: '0.875rem', marginBottom: '1rem' }}>
                 {[
-                  { label: 'Contract Value', value: fmtAED(fin.contract_value), color: '#00D4FF', icon: <DollarSign size={14} /> },
-                  { label: 'Spent to Date', value: fmtAED(fin.spent), color: spentPct !== null && spentPct >= 95 ? '#EF4444' : spentPct !== null && spentPct >= 80 ? '#F59E0B' : '#10B981', icon: <TrendingUp size={14} /> },
-                  { label: 'Forecast at Completion', value: fmtAED(fin.forecast), color: '#8B5CF6', icon: <TrendingUp size={14} /> },
-                  { label: 'Variance', value: fin.variance === 0 ? 'On Budget' : (fin.variance > 0 ? '+' : '') + fmtAED(Math.abs(fin.variance)), color: fin.variance <= 0 ? '#34D399' : '#FCA5A5', icon: fin.variance > 0 ? <TrendingDown size={14} /> : <TrendingUp size={14} /> },
+                  { label: 'Contract Value', value: fmtSAR(fin.contract_value), color: '#00D4FF', icon: <DollarSign size={14} /> },
+                  { label: 'Spent to Date', value: fmtSAR(fin.spent), color: spentPct !== null && spentPct >= 95 ? '#EF4444' : spentPct !== null && spentPct >= 80 ? '#F59E0B' : '#10B981', icon: <TrendingUp size={14} /> },
+                  { label: 'Forecast at Completion', value: fmtSAR(fin.forecast), color: '#8B5CF6', icon: <TrendingUp size={14} /> },
+                  { label: 'Variance', value: fin.variance === 0 ? 'On Budget' : (fin.variance > 0 ? '+' : '') + fmtSAR(Math.abs(fin.variance)), color: fin.variance <= 0 ? '#34D399' : '#FCA5A5', icon: fin.variance > 0 ? <TrendingDown size={14} /> : <TrendingUp size={14} /> },
                 ].map(m => (
                   <div key={m.label} style={{ padding: '0.875rem', borderRadius: '8px', background: `${m.color}08`, border: `1px solid ${m.color}20` }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.375rem', color: m.color }}>{m.icon}<span style={{ fontSize: '0.65rem', color: '#475569' }}>{m.label}</span></div>
@@ -277,7 +277,7 @@ export default function WorkspaceDetail() {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.375rem' }}>
                     <span style={{ fontSize: '0.65rem', color: '#334155' }}>Last Invoice: {fin.last_invoice || '—'}</span>
-                    <span style={{ fontSize: '0.65rem', color: '#F59E0B' }}>Next Milestone: {fmtAED(fin.next_milestone_value)}</span>
+                    <span style={{ fontSize: '0.65rem', color: '#F59E0B' }}>Next Milestone: {fmtSAR(fin.next_milestone_value)}</span>
                   </div>
                 </div>
               )}
@@ -309,7 +309,7 @@ export default function WorkspaceDetail() {
                               <span style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 600, flexShrink: 0 }}>{ms.completion_pct}%</span>
                             </div>
                           </td>
-                          <td style={{ fontSize: '0.78rem', color: '#F59E0B', fontWeight: 600 }}>{fmtAED(ms.value)}</td>
+                          <td style={{ fontSize: '0.78rem', color: '#F59E0B', fontWeight: 600 }}>{fmtSAR(ms.value)}</td>
                           <td><div className="avatar" style={{ width: '22px', height: '22px', fontSize: '0.58rem' }}>{ms.owner}</div></td>
                           <td><span style={{ fontSize: '0.68rem', padding: '2px 6px', borderRadius: '4px', background: `${sc}15`, color: sc, border: `1px solid ${sc}25` }}>{ms.status}</span></td>
                         </tr>
@@ -580,7 +580,7 @@ export default function WorkspaceDetail() {
                     <td><span className={`status-risk-${risk.severity.toLowerCase()}`}>{risk.severity}</span></td>
                     <td><span className={risk.status === 'Mitigated' || risk.status === 'Closed' ? 'status-approved' : risk.status === 'Monitoring' ? 'status-review' : 'status-pending'} style={{ fontSize: '0.65rem' }}>{risk.status}</span></td>
                     <td><div className="avatar" style={{ width: '24px', height: '24px', fontSize: '0.62rem' }}>{risk.owner.split(' ').map(n => n[0]).join('').slice(0, 2)}</div></td>
-                    {!isMobile && <td style={{ fontSize: '0.78rem', color: '#F59E0B', fontWeight: 600 }}>{risk.financial_exposure ? fmtAED(risk.financial_exposure) : '—'}</td>}
+                    {!isMobile && <td style={{ fontSize: '0.78rem', color: '#F59E0B', fontWeight: 600 }}>{risk.financial_exposure ? fmtSAR(risk.financial_exposure) : '—'}</td>}
                   </tr>
                 ))}
                 {risks.length === 0 && <tr><td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: '#334155' }}>No risks logged</td></tr>}

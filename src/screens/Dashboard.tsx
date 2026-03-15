@@ -37,10 +37,10 @@ function RagDot({ status }: { status: 'Green' | 'Amber' | 'Red' }) {
   );
 }
 
-function fmtAED(val: number): string {
-  if (val >= 1000000) return `AED ${(val / 1000000).toFixed(1)}M`;
-  if (val >= 1000) return `AED ${(val / 1000).toFixed(0)}K`;
-  return `AED ${val.toLocaleString()}`;
+function fmtSAR(val: number): string {
+  if (val >= 1000000) return `⃁${(val / 1000000).toFixed(1)}M`;
+  if (val >= 1000) return `⃁${(val / 1000).toFixed(0)}K`;
+  return `⃁${val.toLocaleString()}`;
 }
 
 type ApprovalStatus = 'pending' | 'approved' | 'rejected';
@@ -48,7 +48,7 @@ interface Approval { id: number; title: string; requester: string; type: string;
 
 const initialApprovals: Approval[] = [
   { id: 1, title: 'NCA BRD v2.3', requester: 'AM', type: 'Document Approval', urgency: 'High', status: 'pending' },
-  { id: 2, title: 'SC-10 Budget AED 2.4M', requester: 'RT', type: 'Budget Approval', urgency: 'High', status: 'pending' },
+  { id: 2, title: 'SC-10 Budget ⃁2.4M', requester: 'RT', type: 'Budget Approval', urgency: 'High', status: 'pending' },
   { id: 3, title: 'MOCI Vendor Shortlist', requester: 'FH', type: 'Procurement Decision', urgency: 'Medium', status: 'pending' },
   { id: 4, title: 'Healthcare Strategy Report', requester: 'SK', type: 'Report Sign-off', urgency: 'Low', status: 'pending' },
 ];
@@ -177,7 +177,7 @@ export default function Dashboard() {
               Client Command Center
             </h1>
             <p style={{ margin: 0, fontSize: '0.8rem', color: '#475569', marginTop: '0.25rem' }}>
-              8 active clients · AED 23.4M total engagement value · Last updated 13 Mar 2026
+              8 active clients · ⃁23.4M total engagement value · Last updated 13 Mar 2026
             </p>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -363,7 +363,7 @@ export default function Dashboard() {
                       <Calendar size={9} /> {ms.dueDate}
                     </span>
                     <span style={{ fontSize: '0.65rem', color: '#F59E0B', fontWeight: 600 }}>
-                      {fmtAED(ms.value)}
+                      {fmtSAR(ms.value)}
                     </span>
                   </div>
                 </div>
@@ -508,7 +508,7 @@ export default function Dashboard() {
                         {wsNames[wf.workspaceId] || wf.workspaceId}
                       </td>
                       <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', fontSize: '0.72rem', color: '#F1F5F9', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                        {fmtAED(wf.contractValue)}
+                        {fmtSAR(wf.contractValue)}
                       </td>
                       <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', fontSize: '0.72rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                         <span style={{ color: spentPct >= 95 ? '#FCA5A5' : spentPct >= 80 ? '#FCD34D' : '#34D399', fontWeight: 600 }}>
@@ -516,7 +516,7 @@ export default function Dashboard() {
                         </span>
                       </td>
                       <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', fontSize: '0.72rem', fontWeight: 700, color: varColor, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                        {wf.variance === 0 ? '—' : (wf.variance > 0 ? '+' : '') + fmtAED(wf.variance)}
+                        {wf.variance === 0 ? '—' : (wf.variance > 0 ? '+' : '') + fmtSAR(wf.variance)}
                       </td>
                     </tr>
                   );
@@ -525,12 +525,12 @@ export default function Dashboard() {
               <tfoot>
                 <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
                   <td style={{ padding: '0.5rem 0.75rem', fontSize: '0.72rem', fontWeight: 700, color: '#F1F5F9' }}>Total</td>
-                  <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', fontSize: '0.72rem', fontWeight: 700, color: '#00D4FF' }}>{fmtAED(totalContract)}</td>
+                  <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', fontSize: '0.72rem', fontWeight: 700, color: '#00D4FF' }}>{fmtSAR(totalContract)}</td>
                   <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', fontSize: '0.72rem', fontWeight: 700, color: '#94A3B8' }}>
                     {Math.round((totalSpent / totalContract) * 100)}%
                   </td>
                   <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', fontSize: '0.72rem', fontWeight: 700, color: totalVariance <= 0 ? '#34D399' : '#FCA5A5' }}>
-                    {totalVariance === 0 ? '—' : (totalVariance > 0 ? '+' : '') + fmtAED(totalVariance)}
+                    {totalVariance === 0 ? '—' : (totalVariance > 0 ? '+' : '') + fmtSAR(totalVariance)}
                   </td>
                 </tr>
               </tfoot>

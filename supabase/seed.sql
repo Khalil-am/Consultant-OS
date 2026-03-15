@@ -22,15 +22,15 @@ on conflict (id) do update set
   description = excluded.description, updated_at = now();
 
 -- ── Workspace Financials ─────────────────────────────────────
-insert into workspace_financials (id, workspace_id, contract_value, spent, forecast, variance, currency, billing_model, last_invoice, next_milestone_value) values
-('fin-001','ws-001',4200000,2856000,4150000,-50000,'AED','Fixed Fee','15 Feb 2026',840000),
-('fin-002','ws-002',3500000,1575000,3650000,150000,'AED','Time & Material','01 Mar 2026',700000),
-('fin-003','ws-003',2800000,2576000,2820000,20000,'AED','Fixed Fee','28 Feb 2026',224000),
-('fin-004','ws-004',1950000,877500,1930000,-20000,'AED','Retainer','01 Mar 2026',390000),
-('fin-005','ws-005',6800000,3060000,7100000,300000,'AED','Fixed Fee','10 Mar 2026',1360000),
-('fin-006','ws-006',1200000,1080000,1250000,50000,'AED','Fixed Fee','05 Mar 2026',120000),
-('fin-007','ws-007',890000,445000,870000,-20000,'AED','T&M','01 Mar 2026',178000),
-('fin-008','ws-008',2100000,840000,2100000,0,'AED','Fixed Fee','20 Feb 2026',525000)
+insert into workspace_financials (id, workspace_id, workspace_name, contract_value, spent, forecast, variance, currency, billing_model, last_invoice, next_milestone_value) values
+('fin-001','ws-001','NCA Digital Transformation Program',4200000,2856000,4150000,-50000,'SAR','Fixed Fee','15 Feb 2026',840000),
+('fin-002','ws-002','ADNOC Supply Chain Optimization',3500000,1575000,3650000,150000,'SAR','Time & Material','01 Mar 2026',700000),
+('fin-003','ws-003','MOCI Procurement Reform',2800000,2576000,2820000,20000,'SAR','Fixed Fee','28 Feb 2026',224000),
+('fin-004','ws-004','Healthcare Digital Strategy',1950000,877500,1930000,-20000,'SAR','Retainer','01 Mar 2026',390000),
+('fin-005','ws-005','Smart City Infrastructure PMO',6800000,3060000,7100000,300000,'SAR','Fixed Fee','10 Mar 2026',1360000),
+('fin-006','ws-006','Banking Core Transformation',1200000,1080000,1250000,50000,'SAR','Fixed Fee','05 Mar 2026',120000),
+('fin-007','ws-007','Internal Quality Framework',890000,445000,870000,-20000,'SAR','T&M','01 Mar 2026',178000),
+('fin-008','ws-008','Retail Digital Commerce',2100000,840000,2100000,0,'SAR','Fixed Fee','20 Feb 2026',525000)
 on conflict (id) do update set
   contract_value = excluded.contract_value, spent = excluded.spent, forecast = excluded.forecast,
   variance = excluded.variance, billing_model = excluded.billing_model,
