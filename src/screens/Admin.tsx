@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLayout } from '../hooks/useLayout';
 import {
   Users, Briefcase, Zap, Brain, FileText, Bell, Shield,
   List, Check, X, Settings, Plus, RefreshCw, ExternalLink
 } from 'lucide-react';
 import { users } from '../data/mockData';
+import { getActivities, getWorkspaces } from '../lib/db';
+import type { ActivityRow, WorkspaceRow } from '../lib/db';
 
 const adminSections = [
   { id: 'users', label: 'Users & Roles', icon: <Users size={15} /> },
@@ -61,6 +63,16 @@ const rolePermissions = [
 export default function Admin() {
   const { width, isMobile, isTablet } = useLayout();
   const [activeSection, setActiveSection] = useState('users');
+  const [activities, setActivities] = useState<ActivityRow[]>([]);
+  const [workspaces, setWorkspaces] = useState<WorkspaceRow[]>([]);
+
+  useEffect(() => {
+    getActivities(50).then(setActivities).catch(() => {});
+    getWorkspaces().then(setWorkspaces).catch(() => {});
+  }, []);
+
+  // suppress unused warnings
+  void width;
 
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 60px)', overflow: 'hidden' }}>
@@ -346,15 +358,15 @@ export default function Admin() {
                   </tr>
                 </thead>
                 <tbody>
-                  {auditLogs.map((log, i) => (
-                    <tr key={i}>
-                      <td style={{ fontFamily: 'monospace', fontSize: '0.72rem', color: '#00D4FF' }}>{log.time}</td>
+                  {(activities.length > 0 ? activities : auditLogs.map((l, i) => ({ id: String(i), user: l.user, action: l.action, target: l.resource, workspace: '', workspace_id: null, time: l.time, type: 'system', created_at: l.time }))).map((log) => (
+                    <tr key={log.id}>
+                      <td style={{ fontFamily: 'monospace', fontSize: '0.72rem', color: '#00D4FF' }}>{log.created_at?.slice(0, 16).replace('T', ' ')}</td>
                       <td>
-                        <div className="avatar" style={{ width: '22px', height: '22px', fontSize: '0.6rem', display: 'inline-flex' }}>{log.user}</div>
+                        <div className="avatar" style={{ width: '22px', height: '22px', fontSize: '0.6rem', display: 'inline-flex' }}>{(log.user || '').slice(0, 2).toUpperCase()}</div>
                       </td>
                       <td style={{ fontSize: '0.82rem', color: '#F1F5F9', fontWeight: 500 }}>{log.action}</td>
-                      <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.78rem' }}>{log.resource}</td>
-                      <td style={{ fontFamily: 'monospace', fontSize: '0.72rem' }}>{log.ip}</td>
+                      <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.78rem' }}>{log.target}</td>
+                      <td style={{ fontFamily: 'monospace', fontSize: '0.72rem', color: 'var(--text-muted)' }}>{log.workspace || '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -382,20 +394,16 @@ export default function Admin() {
                     </tr>
                   </thead>
                   <tbody>
-                    {[
-                      { name: 'NCA Digital Transformation', type: 'Client', members: 4, lang: 'Bilingual', conf: 'Confidential', status: 'Active' },
-                      { name: 'ADNOC Supply Chain', type: 'Client', members: 3, lang: 'EN', conf: 'Restricted', status: 'Active' },
-                      { name: 'Banking Core Transformation', type: 'Client', members: 5, lang: 'EN', conf: 'Confidential', status: 'Active' },
-                      { name: 'Smart City Infrastructure PMO', type: 'Project', members: 6, lang: 'AR', conf: 'Public', status: 'Active' },
-                      { name: 'Internal Templates', type: 'Internal', members: 10, lang: 'Bilingual', conf: 'Internal', status: 'Active' },
-                    ].map((ws, i) => (
-                      <tr key={i} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                    {workspaces.map((ws) => (
+                      <tr key={ws.id} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                         <td style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', fontWeight: 500, color: '#F1F5F9', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>{ws.name}</td>
                         <td style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', color: '#94A3B8', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>{ws.type}</td>
-                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', color: '#94A3B8', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>{ws.members}</td>
-                        <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}><span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: 'rgba(14,165,233,0.1)', color: '#38BDF8', border: '1px solid rgba(14,165,233,0.2)' }}>{ws.lang}</span></td>
-                        <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}><span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: ws.conf === 'Confidential' ? 'rgba(239,68,68,0.1)' : ws.conf === 'Restricted' ? 'rgba(245,158,11,0.1)' : 'rgba(148,163,184,0.07)', color: ws.conf === 'Confidential' ? '#FCA5A5' : ws.conf === 'Restricted' ? '#FCD34D' : '#94A3B8' }}>{ws.conf}</span></td>
-                        <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}><span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: 'rgba(16,185,129,0.1)', color: '#34D399' }}>Active</span></td>
+                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', color: '#94A3B8', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>{ws.contributors?.length ?? 0}</td>
+                        <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}><span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: 'rgba(14,165,233,0.1)', color: '#38BDF8', border: '1px solid rgba(14,165,233,0.2)' }}>{ws.language}</span></td>
+                        <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}><span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: 'rgba(148,163,184,0.07)', color: '#94A3B8' }}>{ws.sector}</span></td>
+                        <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                          <span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: ws.status === 'Active' ? 'rgba(16,185,129,0.1)' : 'rgba(100,116,139,0.1)', color: ws.status === 'Active' ? '#34D399' : '#94A3B8' }}>{ws.status}</span>
+                        </td>
                         <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                           <button style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '3px 8px', fontSize: '0.68rem', color: '#94A3B8', cursor: 'pointer', fontFamily: 'inherit' }}>Configure</button>
                         </td>
