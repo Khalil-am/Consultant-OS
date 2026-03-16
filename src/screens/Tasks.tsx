@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { useLayout } from '../hooks/useLayout';
 import {
   AlertTriangle, CheckSquare, Clock, TrendingUp, Plus, Filter, Search,
-  ArrowRight, MoreHorizontal,
+  ArrowRight, MoreHorizontal, RefreshCw, ExternalLink, Download,
 } from 'lucide-react';
-import { getTasks, getRisks, updateTask, upsertTask, getWorkspaces } from '../lib/db';
+import { getTasks, getRisks, updateTask, upsertTask, upsertRisk, getWorkspaces } from '../lib/db';
 import type { TaskRow, RiskRow, WorkspaceRow } from '../lib/db';
 import { X } from 'lucide-react';
+import { fetchBoardData } from '../lib/trello';
+import type { BoardData, MappedTask, MappedRisk } from '../lib/trello';
 
 const kanbanColumns = [
   { key: 'Backlog',     label: 'Backlog',      color: '#475569', trackColor: 'rgba(71,85,105,0.3)' },
@@ -22,7 +24,7 @@ const priorityConfig: Record<string, { color: string; bg: string; border: string
   Low:    { color: '#34D399', bg: 'rgba(16,185,129,0.1)',   border: 'rgba(16,185,129,0.22)',  label: 'Low' },
 };
 
-type RAIDTab = 'Tasks' | 'Risks' | 'Assumptions' | 'Issues' | 'Dependencies';
+type RAIDTab = 'Tasks' | 'Risks' | 'Assumptions' | 'Issues' | 'Dependencies' | 'Trello';
 
 const assumptions = [
   { id: 'AS-001', statement: 'Steering committee approval will be obtained within 5 business days of submission', owner: 'AM', validUntil: '30 Jun 2026', status: 'Valid' },
@@ -121,11 +123,93 @@ export default function Tasks() {
     status: 'Backlog' as TaskRow['status'], due_date: '', assignee: '', description: '',
   });
 
+  // Trello integration state
+  const [trelloData, setTrelloData] = useState<BoardData | null>(null);
+  const [trelloLoading, setTrelloLoading] = useState(false);
+  const [trelloError, setTrelloError] = useState('');
+  const [trelloLastSync, setTrelloLastSync] = useState<string | null>(null);
+  const [importingTasks, setImportingTasks] = useState(false);
+  const [importingRisks, setImportingRisks] = useState(false);
+  const [importedCount, setImportedCount] = useState<{ tasks: number; risks: number } | null>(null);
+
   useEffect(() => {
     Promise.all([getTasks(), getRisks(), getWorkspaces()])
       .then(([t, r, ws]) => { setTasks(t); setRisks(r); setWorkspaces(ws); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
+
+  async function syncTrello() {
+    setTrelloLoading(true);
+    setTrelloError('');
+    setImportedCount(null);
+    try {
+      const data = await fetchBoardData();
+      setTrelloData(data);
+      setTrelloLastSync(new Date().toLocaleTimeString());
+    } catch (e) {
+      setTrelloError(e instanceof Error ? e.message : 'Failed to connect to Trello');
+    } finally {
+      setTrelloLoading(false);
+    }
+  }
+
+  async function handleImportTrelloTasks(trelloTasks: MappedTask[]) {
+    if (!trelloTasks.length) return;
+    setImportingTasks(true);
+    try {
+      const ws = workspaces[0];
+      let count = 0;
+      for (const t of trelloTasks) {
+        await upsertTask({
+          id: crypto.randomUUID(),
+          title: t.title,
+          workspace: ws?.name ?? 'Trello Import',
+          workspace_id: ws?.id ?? '',
+          priority: t.priority === 'Critical' ? 'High' : t.priority as TaskRow['priority'],
+          status: t.status as TaskRow['status'],
+          due_date: t.dueDate ?? new Date().toISOString().slice(0, 10),
+          assignee: t.assignees[0] ?? '',
+          description: t.description,
+          linked_doc: null,
+          linked_meeting: null,
+        });
+        count++;
+      }
+      setTasks(await getTasks());
+      setImportedCount(prev => ({ tasks: count, risks: prev?.risks ?? 0 }));
+    } catch { /* ignore */ }
+    finally { setImportingTasks(false); }
+  }
+
+  async function handleImportTrelloRisks(trelloRisks: MappedRisk[]) {
+    if (!trelloRisks.length) return;
+    setImportingRisks(true);
+    try {
+      const ws = workspaces[0];
+      let count = 0;
+      for (const r of trelloRisks) {
+        await upsertRisk({
+          id: crypto.randomUUID(),
+          title: r.title,
+          workspace: ws?.name ?? 'Trello Import',
+          workspace_id: ws?.id ?? '',
+          severity: r.severity,
+          status: 'Open',
+          probability: 3,
+          impact: r.severity === 'Critical' ? 5 : r.severity === 'High' ? 4 : r.severity === 'Medium' ? 3 : 2,
+          owner: r.assignees[0] ?? '',
+          mitigation: r.description || 'To be assessed',
+          date_identified: new Date().toISOString().slice(0, 10),
+          category: r.category,
+          financial_exposure: null,
+        });
+        count++;
+      }
+      setRisks(await getRisks());
+      setImportedCount(prev => ({ tasks: prev?.tasks ?? 0, risks: count }));
+    } catch { /* ignore */ }
+    finally { setImportingRisks(false); }
+  }
 
   async function handleUpdateStatus(taskId: string, newStatus: string) {
     setUpdatingTaskId(taskId);
@@ -184,20 +268,23 @@ export default function Tasks() {
     return                       { color: '#38BDF8', bg: 'rgba(14,165,233,0.12)', border: 'rgba(14,165,233,0.25)' };
   };
 
-  const raidTabs: RAIDTab[] = ['Tasks', 'Risks', 'Assumptions', 'Issues', 'Dependencies'];
+  const raidTabs: RAIDTab[] = ['Tasks', 'Risks', 'Assumptions', 'Issues', 'Dependencies', 'Trello'];
 
   const tabLabels: Record<RAIDTab, string> = {
     Tasks: 'Tasks', Risks: 'Risks', Assumptions: 'Assumptions', Issues: 'Issues', Dependencies: 'Dependencies',
+    Trello: '⬡ Trello',
   };
 
   const addLabel: Record<RAIDTab, string> = {
     Tasks: 'New Task', Risks: 'Log Risk', Assumptions: 'Add Assumption', Issues: 'Log Issue', Dependencies: 'Add Dependency',
+    Trello: 'Sync Board',
   };
 
   // suppress unused warning
   void isMobile;
   void updatingTaskId;
   void handleUpdateStatus;
+  void ArrowRight;
 
   return (
     <div className="screen-container animate-fade-in">
@@ -249,8 +336,9 @@ export default function Tasks() {
           <button className="btn-ghost" style={{ height: '34px', fontSize: '0.78rem' }}>
             <Filter size={12} /> Filter
           </button>
-          <button className="btn-primary" style={{ height: '34px', fontSize: '0.78rem' }} onClick={() => activeView === 'Tasks' && setShowNewTask(true)}>
-            <Plus size={12} /> {addLabel[activeView]}
+          <button className="btn-primary" style={{ height: '34px', fontSize: '0.78rem' }} onClick={() => activeView === 'Tasks' ? setShowNewTask(true) : activeView === 'Trello' ? syncTrello() : undefined}>
+            {activeView === 'Trello' ? <RefreshCw size={12} className={trelloLoading ? 'animate-spin' : ''} /> : <Plus size={12} />}
+            {addLabel[activeView]}
           </button>
         </div>
       </div>
@@ -708,6 +796,248 @@ export default function Tasks() {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* Trello Board View */}
+      {activeView === 'Trello' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }} className="animate-fade-in">
+
+          {/* Trello Connect Banner */}
+          {!trelloData && !trelloLoading && !trelloError && (
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(0,82,204,0.12) 0%, var(--bg-elevated) 60%, rgba(0,121,191,0.08) 100%)',
+              border: '1px solid rgba(0,121,191,0.25)', borderRadius: 'var(--radius-lg)',
+              padding: '2.5rem 2rem', textAlign: 'center',
+            }}>
+              <div style={{ width: '56px', height: '56px', background: 'rgba(0,121,191,0.15)', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem', border: '1px solid rgba(0,121,191,0.3)' }}>
+                <svg viewBox="0 0 32 32" width="28" height="28" fill="none"><rect x="2" y="2" width="12" height="28" rx="3" fill="#0052CC"/><rect x="18" y="2" width="12" height="18" rx="3" fill="#0052CC"/></svg>
+              </div>
+              <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>Connect to Trello BA Board</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.5rem', maxWidth: '420px', margin: '0 auto 1.5rem' }}>
+                Sync your Trello board to import tasks and risks directly into your RAID log. Cards are automatically mapped to status, priority, and risk category.
+              </div>
+              <button className="btn-primary" onClick={syncTrello} style={{ fontSize: '0.85rem', padding: '0.6rem 1.5rem' }}>
+                <RefreshCw size={14} /> Sync BA Board
+              </button>
+            </div>
+          )}
+
+          {/* Loading */}
+          {trelloLoading && (
+            <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', padding: '2rem', textAlign: 'center' }}>
+              <RefreshCw size={20} style={{ color: '#0052CC', animation: 'spin 1s linear infinite', margin: '0 auto 0.75rem', display: 'block' }} />
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Connecting to Trello…</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Fetching board data</div>
+            </div>
+          )}
+
+          {/* Error */}
+          {trelloError && (
+            <div style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.22)', borderRadius: 'var(--radius-lg)', padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: '0.82rem', color: '#FCA5A5' }}>{trelloError}</div>
+              <button className="btn-ghost" onClick={syncTrello} style={{ fontSize: '0.75rem', height: '30px' }}><RefreshCw size={12} /> Retry</button>
+            </div>
+          )}
+
+          {/* Board Data */}
+          {trelloData && !trelloLoading && (
+            <>
+              {/* Board Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{ width: '32px', height: '32px', background: 'rgba(0,82,204,0.15)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(0,82,204,0.3)' }}>
+                    <svg viewBox="0 0 32 32" width="18" height="18" fill="none"><rect x="2" y="2" width="12" height="28" rx="3" fill="#0052CC"/><rect x="18" y="2" width="12" height="18" rx="3" fill="#0052CC"/></svg>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>{trelloData.board.name}</div>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                      {trelloData.tasks.length} tasks · {trelloData.risks.length} risks · {trelloData.members.length} members
+                      {trelloLastSync && <span style={{ marginLeft: '0.5rem', color: 'var(--text-faint)' }}>· Last synced {trelloLastSync}</span>}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <button className="btn-ghost" onClick={syncTrello} style={{ height: '32px', fontSize: '0.75rem' }}>
+                    <RefreshCw size={12} /> Refresh
+                  </button>
+                  <a href={trelloData.board.url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', height: '32px', padding: '0 0.875rem', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', fontWeight: 600, color: '#38BDF8', background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)', textDecoration: 'none' }}>
+                    <ExternalLink size={11} /> Open in Trello
+                  </a>
+                </div>
+              </div>
+
+              {/* Import Success */}
+              {importedCount && (
+                <div style={{ background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.22)', borderRadius: 'var(--radius-md)', padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: '#34D399' }}>
+                  <CheckSquare size={14} /> Imported {importedCount.tasks} task{importedCount.tasks !== 1 ? 's' : ''} and {importedCount.risks} risk{importedCount.risks !== 1 ? 's' : ''} into your RAID log
+                  <button onClick={() => setImportedCount(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#34D399', display: 'flex', alignItems: 'center' }}><X size={13} /></button>
+                </div>
+              )}
+
+              {/* Tasks Section */}
+              <div className="section-card">
+                <div className="section-card-header">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <CheckSquare size={14} style={{ color: '#0EA5E9' }} />
+                    <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>Tasks from Trello</span>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '1px 7px', borderRadius: '9999px', background: 'rgba(14,165,233,0.12)', color: '#38BDF8', border: '1px solid rgba(14,165,233,0.22)' }}>{trelloData.tasks.length}</span>
+                  </div>
+                  <button className="btn-primary" style={{ height: '30px', fontSize: '0.75rem' }}
+                    onClick={() => handleImportTrelloTasks(trelloData.tasks)}
+                    disabled={importingTasks || trelloData.tasks.length === 0}>
+                    {importingTasks ? <RefreshCw size={11} className="animate-spin" /> : <Download size={11} />}
+                    {importingTasks ? 'Importing…' : 'Import All Tasks'}
+                  </button>
+                </div>
+                {trelloData.tasks.length === 0 ? (
+                  <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-faint)', fontSize: '0.8rem' }}>No task cards found on this board</div>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table className="data-table" style={{ minWidth: '680px' }}>
+                      <thead>
+                        <tr>
+                          <th>Card Title</th>
+                          <th style={{ width: '120px' }}>List / Status</th>
+                          <th style={{ width: '90px' }}>Priority</th>
+                          <th style={{ width: '110px' }}>Due Date</th>
+                          <th style={{ width: '90px' }}>Assignees</th>
+                          <th style={{ width: '60px' }}>Link</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {trelloData.tasks.map((t: MappedTask) => {
+                          const pc = priorityConfig[t.priority === 'Critical' ? 'High' : t.priority] || priorityConfig.Low;
+                          const sc = kanbanColumns.find(c => c.key === t.status);
+                          return (
+                            <tr key={t.trelloId}>
+                              <td>
+                                <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>{t.title}</div>
+                                {t.description && <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '2px', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.description}</div>}
+                              </td>
+                              <td>
+                                <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 7px', borderRadius: '9999px', background: `${sc?.color ?? '#475569'}18`, color: sc?.color ?? '#94A3B8', border: `1px solid ${sc?.color ?? '#475569'}30` }}>
+                                  {t.listName}
+                                </span>
+                              </td>
+                              <td>
+                                <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 7px', borderRadius: '9999px', background: pc.bg, color: pc.color, border: `1px solid ${pc.border}` }}>
+                                  {t.priority}
+                                </span>
+                              </td>
+                              <td style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{t.dueDate ?? '—'}</td>
+                              <td>
+                                <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
+                                  {t.assignees.length ? t.assignees.map((a, i) => (
+                                    <div key={i} className="avatar" style={{ width: '22px', height: '22px', fontSize: '0.55rem' }}>{a}</div>
+                                  )) : <span style={{ color: 'var(--text-faint)', fontSize: '0.72rem' }}>—</span>}
+                                </div>
+                              </td>
+                              <td>
+                                <a href={t.trelloUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#38BDF8', display: 'flex', alignItems: 'center' }}>
+                                  <ExternalLink size={12} />
+                                </a>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Risks Section */}
+              <div className="section-card">
+                <div className="section-card-header">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <AlertTriangle size={14} style={{ color: '#EF4444' }} />
+                    <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>Risks from Trello</span>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '1px 7px', borderRadius: '9999px', background: 'rgba(239,68,68,0.12)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.25)' }}>{trelloData.risks.length}</span>
+                  </div>
+                  <button className="btn-primary" style={{ height: '30px', fontSize: '0.75rem', background: 'rgba(239,68,68,0.15)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.3)' }}
+                    onClick={() => handleImportTrelloRisks(trelloData.risks)}
+                    disabled={importingRisks || trelloData.risks.length === 0}>
+                    {importingRisks ? <RefreshCw size={11} className="animate-spin" /> : <Download size={11} />}
+                    {importingRisks ? 'Importing…' : 'Import All Risks'}
+                  </button>
+                </div>
+                {trelloData.risks.length === 0 ? (
+                  <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-faint)', fontSize: '0.8rem' }}>No risk cards found — label cards with "Risk" to surface them here</div>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table className="data-table" style={{ minWidth: '680px' }}>
+                      <thead>
+                        <tr>
+                          <th>Risk Title</th>
+                          <th style={{ width: '100px' }}>Category</th>
+                          <th style={{ width: '90px' }}>Severity</th>
+                          <th style={{ width: '110px' }}>Due Date</th>
+                          <th style={{ width: '90px' }}>Assignees</th>
+                          <th style={{ width: '60px' }}>Link</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {trelloData.risks.map((r: MappedRisk) => {
+                          const sevColor = r.severity === 'Critical' ? { color: '#FCA5A5', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.25)' }
+                            : r.severity === 'High' ? { color: '#FCD34D', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.25)' }
+                            : r.severity === 'Medium' ? { color: '#38BDF8', bg: 'rgba(14,165,233,0.1)', border: 'rgba(14,165,233,0.22)' }
+                            : { color: '#34D399', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.22)' };
+                          return (
+                            <tr key={r.trelloId}>
+                              <td>
+                                <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>{r.title}</div>
+                                {r.description && <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '2px', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description}</div>}
+                              </td>
+                              <td>
+                                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', padding: '1px 6px', background: 'rgba(255,255,255,0.04)', borderRadius: '4px', border: '1px solid var(--border-subtle)' }}>{r.category}</span>
+                              </td>
+                              <td>
+                                <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 7px', borderRadius: '9999px', background: sevColor.bg, color: sevColor.color, border: `1px solid ${sevColor.border}` }}>
+                                  {r.severity}
+                                </span>
+                              </td>
+                              <td style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{r.dueDate ?? '—'}</td>
+                              <td>
+                                <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
+                                  {r.assignees.length ? r.assignees.map((a, i) => (
+                                    <div key={i} className="avatar" style={{ width: '22px', height: '22px', fontSize: '0.55rem' }}>{a}</div>
+                                  )) : <span style={{ color: 'var(--text-faint)', fontSize: '0.72rem' }}>—</span>}
+                                </div>
+                              </td>
+                              <td>
+                                <a href={r.trelloUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#38BDF8', display: 'flex', alignItems: 'center' }}>
+                                  <ExternalLink size={12} />
+                                </a>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Lists overview */}
+              <div className="section-card">
+                <div className="section-card-header">
+                  <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>Board Lists</span>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  {trelloData.lists.map(list => {
+                    const count = trelloData.cards.filter(c => c.idList === list.id && !c.closed).length;
+                    return (
+                      <div key={list.id} style={{ padding: '0.5rem 0.875rem', background: 'rgba(255,255,255,0.04)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{list.name}</span>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '1px 6px', borderRadius: '9999px', background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }}>{count}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
 

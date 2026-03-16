@@ -1,12 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLayout } from '../hooks/useLayout';
 import {
   Plus, Video, Users, Clock, CheckCircle, FileText,
   ChevronRight, Calendar, MapPin, Activity, TrendingUp, Search,
+  Upload, Check, Loader2, ExternalLink,
 } from 'lucide-react';
-import { getMeetings, updateMeeting, upsertMeeting, getWorkspaces } from '../lib/db';
+import { getMeetings, updateMeeting, upsertMeeting, upsertDocument, getWorkspaces } from '../lib/db';
 import type { MeetingRow, WorkspaceRow } from '../lib/db';
+import { supabase } from '../lib/supabase';
 import { X } from 'lucide-react';
 
 const filterTabs = ['All', 'Upcoming', 'In Progress', 'Completed', 'Committee'];
@@ -70,6 +72,20 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+// ── Minutes upload modal state ────────────────────────────────
+interface MinutesForm {
+  meetingId: string;
+  meetingTitle: string;
+  workspaceId: string;
+  workspaceName: string;
+  text: string;
+  author: string;
+  file: File | null;
+}
+const emptyMinutesForm: MinutesForm = {
+  meetingId: '', meetingTitle: '', workspaceId: '', workspaceName: '', text: '', author: '', file: null,
+};
+
 export default function Meetings() {
   const navigate = useNavigate();
   const { width, isMobile, isTablet } = useLayout();
@@ -84,6 +100,15 @@ export default function Meetings() {
     title: '', date: '', time: '09:00', duration: '1h', type: 'Review' as MeetingRow['type'],
     workspace: '', workspace_id: '', location: '', participants: '',
   });
+
+  // Minutes upload
+  const [minutesForm, setMinutesForm] = useState<MinutesForm>(emptyMinutesForm);
+  const [showMinutesModal, setShowMinutesModal] = useState(false);
+  const [uploadingMinutes, setUploadingMinutes] = useState(false);
+  const [minutesSaved, setMinutesSaved] = useState<string | null>(null); // docId
+  const [minutesError, setMinutesError] = useState('');
+  const [markingComplete, setMarkingComplete] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     getMeetings().then(data => { setMeetings(data); setLoading(false); }).catch(() => setLoading(false));
@@ -117,6 +142,90 @@ export default function Meetings() {
       setForm({ title: '', date: '', time: '09:00', duration: '1h', type: 'Review', workspace: '', workspace_id: '', location: '', participants: '' });
     } catch { /* ignore */ }
     finally { setSaving(false); }
+  }
+
+  // ── Mark meeting complete ────────────────────────────────
+  async function handleMarkComplete(id: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    setMarkingComplete(id);
+    try {
+      await updateMeeting(id, { status: 'Completed' });
+      setMeetings(prev => prev.map(m => m.id === id ? { ...m, status: 'Completed' } : m));
+    } catch { /* ignore */ }
+    finally { setMarkingComplete(null); }
+  }
+
+  // ── Open upload minutes modal ────────────────────────────
+  function openMinutesModal(meeting: MeetingRow, e: React.MouseEvent) {
+    e.stopPropagation();
+    setMinutesForm({
+      meetingId: meeting.id,
+      meetingTitle: meeting.title,
+      workspaceId: meeting.workspace_id,
+      workspaceName: meeting.workspace,
+      text: '',
+      author: '',
+      file: null,
+    });
+    setMinutesSaved(null);
+    setMinutesError('');
+    setShowMinutesModal(true);
+  }
+
+  // ── Save minutes to workspace ────────────────────────────
+  async function handleSaveMinutes() {
+    if (!minutesForm.meetingId) return;
+    setUploadingMinutes(true);
+    setMinutesError('');
+    try {
+      let storagePath: string | null = null;
+      let fileUrl: string | null = null;
+
+      // Upload file to Supabase Storage if provided
+      if (minutesForm.file) {
+        const ext = minutesForm.file.name.split('.').pop() ?? 'pdf';
+        const path = `${minutesForm.workspaceId}/meetings/${minutesForm.meetingId}/minutes.${ext}`;
+        const { error: upErr } = await supabase.storage
+          .from('documents')
+          .upload(path, minutesForm.file, { upsert: true, contentType: minutesForm.file.type });
+        if (upErr) throw upErr;
+        storagePath = path;
+        const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path);
+        fileUrl = urlData.publicUrl;
+      }
+
+      // Create document record in workspace
+      const today = new Date().toISOString().slice(0, 10);
+      const doc = await upsertDocument({
+        id: crypto.randomUUID(),
+        name: `${minutesForm.meetingTitle} — Meeting Minutes`,
+        type: 'Meeting Minutes',
+        type_color: '#8B5CF6',
+        workspace: minutesForm.workspaceName,
+        workspace_id: minutesForm.workspaceId,
+        date: today,
+        author: minutesForm.author || 'Unknown',
+        status: 'Final',
+        language: 'EN',
+        size: minutesForm.file ? `${Math.round(minutesForm.file.size / 1024)} KB` : `${Math.round((minutesForm.text.length * 2) / 1024) || 1} KB`,
+        pages: 1,
+        summary: minutesForm.text
+          ? minutesForm.text.slice(0, 500)
+          : `Meeting minutes for ${minutesForm.meetingTitle}. Filed on ${today}.`,
+        tags: ['meeting', 'minutes', 'governance'],
+        file_url: fileUrl,
+      });
+
+      // Mark meeting minutes_generated = true
+      await updateMeeting(minutesForm.meetingId, { minutes_generated: true });
+      setMeetings(prev => prev.map(m => m.id === minutesForm.meetingId ? { ...m, minutes_generated: true } : m));
+
+      setMinutesSaved(doc.id);
+    } catch (e) {
+      setMinutesError(e instanceof Error ? e.message : 'Upload failed. Please try again.');
+    } finally {
+      setUploadingMinutes(false);
+    }
   }
 
   const statsCards = [
@@ -316,7 +425,7 @@ export default function Meetings() {
                         }}>
                           {meeting.workspace}
                         </span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                           {/* Avatar stack */}
                           <div style={{ display: 'flex' }}>
                             {meeting.participants.slice(0, 4).map((p, i) => (
@@ -332,26 +441,56 @@ export default function Meetings() {
                               </div>
                             ))}
                           </div>
-                          {/* Completed action/decision counts */}
+                          {/* Action buttons */}
+                          {(meeting.status === 'Upcoming' || meeting.status === 'In Progress') && (
+                            <button
+                              onClick={e => handleMarkComplete(meeting.id, e)}
+                              disabled={markingComplete === meeting.id}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: '3px',
+                                fontSize: '0.65rem', fontWeight: 700, padding: '3px 8px', borderRadius: '6px',
+                                background: 'rgba(16,185,129,0.1)', color: '#34D399',
+                                border: '1px solid rgba(16,185,129,0.22)', cursor: 'pointer',
+                                fontFamily: 'inherit', transition: 'all 0.15s',
+                              }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.2)'; }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.1)'; }}
+                            >
+                              {markingComplete === meeting.id
+                                ? <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} />
+                                : <Check size={10} />
+                              }
+                              Complete
+                            </button>
+                          )}
                           {meeting.status === 'Completed' && (
-                            <div style={{ display: 'flex', gap: '0.375rem' }}>
-                              {meeting.actions_extracted && (
-                                <span style={{
-                                  fontSize: '0.65rem', fontWeight: 600, padding: '2px 6px', borderRadius: '4px',
-                                  background: 'rgba(245,158,11,0.1)', color: '#FCD34D',
-                                  display: 'inline-flex', alignItems: 'center', gap: '3px',
-                                  border: '1px solid rgba(245,158,11,0.2)',
-                                }}>
+                            <button
+                              onClick={e => openMinutesModal(meeting, e)}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: '3px',
+                                fontSize: '0.65rem', fontWeight: 700, padding: '3px 8px', borderRadius: '6px',
+                                background: meeting.minutes_generated ? 'rgba(14,165,233,0.08)' : 'rgba(139,92,246,0.12)',
+                                color: meeting.minutes_generated ? '#38BDF8' : '#A78BFA',
+                                border: `1px solid ${meeting.minutes_generated ? 'rgba(14,165,233,0.2)' : 'rgba(139,92,246,0.25)'}`,
+                                cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+                              }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.8'; }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
+                            >
+                              <Upload size={10} />
+                              {meeting.minutes_generated ? 'Update Minutes' : 'Upload Minutes'}
+                            </button>
+                          )}
+                          {/* Decision/action counts */}
+                          {meeting.status === 'Completed' && (
+                            <div style={{ display: 'flex', gap: '0.25rem' }}>
+                              {!!meeting.actions_extracted && (
+                                <span style={{ fontSize: '0.63rem', fontWeight: 600, padding: '2px 5px', borderRadius: '4px', background: 'rgba(245,158,11,0.1)', color: '#FCD34D', border: '1px solid rgba(245,158,11,0.2)', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
                                   <CheckCircle size={9} /> {meeting.actions_extracted}a
                                 </span>
                               )}
-                              {meeting.decisions_logged && (
-                                <span style={{
-                                  fontSize: '0.65rem', fontWeight: 600, padding: '2px 6px', borderRadius: '4px',
-                                  background: 'rgba(14,165,233,0.1)', color: '#38BDF8',
-                                  display: 'inline-flex', alignItems: 'center', gap: '3px',
-                                  border: '1px solid rgba(14,165,233,0.2)',
-                                }}>
+                              {!!meeting.decisions_logged && (
+                                <span style={{ fontSize: '0.63rem', fontWeight: 600, padding: '2px 5px', borderRadius: '4px', background: 'rgba(14,165,233,0.1)', color: '#38BDF8', border: '1px solid rgba(14,165,233,0.2)', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
                                   <TrendingUp size={9} /> {meeting.decisions_logged}d
                                 </span>
                               )}
@@ -497,6 +636,189 @@ export default function Meetings() {
           </div>
         </div>
       </div>
+
+      {/* ── Upload Minutes Modal ──────────────────────────── */}
+      {showMinutesModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+          onClick={() => { if (!uploadingMinutes) setShowMinutesModal(false); }}>
+          <div style={{
+            background: '#0C1220', border: '1px solid rgba(139,92,246,0.25)',
+            borderRadius: '16px', width: '100%', maxWidth: '560px',
+            boxShadow: '0 24px 64px rgba(0,0,0,0.7)',
+            display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          }} onClick={e => e.stopPropagation()}>
+            {/* accent */}
+            <div style={{ height: '2px', background: 'linear-gradient(90deg, #8B5CF6, #0EA5E9)', flexShrink: 0 }} />
+
+            {/* Header */}
+            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: 36, height: 36, borderRadius: '9px', background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Upload size={16} style={{ color: '#A78BFA' }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#F1F5F9' }}>Upload Meeting Minutes</div>
+                  <div style={{ fontSize: '0.72rem', color: '#475569', marginTop: '1px' }}>Save to workspace · Available as AI context</div>
+                </div>
+              </div>
+              <button onClick={() => setShowMinutesModal(false)} disabled={uploadingMinutes}
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', cursor: 'pointer', color: '#64748B', padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={16} />
+              </button>
+            </div>
+
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', overflowY: 'auto' }}>
+              {/* Meeting info chip */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                <Video size={14} style={{ color: '#8B5CF6', flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#F1F5F9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{minutesForm.meetingTitle}</div>
+                  <div style={{ fontSize: '0.68rem', color: '#475569', marginTop: '1px' }}>{minutesForm.workspaceName}</div>
+                </div>
+                <span style={{ fontSize: '0.62rem', padding: '2px 7px', borderRadius: '4px', background: 'rgba(16,185,129,0.1)', color: '#34D399', border: '1px solid rgba(16,185,129,0.2)', fontWeight: 700 }}>
+                  Completed
+                </span>
+              </div>
+
+              {/* File upload */}
+              <div>
+                <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', marginBottom: '0.5rem' }}>
+                  Upload File (PDF / DOCX / TXT)
+                </label>
+                <div
+                  onClick={() => fileRef.current?.click()}
+                  style={{
+                    border: `2px dashed ${minutesForm.file ? 'rgba(139,92,246,0.5)' : 'rgba(255,255,255,0.1)'}`,
+                    borderRadius: '10px', padding: '1.25rem', textAlign: 'center', cursor: 'pointer',
+                    background: minutesForm.file ? 'rgba(139,92,246,0.06)' : 'rgba(255,255,255,0.02)',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {minutesForm.file ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.625rem' }}>
+                      <FileText size={18} style={{ color: '#A78BFA' }} />
+                      <div>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#A78BFA' }}>{minutesForm.file.name}</div>
+                        <div style={{ fontSize: '0.68rem', color: '#475569' }}>{(minutesForm.file.size / 1024).toFixed(1)} KB · click to change</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <Upload size={20} style={{ color: '#334155', margin: '0 auto 0.5rem' }} />
+                      <div style={{ fontSize: '0.82rem', color: '#64748B', fontWeight: 600 }}>Drop file or click to browse</div>
+                      <div style={{ fontSize: '0.7rem', color: '#334155', marginTop: '3px' }}>PDF, DOCX, TXT, MD — up to 20 MB</div>
+                    </>
+                  )}
+                </div>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".pdf,.docx,.doc,.txt,.md"
+                  style={{ display: 'none' }}
+                  onChange={e => {
+                    const f = e.target.files?.[0] ?? null;
+                    setMinutesForm(prev => ({ ...prev, file: f }));
+                  }}
+                />
+              </div>
+
+              {/* OR divider */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
+                <span style={{ fontSize: '0.68rem', color: '#334155', fontWeight: 700, letterSpacing: '0.08em' }}>OR PASTE TEXT</span>
+                <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
+              </div>
+
+              {/* Text minutes */}
+              <div>
+                <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', marginBottom: '0.5rem' }}>
+                  Minutes Text Content
+                </label>
+                <textarea
+                  rows={6}
+                  placeholder="Paste or type meeting minutes here…&#10;&#10;Include: attendees, agenda items discussed, key decisions, action items, next steps."
+                  value={minutesForm.text}
+                  onChange={e => setMinutesForm(prev => ({ ...prev, text: e.target.value }))}
+                  style={{ width: '100%', padding: '0.75rem', background: '#080C18', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#F1F5F9', fontSize: '0.82rem', fontFamily: 'inherit', resize: 'vertical', lineHeight: 1.6, outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              {/* Author */}
+              <div>
+                <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', marginBottom: '0.5rem' }}>
+                  Author / Minute-Taker
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. AM, Sara Al-Khalidi"
+                  value={minutesForm.author}
+                  onChange={e => setMinutesForm(prev => ({ ...prev, author: e.target.value }))}
+                  style={{ width: '100%', padding: '0.6rem 0.875rem', background: '#080C18', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#F1F5F9', fontSize: '0.82rem', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              {/* What happens info */}
+              <div style={{ padding: '0.75rem 1rem', borderRadius: '8px', background: 'rgba(14,165,233,0.06)', border: '1px solid rgba(14,165,233,0.15)' }}>
+                <div style={{ fontSize: '0.7rem', color: '#38BDF8', fontWeight: 700, marginBottom: '0.375rem' }}>What happens when you save:</div>
+                <ul style={{ margin: 0, paddingLeft: '1rem', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                  {[
+                    'Document saved to workspace as "Meeting Minutes"',
+                    'Available as AI context in Knowledge Base & Automations',
+                    'Linked to this meeting for traceability',
+                    'Searchable across workflows and reports',
+                  ].map(item => (
+                    <li key={item} style={{ fontSize: '0.72rem', color: '#64748B' }}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Error */}
+              {minutesError && (
+                <div style={{ padding: '0.75rem 1rem', borderRadius: '8px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#FCA5A5', fontSize: '0.8rem' }}>
+                  {minutesError}
+                </div>
+              )}
+
+              {/* Success */}
+              {minutesSaved && (
+                <div style={{ padding: '0.875rem 1rem', borderRadius: '8px', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <Check size={16} style={{ color: '#34D399', flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#34D399' }}>Minutes saved to workspace!</div>
+                    <div style={{ fontSize: '0.7rem', color: '#475569', marginTop: '2px' }}>Document created and available as AI context in automations</div>
+                  </div>
+                  <button
+                    onClick={() => navigate('/knowledge')}
+                    style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '4px 10px', borderRadius: '6px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: '#34D399', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}
+                  >
+                    <ExternalLink size={11} /> View
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', gap: '0.75rem' }}>
+              <button className="btn-ghost" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setShowMinutesModal(false)} disabled={uploadingMinutes}>
+                {minutesSaved ? 'Close' : 'Cancel'}
+              </button>
+              {!minutesSaved && (
+                <button
+                  className="btn-primary"
+                  style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontWeight: 800 }}
+                  onClick={handleSaveMinutes}
+                  disabled={uploadingMinutes || (!minutesForm.file && !minutesForm.text.trim())}
+                >
+                  {uploadingMinutes
+                    ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Saving to Workspace…</>
+                    : <><Upload size={14} /> Save Minutes to Workspace</>
+                  }
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* New Meeting Modal */}
       {showNewModal && (
