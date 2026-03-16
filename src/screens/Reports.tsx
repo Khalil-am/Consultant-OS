@@ -3,6 +3,7 @@ import { useLayout } from '../hooks/useLayout';
 import {
   BarChart3, Download, Share, Eye, Plus, Calendar,
   TrendingUp, AlertTriangle, CheckCircle, Sparkles, Clock, FileText,
+  Search,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell
@@ -77,16 +78,35 @@ const boardPackTypes = [
 
 const scheduledReports = [
   { title: 'Weekly Portfolio Status', schedule: 'Every Monday 08:00', nextRun: '16 Mar 2026', recipients: 'Steering Committee (8)', type: 'Weekly Status' },
-  { title: 'Monthly Board Pack', schedule: '1st of each month', nextRun: '01 Apr 2026', recipients: 'Board Members (5)', type: 'Board Summary' },
-  { title: 'Procurement Dashboard', schedule: 'Every Wednesday', nextRun: '18 Mar 2026', recipients: 'PMO Team (12)', type: 'Procurement' },
+  { title: 'Monthly Board Pack',       schedule: '1st of each month',   nextRun: '01 Apr 2026', recipients: 'Board Members (5)',      type: 'Board Summary' },
+  { title: 'Procurement Dashboard',    schedule: 'Every Wednesday',     nextRun: '18 Mar 2026', recipients: 'PMO Team (12)',          type: 'Procurement' },
 ];
 
 const statsData = [
-  { label: 'Reports This Month', value: '28', trend: '+6', trendUp: true, color: '#0EA5E9' },
-  { label: 'Pending Sign-offs', value: '3', trend: '-2', trendUp: false, color: '#F59E0B' },
-  { label: 'Total Downloads', value: '847', trend: '+124', trendUp: true, color: '#10B981' },
-  { label: 'Avg Generation Time', value: '42s', trend: '-8s', trendUp: true, color: '#8B5CF6' },
+  { label: 'Reports This Month', value: '28',  trend: '+6',   trendUp: true,  color: '#0EA5E9' },
+  { label: 'Pending Sign-offs',  value: '3',   trend: '-2',   trendUp: false, color: '#F59E0B' },
+  { label: 'Total Downloads',    value: '847', trend: '+124', trendUp: true,  color: '#10B981' },
+  { label: 'Avg Generation Time',value: '42s', trend: '-8s',  trendUp: true,  color: '#8B5CF6' },
 ];
+
+function ReportStatusBadge({ status }: { status: string }) {
+  const map: Record<string, { bg: string; color: string; border: string }> = {
+    'Generated': { bg: 'rgba(16,185,129,0.1)',   color: '#34D399', border: 'rgba(16,185,129,0.22)' },
+    'Scheduled': { bg: 'rgba(14,165,233,0.1)',   color: '#38BDF8', border: 'rgba(14,165,233,0.22)' },
+    'Draft':     { bg: 'rgba(100,116,139,0.1)',  color: '#94A3B8', border: 'rgba(100,116,139,0.2)' },
+  };
+  const s = map[status] || map['Draft'];
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: '4px',
+      fontSize: '0.67rem', fontWeight: 700, padding: '2px 8px',
+      borderRadius: '9999px', background: s.bg, color: s.color, border: `1px solid ${s.border}`,
+      whiteSpace: 'nowrap', letterSpacing: '0.02em',
+    }}>
+      {status}
+    </span>
+  );
+}
 
 export default function Reports() {
   const { width, isMobile, isTablet } = useLayout();
@@ -96,15 +116,18 @@ export default function Reports() {
   const [generatingPack, setGeneratingPack] = useState<string | null>(null);
   const [generatedPacks, setGeneratedPacks] = useState<Set<string>>(new Set());
   const [hoveredReport, setHoveredReport] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   const filtered = reports.filter(r => {
-    if (activeCategory === 'All Reports') return true;
-    if (activeCategory === 'Weekly Status') return r.type === 'Weekly Status';
-    if (activeCategory === 'Monthly') return r.type === 'Monthly Report';
-    if (activeCategory === 'Steering Committee') return r.type === 'Steering Committee';
-    if (activeCategory === 'Procurement') return r.type === 'Procurement Report';
-    if (activeCategory === 'Board Summaries') return r.type === 'Board Summary';
-    return true;
+    const matchesCat = activeCategory === 'All Reports'           ? true
+      : activeCategory === 'Weekly Status'       ? r.type === 'Weekly Status'
+      : activeCategory === 'Monthly'             ? r.type === 'Monthly Report'
+      : activeCategory === 'Steering Committee'  ? r.type === 'Steering Committee'
+      : activeCategory === 'Procurement'         ? r.type === 'Procurement Report'
+      : activeCategory === 'Board Summaries'     ? r.type === 'Board Summary'
+      : true;
+    const matchesSearch = !search || r.title.toLowerCase().includes(search.toLowerCase()) || r.workspace?.toLowerCase().includes(search.toLowerCase());
+    return matchesCat && matchesSearch;
   });
 
   const handleGeneratePack = (title: string) => {
@@ -115,156 +138,221 @@ export default function Reports() {
     }, 2000);
   };
 
+  const selectStyle: React.CSSProperties = {
+    width: '100%', padding: '0.5rem 0.75rem',
+    borderRadius: 'var(--radius-md)', fontSize: '0.8rem',
+    background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-default)',
+    color: 'var(--text-primary)', fontFamily: 'inherit',
+    outline: 'none', cursor: 'pointer',
+    transition: 'border-color var(--transition-base)',
+  };
+
   return (
-    <div style={{ padding: isMobile ? '0.875rem' : '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div className="screen-container animate-fade-in">
 
       {/* Stats Row */}
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 768 ? 4 : 2}, 1fr)`, gap: '0.875rem' }}>
         {statsData.map(s => (
           <div key={s.label} className="metric-card" style={{ position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(90deg, ${s.color}, transparent)` }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-              <div style={{ fontSize: '0.65rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{s.label}</div>
-              <span style={{ fontSize: '0.65rem', fontWeight: 600, color: s.trendUp ? '#34D399' : '#FCA5A5' }}>{s.trend}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.625rem' }}>
+              <div style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{s.label}</div>
+              <span style={{
+                fontSize: '0.65rem', fontWeight: 700,
+                color: s.trendUp ? '#34D399' : '#FCA5A5',
+                background: s.trendUp ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+                padding: '1px 5px', borderRadius: '4px',
+                border: s.trendUp ? '1px solid rgba(16,185,129,0.2)' : '1px solid rgba(239,68,68,0.2)',
+              }}>{s.trend}</span>
             </div>
-            <div style={{ fontSize: '1.75rem', fontWeight: 900, color: s.color, lineHeight: 1, letterSpacing: '-0.02em' }}>{s.value}</div>
+            <div className="hero-number" style={{ color: s.color }}>{s.value}</div>
           </div>
         ))}
       </div>
 
       {/* Board Pack Generator */}
-      <div style={{ background: 'linear-gradient(135deg, #0D1527, #0D1B3E)', border: '1px solid rgba(14,165,233,0.15)', borderRadius: '12px', overflow: 'hidden' }}>
-        <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-            <Sparkles size={16} style={{ color: '#00D4FF' }} />
-            <div>
-              <div style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9' }}>Generate Board Pack</div>
-              <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '2px' }}>AI-powered report generation for board and executive audiences</div>
-            </div>
+      <div style={{
+        background: 'linear-gradient(135deg, rgba(14,165,233,0.06) 0%, var(--bg-elevated) 50%, rgba(139,92,246,0.05) 100%)',
+        border: '1px solid rgba(14,165,233,0.14)', borderRadius: 'var(--radius-lg)', overflow: 'hidden',
+      }}>
+        <div style={{ padding: '1.125rem 1.5rem', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div style={{ padding: '0.5rem', borderRadius: '8px', background: 'rgba(0,212,255,0.1)', color: '#00D4FF' }}>
+            <Sparkles size={16} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.925rem', fontWeight: 700, color: 'var(--text-primary)' }}>Generate Board Pack</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '1px' }}>AI-powered report generation for board and executive audiences</div>
           </div>
         </div>
-        <div style={{ padding: '1.25rem 1.5rem', display: 'grid', gridTemplateColumns: `repeat(${width >= 900 ? 4 : width >= 600 ? 2 : 1}, 1fr)`, gap: '0.875rem' }}>
+        <div style={{ padding: '1.125rem 1.5rem', display: 'grid', gridTemplateColumns: `repeat(${width >= 900 ? 4 : width >= 600 ? 2 : 1}, 1fr)`, gap: '0.875rem' }}>
           {boardPackTypes.map(pack => (
-            <div
-              key={pack.title}
-              className="board-pack-card"
-              style={{ position: 'relative' }}
-            >
-              <div style={{ padding: '0.625rem', borderRadius: '8px', background: `${pack.color}15`, color: pack.color, width: 'fit-content', marginBottom: '0.75rem' }}>
-                {pack.icon}
-              </div>
-              <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#F1F5F9', marginBottom: '0.375rem' }}>{pack.title}</div>
-              <div style={{ fontSize: '0.72rem', color: '#475569', marginBottom: '1rem', lineHeight: 1.5 }}>{pack.desc}</div>
-              {generatedPacks.has(pack.title) ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.75rem', color: '#34D399', padding: '0.375rem 0' }}>
-                  <CheckCircle size={13} /> Generated successfully
+            <div key={pack.title} className="board-pack-card" style={{ position: 'relative' }}>
+              <div style={{ width: '2px', height: '100%', position: 'absolute', left: 0, top: 0, bottom: 0, background: `linear-gradient(180deg, ${pack.color}, transparent)`, borderRadius: '2px 0 0 2px' }} />
+              <div style={{ paddingLeft: '0.25rem' }}>
+                <div style={{ padding: '0.5rem', borderRadius: '8px', background: `${pack.color}12`, color: pack.color, width: 'fit-content', marginBottom: '0.75rem' }}>
+                  {pack.icon}
                 </div>
-              ) : (
-                <button
-                  onClick={() => handleGeneratePack(pack.title)}
-                  disabled={generatingPack === pack.title}
-                  style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: `1px solid ${pack.color}30`, background: `${pack.color}10`, color: pack.color, cursor: generatingPack === pack.title ? 'wait' : 'pointer', fontSize: '0.78rem', fontWeight: 600, fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem', transition: 'all 0.2s' }}
-                  onMouseEnter={e => { if (generatingPack !== pack.title) { (e.currentTarget as HTMLElement).style.background = `${pack.color}20`; } }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = `${pack.color}10`; }}
-                >
-                  {generatingPack === pack.title ? (
-                    <><Clock size={13} style={{ animation: 'spin 1s linear infinite' }} /> Generating...</>
-                  ) : (
-                    <><Sparkles size={13} /> Generate</>
-                  )}
-                </button>
-              )}
+                <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.375rem' }}>{pack.title}</div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '1rem', lineHeight: 1.55 }}>{pack.desc}</div>
+                {generatedPacks.has(pack.title) ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.75rem', fontWeight: 600, color: '#34D399', padding: '0.375rem 0' }}>
+                    <CheckCircle size={13} /> Generated successfully
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => handleGeneratePack(pack.title)}
+                    disabled={generatingPack === pack.title}
+                    style={{
+                      width: '100%', padding: '0.5rem', borderRadius: 'var(--radius-md)',
+                      border: `1px solid ${pack.color}35`, background: `${pack.color}0D`,
+                      color: pack.color, cursor: generatingPack === pack.title ? 'wait' : 'pointer',
+                      fontSize: '0.78rem', fontWeight: 700, fontFamily: 'inherit',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem',
+                      transition: 'all var(--transition-base)',
+                    }}
+                    onMouseEnter={e => { if (generatingPack !== pack.title) { (e.currentTarget as HTMLElement).style.background = `${pack.color}20`; (e.currentTarget as HTMLElement).style.borderColor = `${pack.color}55`; } }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = `${pack.color}0D`; (e.currentTarget as HTMLElement).style.borderColor = `${pack.color}35`; }}
+                  >
+                    {generatingPack === pack.title ? (
+                      <><Clock size={13} style={{ animation: 'spin 1s linear infinite' }} /> Generating…</>
+                    ) : (
+                      <><Sparkles size={13} /> Generate</>
+                    )}
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Category Filter */}
-      <div style={{ display: 'flex', gap: '0.25rem', background: 'rgba(255,255,255,0.03)', padding: '0.25rem', borderRadius: '0.625rem', border: '1px solid rgba(255,255,255,0.06)', overflowX: 'auto', width: 'fit-content', maxWidth: '100%' }}>
-        {categoryTabs.map(tab => (
-          <button key={tab} className={`tab-item ${activeCategory === tab ? 'active' : ''}`} onClick={() => setActiveCategory(tab)} style={{ padding: '0.375rem 0.875rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
-            {tab}
-          </button>
-        ))}
+      {/* Filter toolbar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative', flex: '0 0 auto' }}>
+          <Search size={13} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+          <input
+            className="input-field"
+            placeholder="Search reports..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ paddingLeft: '2.25rem', height: '36px', fontSize: '0.8rem', width: '200px' }}
+          />
+        </div>
+        <div style={{ display: 'flex', gap: '0.25rem', background: 'rgba(255,255,255,0.03)', padding: '0.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', overflowX: 'auto', flex: 1 }}>
+          {categoryTabs.map(tab => (
+            <button key={tab} className={`tab-item ${activeCategory === tab ? 'active' : ''}`} onClick={() => setActiveCategory(tab)} style={{ padding: '0.3rem 0.75rem', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+              {tab}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Main Layout */}
       <div style={{ display: 'grid', gridTemplateColumns: isTablet ? '1fr' : '1fr 320px', gap: '1.25rem', alignItems: 'start' }}>
+
+        {/* Left column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
           {/* Reports Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 1100 ? 3 : width >= 640 ? 2 : 1}, 1fr)`, gap: '0.875rem' }}>
-            {filtered.map(report => (
-              <div
-                key={report.id}
-                className="section-card"
-                style={{ cursor: 'pointer', overflow: 'hidden', transition: 'all 0.2s', position: 'relative' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.12)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 24px rgba(0,0,0,0.3)'; setHoveredReport(report.id); }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none'; setHoveredReport(null); }}
-              >
-                <div style={{ height: '3px', background: `linear-gradient(90deg, ${report.typeColor}, transparent)` }} />
-                <div style={{ padding: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <div style={{ padding: '0.5rem', borderRadius: '8px', background: `${report.typeColor}15`, color: report.typeColor }}>
-                        <BarChart3 size={16} />
+          {filtered.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3.5rem 1rem', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-lg)', border: '1px dashed var(--border-default)' }}>
+              <FileText size={36} style={{ color: 'var(--text-faint)', margin: '0 auto 0.875rem' }} />
+              <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>No reports found</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Try a different filter or generate a new report</div>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 1100 ? 3 : width >= 640 ? 2 : 1}, 1fr)`, gap: '0.875rem' }}>
+              {filtered.map(report => (
+                <div
+                  key={report.id}
+                  className="section-card"
+                  style={{ cursor: 'pointer', overflow: 'hidden', transition: 'all var(--transition-base)', position: 'relative' }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLElement).style.borderColor = `${report.typeColor}35`;
+                    (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)';
+                    (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 28px rgba(0,0,0,0.35)';
+                    setHoveredReport(report.id);
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)';
+                    (e.currentTarget as HTMLElement).style.transform = 'translateY(0)';
+                    (e.currentTarget as HTMLElement).style.boxShadow = 'none';
+                    setHoveredReport(null);
+                  }}
+                >
+                  {/* Top accent */}
+                  <div style={{ height: '2px', background: `linear-gradient(90deg, ${report.typeColor} 0%, ${report.typeColor}55 60%, transparent 100%)` }} />
+
+                  <div style={{ padding: '1rem' }}>
+                    {/* Header row */}
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.875rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div style={{ padding: '0.5rem', borderRadius: '8px', background: `${report.typeColor}12`, color: report.typeColor }}>
+                          <BarChart3 size={15} />
+                        </div>
+                        <span style={{ fontSize: '0.62rem', fontWeight: 600, padding: '2px 6px', borderRadius: '9999px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}>
+                          {report.pages}p
+                        </span>
                       </div>
-                      <div style={{ padding: '3px 6px', borderRadius: '9999px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', fontSize: '0.65rem', color: '#475569' }}>
-                        {report.pages}p
+                      <ReportStatusBadge status={report.status} />
+                    </div>
+
+                    {/* Title */}
+                    <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 0.25rem', lineHeight: 1.35 }}>
+                      {report.title}
+                    </h3>
+                    <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '0 0 0.625rem' }}>
+                      {report.workspace}
+                    </p>
+
+                    {/* Author / period row */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.875rem' }}>
+                      <div className="avatar" style={{ width: '20px', height: '20px', fontSize: '0.55rem', flexShrink: 0 }}>
+                        {report.author ? report.author.charAt(0) : 'A'}
                       </div>
+                      <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{report.period}</span>
+                      <span style={{ width: '3px', height: '3px', borderRadius: '50%', background: 'var(--text-faint)', display: 'inline-block', flexShrink: 0 }} />
+                      <span style={{ fontSize: '0.68rem', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        <Calendar size={9} /> {report.date}
+                      </span>
                     </div>
-                    <span style={{ fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', background: report.status === 'Generated' ? 'rgba(16,185,129,0.1)' : report.status === 'Scheduled' ? 'rgba(14,165,233,0.1)' : 'rgba(148,163,184,0.1)', color: report.status === 'Generated' ? '#34D399' : report.status === 'Scheduled' ? '#38BDF8' : '#94A3B8', border: `1px solid ${report.status === 'Generated' ? 'rgba(16,185,129,0.2)' : 'rgba(14,165,233,0.15)'}` }}>
-                      {report.status}
-                    </span>
-                  </div>
 
-                  <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#F1F5F9', margin: 0, marginBottom: '0.25rem', lineHeight: 1.3 }}>
-                    {report.title}
-                  </h3>
-                  <p style={{ fontSize: '0.72rem', color: '#475569', margin: 0, marginBottom: '0.5rem' }}>
-                    {report.workspace}
-                  </p>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                    <div className="avatar" style={{ width: '20px', height: '20px', fontSize: '0.55rem', flexShrink: 0 }}>
-                      {report.author ? report.author.charAt(0) : 'A'}
+                    {/* Action buttons – fade in on hover */}
+                    <div style={{
+                      display: 'flex', gap: '0.5rem',
+                      opacity: hoveredReport === report.id ? 1 : 0.5,
+                      transform: hoveredReport === report.id ? 'translateY(0)' : 'translateY(2px)',
+                      transition: 'all var(--transition-base)',
+                    }}>
+                      <button className="btn-ghost" style={{ flex: 1, height: '28px', fontSize: '0.72rem', justifyContent: 'center', padding: '0' }}>
+                        <Eye size={11} /> Preview
+                      </button>
+                      <button className="btn-ghost" style={{ height: '28px', fontSize: '0.72rem', padding: '0 0.625rem' }} title="Download">
+                        <Download size={11} />
+                      </button>
+                      <button className="btn-ghost" style={{ height: '28px', fontSize: '0.72rem', padding: '0 0.625rem' }} title="Share">
+                        <Share size={11} />
+                      </button>
                     </div>
-                    <span style={{ fontSize: '0.68rem', color: '#475569' }}>{report.period}</span>
-                    <span style={{ fontSize: '0.68rem', color: '#334155' }}>·</span>
-                    <span style={{ fontSize: '0.68rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                      <Calendar size={9} /> {report.date}
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '0.5rem', opacity: hoveredReport === report.id ? 1 : 0.6, transition: 'opacity 0.2s' }}>
-                    <button className="btn-ghost" style={{ flex: 1, height: '28px', fontSize: '0.72rem', justifyContent: 'center' }}>
-                      <Eye size={11} /> Preview
-                    </button>
-                    <button className="btn-ghost" style={{ height: '28px', fontSize: '0.72rem', padding: '0 0.625rem' }}>
-                      <Download size={11} />
-                    </button>
-                    <button className="btn-ghost" style={{ height: '28px', fontSize: '0.72rem', padding: '0 0.625rem' }}>
-                      <Share size={11} />
-                    </button>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
           {/* Scheduled Reports */}
           <div className="section-card">
             <div className="section-card-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Calendar size={14} style={{ color: '#8B5CF6' }} />
-                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Scheduled Reports</span>
+                <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>Scheduled Reports</span>
               </div>
-              <button className="btn-ghost" style={{ padding: '0.25rem 0.625rem', fontSize: '0.72rem' }}>
+              <button className="btn-ghost" style={{ padding: '0 0.75rem', height: '30px', fontSize: '0.72rem' }}>
                 <Plus size={11} /> Add Schedule
               </button>
             </div>
             <div style={{ overflowX: 'auto' }}>
-              <table className="data-table" style={{ minWidth: '500px' }}>
+              <table className="data-table" style={{ minWidth: '520px' }}>
                 <thead>
                   <tr>
                     <th>Report</th>
@@ -276,19 +364,27 @@ export default function Reports() {
                 </thead>
                 <tbody>
                   {scheduledReports.map(sr => (
-                    <tr key={sr.title}>
+                    <tr key={sr.title} style={{ cursor: 'pointer' }}>
                       <td>
-                        <div style={{ fontSize: '0.82rem', fontWeight: 500, color: '#F1F5F9' }}>{sr.title}</div>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{sr.title}</div>
                       </td>
-                      <td style={{ fontSize: '0.75rem', color: '#475569' }}>{sr.schedule}</td>
                       <td>
-                        <span style={{ fontSize: '0.72rem', padding: '2px 7px', borderRadius: '4px', background: 'rgba(14,165,233,0.1)', color: '#38BDF8', border: '1px solid rgba(14,165,233,0.15)' }}>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{sr.schedule}</span>
+                      </td>
+                      <td>
+                        <span style={{
+                          fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '9999px',
+                          background: 'rgba(14,165,233,0.1)', color: '#38BDF8', border: '1px solid rgba(14,165,233,0.22)',
+                        }}>
                           {sr.nextRun}
                         </span>
                       </td>
-                      <td style={{ fontSize: '0.75rem', color: '#94A3B8' }}>{sr.recipients}</td>
+                      <td style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{sr.recipients}</td>
                       <td>
-                        <span style={{ fontSize: '0.68rem', padding: '2px 6px', borderRadius: '3px', background: 'rgba(139,92,246,0.1)', color: '#A78BFA', border: '1px solid rgba(139,92,246,0.2)' }}>
+                        <span style={{
+                          fontSize: '0.67rem', fontWeight: 700, padding: '2px 7px', borderRadius: '9999px',
+                          background: 'rgba(139,92,246,0.1)', color: '#A78BFA', border: '1px solid rgba(139,92,246,0.22)',
+                        }}>
                           {sr.type}
                         </span>
                       </td>
@@ -302,17 +398,25 @@ export default function Reports() {
           {/* Volume Chart */}
           <div className="section-card">
             <div className="section-card-header">
-              <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Reports Generated – 6 Months</span>
+              <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>Reports Generated — 6 Months</span>
+              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#8B5CF6', background: 'rgba(139,92,246,0.1)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(139,92,246,0.2)' }}>
+                +47% vs prior period
+              </span>
             </div>
-            <div style={{ padding: '1rem 0.5rem 0.5rem' }}>
+            <div style={{ padding: '1.125rem 1rem 0.875rem' }}>
               <ResponsiveContainer width="100%" height={100}>
-                <BarChart data={reportVolumeData}>
-                  <XAxis dataKey="month" tick={{ fill: '#475569', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <BarChart data={reportVolumeData} barCategoryGap="30%">
+                  <XAxis dataKey="month" tick={{ fill: '#64748B', fontSize: 11, fontWeight: 500 }} axisLine={false} tickLine={false} />
                   <YAxis hide />
-                  <Tooltip contentStyle={{ background: '#111B35', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '0.75rem' }} labelStyle={{ color: '#94A3B8' }} itemStyle={{ color: '#8B5CF6' }} />
-                  <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                  <Tooltip
+                    contentStyle={{ background: 'var(--bg-overlay)', border: '1px solid var(--border-default)', borderRadius: '8px', fontSize: '0.75rem', boxShadow: 'var(--shadow-md)' }}
+                    labelStyle={{ color: 'var(--text-secondary)', fontWeight: 600 }}
+                    itemStyle={{ color: '#8B5CF6', fontWeight: 700 }}
+                    cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+                  />
+                  <Bar dataKey="count" radius={[5, 5, 0, 0]}>
                     {reportVolumeData.map((_, index) => (
-                      <Cell key={index} fill={index === reportVolumeData.length - 1 ? '#8B5CF6' : 'rgba(139,92,246,0.4)'} />
+                      <Cell key={index} fill={index === reportVolumeData.length - 1 ? '#8B5CF6' : 'rgba(139,92,246,0.35)'} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -323,24 +427,42 @@ export default function Reports() {
 
         {/* Right Panel */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {/* Generate New Report */}
-          <div className="section-card" style={{ background: 'linear-gradient(160deg, #0D1527, #111827)' }}>
+
+          {/* Generate Report form */}
+          <div className="section-card" style={{
+            background: 'linear-gradient(160deg, rgba(139,92,246,0.05) 0%, var(--bg-elevated) 100%)',
+            border: '1px solid rgba(139,92,246,0.15)',
+          }}>
             <div className="section-card-header" style={{ borderBottom: '1px solid rgba(139,92,246,0.15)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Sparkles size={15} style={{ color: '#8B5CF6' }} />
-                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Generate Report</span>
+                <div style={{ padding: '5px', borderRadius: '7px', background: 'rgba(139,92,246,0.15)', color: '#A78BFA' }}>
+                  <Sparkles size={14} />
+                </div>
+                <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>Generate Report</span>
               </div>
             </div>
             <div style={{ padding: '1rem' }}>
               <div style={{ marginBottom: '0.75rem' }}>
-                <label style={{ fontSize: '0.72rem', color: '#475569', display: 'block', marginBottom: '0.375rem' }}>Report Type</label>
-                <select value={reportType} onChange={e => setReportType(e.target.value)} style={{ width: '100%', padding: '0.5rem 0.625rem', borderRadius: '6px', fontSize: '0.8rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#F1F5F9', fontFamily: 'inherit' }}>
+                <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '0.375rem', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Report Type</label>
+                <select
+                  value={reportType}
+                  onChange={e => setReportType(e.target.value)}
+                  style={selectStyle}
+                  onFocus={e => (e.currentTarget.style.borderColor = 'rgba(139,92,246,0.5)')}
+                  onBlur={e => (e.currentTarget.style.borderColor = 'var(--border-default)')}
+                >
                   {reportTypeOptions.map(opt => <option key={opt}>{opt}</option>)}
                 </select>
               </div>
               <div style={{ marginBottom: '0.75rem' }}>
-                <label style={{ fontSize: '0.72rem', color: '#475569', display: 'block', marginBottom: '0.375rem' }}>Workspace</label>
-                <select value={selectedWorkspace} onChange={e => setSelectedWorkspace(e.target.value)} style={{ width: '100%', padding: '0.5rem 0.625rem', borderRadius: '6px', fontSize: '0.8rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#F1F5F9', fontFamily: 'inherit' }}>
+                <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '0.375rem', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Workspace</label>
+                <select
+                  value={selectedWorkspace}
+                  onChange={e => setSelectedWorkspace(e.target.value)}
+                  style={selectStyle}
+                  onFocus={e => (e.currentTarget.style.borderColor = 'rgba(139,92,246,0.5)')}
+                  onBlur={e => (e.currentTarget.style.borderColor = 'var(--border-default)')}
+                >
                   <option>All Workspaces</option>
                   <option>NCA Digital Transformation</option>
                   <option>ADNOC Supply Chain</option>
@@ -348,9 +470,13 @@ export default function Reports() {
                   <option>Smart City Infrastructure PMO</option>
                 </select>
               </div>
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ fontSize: '0.72rem', color: '#475569', display: 'block', marginBottom: '0.375rem' }}>Period</label>
-                <select style={{ width: '100%', padding: '0.5rem 0.625rem', borderRadius: '6px', fontSize: '0.8rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#F1F5F9', fontFamily: 'inherit' }}>
+              <div style={{ marginBottom: '1.125rem' }}>
+                <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '0.375rem', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Period</label>
+                <select
+                  style={selectStyle}
+                  onFocus={e => (e.currentTarget.style.borderColor = 'rgba(139,92,246,0.5)')}
+                  onBlur={e => (e.currentTarget.style.borderColor = 'var(--border-default)')}
+                >
                   <option>This Week (W10)</option>
                   <option>Last Week (W9)</option>
                   <option>This Month (March)</option>
@@ -363,54 +489,71 @@ export default function Reports() {
             </div>
           </div>
 
-          {/* AI Narrative */}
+          {/* AI Insights */}
           <div className="section-card">
             <div className="section-card-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Sparkles size={14} style={{ color: '#8B5CF6' }} />
-                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>AI Insights</span>
+                <div style={{ padding: '5px', borderRadius: '7px', background: 'rgba(139,92,246,0.12)', color: '#A78BFA' }}>
+                  <Sparkles size={13} />
+                </div>
+                <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>AI Insights</span>
               </div>
-              <span style={{ fontSize: '0.65rem', color: '#334155' }}>Updated 5 min ago</span>
+              <span style={{ fontSize: '0.62rem', fontWeight: 600, color: 'var(--text-faint)', background: 'rgba(255,255,255,0.04)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border-subtle)' }}>5 min ago</span>
             </div>
             <div style={{ padding: '1rem' }}>
-              <div style={{ fontSize: '0.7rem', color: '#475569', marginBottom: '0.875rem', lineHeight: 1.6, padding: '0.625rem', background: 'rgba(139,92,246,0.05)', borderRadius: '6px', border: '1px solid rgba(139,92,246,0.1)' }}>
-                Portfolio is performing at 87% on-time delivery this quarter. Two engagements require immediate attention.
+              {/* Summary pill */}
+              <div style={{
+                fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '1rem',
+                lineHeight: 1.6, padding: '0.75rem 0.875rem',
+                background: 'rgba(139,92,246,0.06)', borderRadius: 'var(--radius-md)',
+                border: '1px solid rgba(139,92,246,0.14)',
+              }}>
+                Portfolio is performing at <strong style={{ color: '#A78BFA' }}>87% on-time delivery</strong> this quarter. Two engagements require immediate attention.
               </div>
 
-              <div style={{ marginBottom: '1rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.5rem' }}>
-                  <CheckCircle size={13} style={{ color: '#10B981' }} />
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#34D399', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Highlights</span>
+              {/* Highlights */}
+              <div style={{ marginBottom: '1.125rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.625rem' }}>
+                  <CheckCircle size={12} style={{ color: '#10B981', flexShrink: 0 }} />
+                  <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#34D399', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Highlights</span>
                 </div>
-                {aiNarrative.highlights.map((h, i) => (
-                  <div key={i} style={{ fontSize: '0.75rem', color: '#94A3B8', lineHeight: 1.5, paddingLeft: '1rem', marginBottom: '0.375rem', borderLeft: '2px solid rgba(16,185,129,0.3)' }}>
-                    {h}
-                  </div>
-                ))}
-              </div>
-
-              <div style={{ marginBottom: '1rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.5rem' }}>
-                  <AlertTriangle size={13} style={{ color: '#F59E0B' }} />
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#FCD34D', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Concerns</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+                  {aiNarrative.highlights.map((h, i) => (
+                    <div key={i} style={{ fontSize: '0.73rem', color: 'var(--text-secondary)', lineHeight: 1.5, paddingLeft: '0.875rem', borderLeft: '2px solid rgba(16,185,129,0.35)' }}>
+                      {h}
+                    </div>
+                  ))}
                 </div>
-                {aiNarrative.concerns.map((c, i) => (
-                  <div key={i} style={{ fontSize: '0.75rem', color: '#94A3B8', lineHeight: 1.5, paddingLeft: '1rem', marginBottom: '0.375rem', borderLeft: '2px solid rgba(245,158,11,0.3)' }}>
-                    {c}
-                  </div>
-                ))}
               </div>
 
+              {/* Concerns */}
+              <div style={{ marginBottom: '1.125rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.625rem' }}>
+                  <AlertTriangle size={12} style={{ color: '#F59E0B', flexShrink: 0 }} />
+                  <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#FCD34D', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Concerns</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+                  {aiNarrative.concerns.map((c, i) => (
+                    <div key={i} style={{ fontSize: '0.73rem', color: 'var(--text-secondary)', lineHeight: 1.5, paddingLeft: '0.875rem', borderLeft: '2px solid rgba(245,158,11,0.35)' }}>
+                      {c}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Recommendations */}
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.5rem' }}>
-                  <TrendingUp size={13} style={{ color: '#0EA5E9' }} />
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#38BDF8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Recommendations</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.625rem' }}>
+                  <TrendingUp size={12} style={{ color: '#0EA5E9', flexShrink: 0 }} />
+                  <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#38BDF8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Recommendations</span>
                 </div>
-                {aiNarrative.recommendations.map((r, i) => (
-                  <div key={i} style={{ fontSize: '0.75rem', color: '#94A3B8', lineHeight: 1.5, paddingLeft: '1rem', marginBottom: '0.375rem', borderLeft: '2px solid rgba(14,165,233,0.3)' }}>
-                    {r}
-                  </div>
-                ))}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+                  {aiNarrative.recommendations.map((r, i) => (
+                    <div key={i} style={{ fontSize: '0.73rem', color: 'var(--text-secondary)', lineHeight: 1.5, paddingLeft: '0.875rem', borderLeft: '2px solid rgba(14,165,233,0.35)' }}>
+                      {r}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

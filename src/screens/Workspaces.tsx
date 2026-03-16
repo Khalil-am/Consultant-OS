@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Grid3X3, List, FileText, Video, CheckSquare, ChevronRight, TrendingUp, TrendingDown, DollarSign, RefreshCw, X, AlertCircle } from 'lucide-react';
+import {
+  Search, Plus, Grid3X3, List, FileText, Video, CheckSquare,
+  ChevronRight, TrendingUp, TrendingDown, DollarSign, RefreshCw,
+  X, AlertCircle, Briefcase, ArrowRight,
+} from 'lucide-react';
 import { useLayout } from '../hooks/useLayout';
 import {
   getWorkspaces, getWorkspaceFinancials, getWorkspaceRagStatuses, createWorkspace,
@@ -30,23 +34,29 @@ const avatarColors = [
 ];
 
 const RAG_COLORS: Record<string, string> = { Green: '#10B981', Amber: '#F59E0B', Red: '#EF4444' };
+const RAG_GLOW: Record<string, string> = { Green: 'rgba(16,185,129,0.55)', Amber: 'rgba(245,158,11,0.55)', Red: 'rgba(239,68,68,0.55)' };
 
 function fmtSAR(val: number): string {
-  if (val >= 1_000_000) return `⃁${(val / 1_000_000).toFixed(1)}M`;
-  if (val >= 1_000) return `⃁${(val / 1_000).toFixed(0)}K`;
-  return `⃁${val.toLocaleString()}`;
+  if (val >= 1_000_000) return `\u20C1${(val / 1_000_000).toFixed(1)}M`;
+  if (val >= 1_000) return `\u20C1${(val / 1_000).toFixed(0)}K`;
+  return `\u20C1${val.toLocaleString()}`;
 }
 
 function LoadingSkeleton() {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
       {[1, 2, 3, 4, 5, 6].map(i => (
-        <div key={i} className="section-card" style={{ padding: '1.25rem', overflow: 'hidden' }}>
-          <div style={{ height: '4px', background: 'rgba(255,255,255,0.06)', marginBottom: '1rem', borderRadius: 2 }} />
-          <div style={{ height: '16px', width: '70%', background: 'rgba(255,255,255,0.06)', borderRadius: 4, marginBottom: 8 }} />
-          <div style={{ height: '12px', width: '45%', background: 'rgba(255,255,255,0.04)', borderRadius: 4, marginBottom: 16 }} />
-          <div style={{ height: '60px', background: 'rgba(255,255,255,0.03)', borderRadius: 6, marginBottom: 12 }} />
-          <div style={{ height: '8px', background: 'rgba(255,255,255,0.04)', borderRadius: 9999 }} />
+        <div key={i} style={{
+          background: '#0C1220', border: '1px solid rgba(255,255,255,0.07)',
+          borderRadius: '14px', overflow: 'hidden',
+        }}>
+          <div style={{ height: '3px', background: 'rgba(255,255,255,0.07)' }} />
+          <div style={{ padding: '1.25rem' }}>
+            <div style={{ height: '14px', width: '65%', background: 'rgba(255,255,255,0.06)', borderRadius: '6px', marginBottom: '8px' }} />
+            <div style={{ height: '11px', width: '40%', background: 'rgba(255,255,255,0.04)', borderRadius: '4px', marginBottom: '18px' }} />
+            <div style={{ height: '56px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', marginBottom: '14px' }} />
+            <div style={{ height: '6px', background: 'rgba(255,255,255,0.04)', borderRadius: '9999px' }} />
+          </div>
         </div>
       ))}
     </div>
@@ -64,6 +74,23 @@ interface NewWorkspaceForm {
 
 const defaultForm: NewWorkspaceForm = {
   name: '', client: '', sector: 'Government', type: 'Client', language: 'EN', description: '',
+};
+
+// ── Label component for form fields ──────────────────────────────────────────
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B', display: 'block', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+      {children}
+    </label>
+  );
+}
+
+const inputStyle: React.CSSProperties = {
+  width: '100%', padding: '0.625rem 0.875rem',
+  background: '#080C18', border: '1px solid rgba(255,255,255,0.09)',
+  borderRadius: '8px', color: '#F1F5F9', fontSize: '0.85rem',
+  fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
+  transition: 'border-color 0.15s',
 };
 
 export default function Workspaces() {
@@ -121,6 +148,7 @@ export default function Workspaces() {
   const totalContract = financials.reduce((s, f) => s + f.contract_value, 0);
   const totalSpent = financials.reduce((s, f) => s + f.spent, 0);
   const totalVariance = financials.reduce((s, f) => s + f.variance, 0);
+  const healthScore = Math.round((ragData.filter(r => r.rag === 'Green').length / Math.max(ragData.length, 1)) * 100);
 
   const handleCreateWorkspace = async () => {
     if (!form.name.trim() || !form.client.trim()) {
@@ -140,7 +168,6 @@ export default function Workspaces() {
         contributors: [], last_activity: 'Just now',
         description: form.description.trim(),
       });
-      // Create default financial record
       await upsertWorkspaceFinancial({
         id: `fin-${Date.now()}`, workspace_id: newWs.id, workspace_name: newWs.name,
         contract_value: 0, spent: 0, forecast: 0, variance: 0,
@@ -156,351 +183,617 @@ export default function Workspaces() {
     }
   };
 
+  // ── Loading state ──────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div style={{ padding: isMobile ? '0.875rem' : '1.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
-          <div style={{ width: 20, height: 20, border: '2px solid #0EA5E9', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-          <span style={{ fontSize: '0.85rem', color: '#475569' }}>Loading workspaces…</span>
+      <div style={{ padding: isMobile ? '0.875rem' : '1.5rem', background: '#080C18', minHeight: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '1.75rem' }}>
+          <div style={{ width: 18, height: 18, border: '2px solid #00D4FF', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+          <span style={{ fontSize: '0.82rem', color: '#475569', fontWeight: 500 }}>Loading workspaces…</span>
         </div>
         <LoadingSkeleton />
+        <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
+  // ── Error state ────────────────────────────────────────────────────────────
   if (error) {
     return (
-      <div style={{ padding: isMobile ? '0.875rem' : '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', paddingTop: '4rem' }}>
-        <AlertCircle size={40} style={{ color: '#EF4444' }} />
-        <div style={{ fontSize: '0.9rem', color: '#FCA5A5', fontWeight: 600 }}>Failed to load workspaces</div>
-        <div style={{ fontSize: '0.78rem', color: '#475569', maxWidth: '400px', textAlign: 'center' }}>{error}</div>
+      <div style={{ padding: isMobile ? '0.875rem' : '1.5rem', background: '#080C18', minHeight: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', paddingTop: '5rem' }}>
+        <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '0.25rem' }}>
+          <AlertCircle size={28} style={{ color: '#EF4444' }} />
+        </div>
+        <div style={{ fontSize: '1rem', fontWeight: 700, color: '#FCA5A5' }}>Failed to load workspaces</div>
+        <div style={{ fontSize: '0.8rem', color: '#475569', maxWidth: '400px', textAlign: 'center', lineHeight: 1.6 }}>{error}</div>
         <button className="btn-primary" onClick={() => loadData()}>Retry</button>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: isMobile ? '0.875rem' : '1.5rem', display: 'flex', flexDirection: 'column', gap: isMobile ? '0.875rem' : '1.25rem' }}>
+    <div style={{ padding: isMobile ? '0.875rem' : '1.5rem', display: 'flex', flexDirection: 'column', gap: isMobile ? '0.875rem' : '1.25rem', background: '#080C18', minHeight: '100%' }}>
 
-      {/* Banner */}
-      <div className="portfolio-banner">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+      {/* ── Portfolio Banner ────────────────────────────────────────────── */}
+      <div style={{
+        background: 'linear-gradient(135deg, #0C1628 0%, #080C18 55%, #0D0C20 100%)',
+        border: '1px solid rgba(0,212,255,0.12)',
+        borderRadius: '14px',
+        padding: isMobile ? '1.25rem' : '1.75rem',
+        position: 'relative', overflow: 'hidden',
+        boxShadow: '0 4px 32px rgba(0,0,0,0.45)',
+      }}>
+        {/* Ambient glows */}
+        <div style={{ position: 'absolute', top: -60, right: -40, width: 240, height: 240, borderRadius: '50%', background: 'radial-gradient(circle, rgba(0,212,255,0.07) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: -50, left: 60, width: 180, height: 180, borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.05) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px)', backgroundSize: '48px 48px', pointerEvents: 'none' }} />
+
+        <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1.25rem' }}>
           <div>
-            <div style={{ fontSize: '0.65rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.375rem' }}>Client Engagement Overview</div>
-            <div style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 900, color: '#F1F5F9', lineHeight: 1, letterSpacing: '-0.02em' }}>{fmtSAR(totalContract)}</div>
-            <div style={{ fontSize: '0.8rem', color: '#475569', marginTop: '0.375rem' }}>
-              {workspaces.filter(w => w.status === 'Active').length} active engagements · Health score{' '}
-              <span style={{ color: '#10B981', fontWeight: 700 }}>
-                {Math.round((ragData.filter(r => r.rag === 'Green').length / Math.max(ragData.length, 1)) * 100)}%
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#10B981', boxShadow: '0 0 8px rgba(16,185,129,0.8)' }} />
+              <span style={{ fontSize: '0.65rem', color: '#64748B', letterSpacing: '0.1em', textTransform: 'uppercase', fontWeight: 600 }}>Client Engagement Overview</span>
+            </div>
+            <div style={{
+              fontSize: isMobile ? '1.75rem' : '2.5rem', fontWeight: 900, lineHeight: 1,
+              letterSpacing: '-0.03em',
+              background: 'linear-gradient(135deg, #00D4FF 0%, #0EA5E9 60%, #F1F5F9 100%)',
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+            }}>
+              {fmtSAR(totalContract)}
+            </div>
+            <div style={{ fontSize: '0.82rem', color: '#64748B', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <span style={{ color: '#00D4FF', fontWeight: 700 }}>{workspaces.filter(w => w.status === 'Active').length}</span>
+              <span>active engagements</span>
+              <span style={{ color: '#1E3A5F' }}>·</span>
+              <span>Portfolio health</span>
+              <span style={{ color: healthScore >= 80 ? '#10B981' : healthScore >= 60 ? '#F59E0B' : '#EF4444', fontWeight: 800 }}>
+                {healthScore}%
               </span>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+
+          <div style={{ display: 'flex', gap: isMobile ? '1rem' : '2rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
             {[
               { label: 'Revenue Recognized', value: fmtSAR(totalSpent), color: '#10B981' },
               { label: 'Budget Variance', value: (totalVariance > 0 ? '+' : '') + fmtSAR(Math.abs(totalVariance)), color: totalVariance > 0 ? '#EF4444' : '#10B981' },
-              { label: 'Last Refreshed', value: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }), color: '#94A3B8' },
+              { label: 'Refreshed', value: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }), color: '#64748B' },
             ].map(s => (
               <div key={s.label} style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: '2px' }}>{s.label}</div>
-                <div style={{ fontSize: '0.95rem', fontWeight: 700, color: s.color }}>{s.value}</div>
+                <div style={{ fontSize: '0.65rem', color: '#334155', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>{s.label}</div>
+                <div style={{ fontSize: '1rem', fontWeight: 800, color: s.color, textShadow: `0 0 18px ${s.color}40` }}>{s.value}</div>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Financial Stats Row */}
+      {/* ── Financial Stats Row ─────────────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 768 ? 4 : 2}, 1fr)`, gap: '0.875rem' }}>
         {[
-          { label: 'Total Contract Value', value: fmtSAR(totalContract), icon: <DollarSign size={16} />, color: '#00D4FF', trend: `${workspaces.length} engagements`, trendUp: true },
-          { label: 'Revenue Recognized', value: fmtSAR(totalSpent), icon: <TrendingUp size={16} />, color: '#10B981', trend: `${totalContract > 0 ? Math.round((totalSpent / totalContract) * 100) : 0}% collected`, trendUp: true },
-          { label: 'Budget Variance', value: (totalVariance > 0 ? '+' : '') + fmtSAR(Math.abs(totalVariance)), icon: <TrendingDown size={16} />, color: totalVariance > 0 ? '#EF4444' : '#10B981', trend: totalVariance > 0 ? 'Over Budget' : 'Under Budget', trendUp: totalVariance <= 0 },
-          { label: 'Milestones Due (30d)', value: `${financials.reduce((s, f) => s + (f.next_milestone_value > 0 ? 1 : 0), 0)}`, icon: <CheckSquare size={16} />, color: '#F59E0B', trend: fmtSAR(financials.reduce((s, f) => s + f.next_milestone_value, 0)) + ' gate value', trendUp: true },
+          { label: 'Total Contract Value', value: fmtSAR(totalContract), icon: <DollarSign size={15} />, color: '#00D4FF', trend: `${workspaces.length} engagements`, trendUp: true },
+          { label: 'Revenue Recognized', value: fmtSAR(totalSpent), icon: <TrendingUp size={15} />, color: '#10B981', trend: `${totalContract > 0 ? Math.round((totalSpent / totalContract) * 100) : 0}% collected`, trendUp: true },
+          { label: 'Budget Variance', value: (totalVariance > 0 ? '+' : '') + fmtSAR(Math.abs(totalVariance)), icon: <TrendingDown size={15} />, color: totalVariance > 0 ? '#EF4444' : '#10B981', trend: totalVariance > 0 ? 'Over Budget' : 'Under Budget', trendUp: totalVariance <= 0 },
+          { label: 'Milestones Due (30d)', value: `${financials.reduce((s, f) => s + (f.next_milestone_value > 0 ? 1 : 0), 0)}`, icon: <CheckSquare size={15} />, color: '#F59E0B', trend: fmtSAR(financials.reduce((s, f) => s + f.next_milestone_value, 0)) + ' gate value', trendUp: true },
         ].map(stat => (
-          <div key={stat.label} className="metric-card" style={{ position: 'relative', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(90deg, ${stat.color}, transparent)` }} />
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-              <div style={{ padding: '0.45rem', borderRadius: '8px', background: `${stat.color}15`, color: stat.color }}>{stat.icon}</div>
-              <span style={{ fontSize: '0.65rem', fontWeight: 600, color: stat.trendUp ? '#34D399' : '#FCA5A5' }}>{stat.trend}</span>
+          <div key={stat.label} style={{
+            background: '#0C1220', border: '1px solid rgba(255,255,255,0.07)',
+            borderRadius: '12px', padding: '1.125rem',
+            position: 'relative', overflow: 'hidden',
+            transition: 'all 0.2s',
+          }}
+            onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = stat.color + '30'; el.style.transform = 'translateY(-2px)'; }}
+            onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = 'rgba(255,255,255,0.07)'; el.style.transform = 'translateY(0)'; }}
+          >
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(90deg, ${stat.color}, ${stat.color}30)` }} />
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '50%', background: `linear-gradient(180deg, ${stat.color}07 0%, transparent 100%)`, pointerEvents: 'none' }} />
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+              <div style={{ padding: '0.5rem', borderRadius: '8px', background: `${stat.color}15`, color: stat.color }}>{stat.icon}</div>
+              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: stat.trendUp ? '#34D399' : '#FCA5A5' }}>{stat.trend}</span>
             </div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#F1F5F9', lineHeight: 1, letterSpacing: '-0.02em' }}>{stat.value}</div>
-            <div style={{ fontSize: '0.72rem', color: '#475569', marginTop: '0.25rem' }}>{stat.label}</div>
+            <div style={{ position: 'relative' }}>
+              <div style={{
+                fontSize: isMobile ? '1.3rem' : '1.6rem', fontWeight: 900, lineHeight: 1,
+                letterSpacing: '-0.025em',
+                background: `linear-gradient(135deg, #F1F5F9 0%, ${stat.color} 200%)`,
+                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+              }}>
+                {stat.value}
+              </div>
+              <div style={{ position: 'absolute', top: '50%', left: 0, transform: 'translateY(-50%)', width: '50px', height: '24px', background: `radial-gradient(ellipse, ${stat.color}1A 0%, transparent 70%)`, pointerEvents: 'none', filter: 'blur(4px)' }} />
+            </div>
+            <div style={{ fontSize: '0.7rem', color: '#64748B', marginTop: '0.375rem', fontWeight: 500 }}>{stat.label}</div>
           </div>
         ))}
       </div>
 
-      {/* Toolbar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: '0.25rem', background: 'rgba(255,255,255,0.03)', padding: '0.25rem', borderRadius: '0.625rem', border: '1px solid rgba(255,255,255,0.06)', overflowX: 'auto' }}>
-          {filterTabs.map(tab => (
-            <button key={tab} className={`tab-item ${activeFilter === tab ? 'active' : ''}`} onClick={() => setActiveFilter(tab)} style={{ padding: '0.375rem 0.875rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
-              {tab}
-              {tab !== 'All' && <span style={{ marginLeft: '4px', fontSize: '0.65rem', color: '#475569' }}>({workspaces.filter(w => w.type === tab).length})</span>}
-              {tab === 'All' && <span style={{ marginLeft: '4px', fontSize: '0.65rem', color: '#475569' }}>({workspaces.length})</span>}
-            </button>
-          ))}
+      {/* ── Toolbar ─────────────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.875rem', flexWrap: 'wrap' }}>
+        {/* Filter tabs */}
+        <div style={{
+          display: 'flex', gap: '2px',
+          background: 'rgba(255,255,255,0.03)', padding: '3px',
+          borderRadius: '10px', border: '1px solid rgba(255,255,255,0.07)',
+          overflowX: 'auto',
+        }}>
+          {filterTabs.map(tab => {
+            const count = tab === 'All' ? workspaces.length : workspaces.filter(w => w.type === tab).length;
+            const active = activeFilter === tab;
+            return (
+              <button key={tab} onClick={() => setActiveFilter(tab)} style={{
+                padding: '0.3rem 0.875rem', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                fontSize: '0.78rem', fontFamily: 'inherit', fontWeight: 600, transition: 'all 0.15s',
+                background: active ? 'rgba(0,212,255,0.12)' : 'transparent',
+                color: active ? '#00D4FF' : '#64748B',
+                whiteSpace: 'nowrap',
+                boxShadow: active ? '0 0 12px rgba(0,212,255,0.1)' : 'none',
+              }}>
+                {tab}
+                <span style={{ marginLeft: '5px', fontSize: '0.65rem', opacity: 0.7, color: active ? '#00D4FF' : '#475569' }}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0 0.75rem', height: '36px', borderRadius: '0.5rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', width: isMobile ? '100%' : '220px' }}>
-            <Search size={14} style={{ color: '#475569' }} />
-            <input type="text" placeholder="Search workspaces…" value={search} onChange={e => setSearch(e.target.value)} style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: '0.8rem', color: '#F1F5F9', width: '100%', fontFamily: 'inherit' }} />
+
+        <div style={{ display: 'flex', gap: '0.625rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Search */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '0.5rem',
+            padding: '0 0.875rem', height: '36px', borderRadius: '9px',
+            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)',
+            width: isMobile ? '100%' : '220px', transition: 'border-color 0.15s',
+          }}
+            onFocusCapture={e => { e.currentTarget.style.borderColor = 'rgba(0,212,255,0.3)'; }}
+            onBlurCapture={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; }}
+          >
+            <Search size={13} style={{ color: '#475569', flexShrink: 0 }} />
+            <input type="text" placeholder="Search workspaces…" value={search} onChange={e => setSearch(e.target.value)}
+              style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: '0.8rem', color: '#F1F5F9', width: '100%', fontFamily: 'inherit' }} />
+            {search && (
+              <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: 0, display: 'flex', lineHeight: 1, transition: 'color 0.15s' }}
+                onMouseEnter={e => { e.currentTarget.style.color = '#94A3B8'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = '#475569'; }}
+              >
+                <X size={12} />
+              </button>
+            )}
           </div>
-          <div style={{ display: 'flex', gap: '0.25rem' }}>
-            <button className={viewMode === 'grid' ? 'btn-primary' : 'btn-ghost'} style={{ padding: '0.375rem 0.625rem', width: '34px', height: '34px' }} onClick={() => setViewMode('grid')}><Grid3X3 size={14} /></button>
-            <button className={viewMode === 'list' ? 'btn-primary' : 'btn-ghost'} style={{ padding: '0.375rem 0.625rem', width: '34px', height: '34px' }} onClick={() => setViewMode('list')}><List size={14} /></button>
+
+          {/* View mode toggle */}
+          <div style={{ display: 'flex', gap: '2px', background: 'rgba(255,255,255,0.04)', padding: '3px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }}>
+            {([['grid', <Grid3X3 size={13} />], ['list', <List size={13} />]] as const).map(([mode, icon]) => (
+              <button key={mode} onClick={() => setViewMode(mode as 'grid' | 'list')} style={{
+                width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                borderRadius: '6px', border: 'none', cursor: 'pointer',
+                background: viewMode === mode ? 'rgba(0,212,255,0.12)' : 'transparent',
+                color: viewMode === mode ? '#00D4FF' : '#475569',
+                transition: 'all 0.15s', fontFamily: 'inherit',
+              }}>
+                {icon}
+              </button>
+            ))}
           </div>
-          <button className="btn-ghost" style={{ height: '36px', width: '36px', padding: '0.375rem' }} onClick={() => loadData(true)} title="Refresh">
-            <RefreshCw size={14} style={{ animation: refreshing ? 'spin 0.8s linear infinite' : 'none' }} />
+
+          {/* Refresh */}
+          <button style={{
+            width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            borderRadius: '9px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)',
+            color: '#64748B', cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit',
+          }}
+            onClick={() => loadData(true)}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)'; e.currentTarget.style.color = '#94A3B8'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; e.currentTarget.style.color = '#64748B'; }}
+            title="Refresh"
+          >
+            <RefreshCw size={13} style={{ animation: refreshing ? 'spin 0.8s linear infinite' : 'none' }} />
           </button>
-          <button className="btn-primary" style={{ height: '36px' }} onClick={() => setShowNewModal(true)}>
-            <Plus size={15} /> New Workspace
+
+          {/* New workspace */}
+          <button className="btn-primary" onClick={() => setShowNewModal(true)}>
+            <Plus size={14} /> New Workspace
           </button>
         </div>
       </div>
 
-      {/* Empty state */}
+      {/* ── Empty State ─────────────────────────────────────────────────── */}
       {filtered.length === 0 && !loading && (
-        <div style={{ padding: '4rem', textAlign: 'center', color: '#475569' }}>
-          <div style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.5rem' }}>No workspaces found</div>
-          <div style={{ fontSize: '0.78rem' }}>{search ? `No results for "${search}"` : 'Create your first workspace to get started'}</div>
+        <div style={{
+          padding: '5rem 2rem', textAlign: 'center',
+          background: '#0C1220', border: '1px solid rgba(255,255,255,0.07)',
+          borderRadius: '14px',
+        }}>
+          <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(0,212,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem', border: '1px solid rgba(0,212,255,0.12)' }}>
+            <Briefcase size={26} style={{ color: '#00D4FF' }} />
+          </div>
+          <div style={{ fontSize: '1rem', fontWeight: 700, color: '#94A3B8', marginBottom: '0.5rem' }}>
+            {search ? `No results for "${search}"` : 'No workspaces found'}
+          </div>
+          <div style={{ fontSize: '0.8rem', color: '#475569', marginBottom: '1.5rem', maxWidth: '320px', margin: '0 auto 1.5rem', lineHeight: 1.7 }}>
+            {search
+              ? 'Try adjusting your search or changing the active filter.'
+              : 'Create your first workspace to start managing client engagements, documents, and milestones.'}
+          </div>
+          {!search && (
+            <button className="btn-primary" onClick={() => setShowNewModal(true)}>
+              <Plus size={14} /> Create Workspace
+            </button>
+          )}
         </div>
       )}
 
-      {/* Grid / List */}
-      <div style={{
-        display: viewMode === 'grid' ? 'grid' : 'flex',
-        gridTemplateColumns: viewMode === 'grid' ? `repeat(${gridCols}, 1fr)` : undefined,
-        flexDirection: viewMode === 'list' ? 'column' : undefined,
-        gap: '1rem',
-      }}>
-        {filtered.map((ws) => {
-          const fin = financials.find(f => f.workspace_id === ws.id);
-          const rag = ragData.find(r => r.workspace_id === ws.id);
-          const spentPct = fin && fin.contract_value > 0 ? Math.round((fin.spent / fin.contract_value) * 100) : null;
-          const sectorColor = sectorColors[ws.sector] ?? '#0EA5E9';
-          const spentBarColor = spentPct !== null ? (spentPct >= 95 ? '#EF4444' : spentPct >= 80 ? '#F59E0B' : '#10B981') : '#0EA5E9';
+      {/* ── Grid / List view ────────────────────────────────────────────── */}
+      {filtered.length > 0 && (
+        <div style={{
+          display: viewMode === 'grid' ? 'grid' : 'flex',
+          gridTemplateColumns: viewMode === 'grid' ? `repeat(${gridCols}, 1fr)` : undefined,
+          flexDirection: viewMode === 'list' ? 'column' : undefined,
+          gap: viewMode === 'grid' ? '1rem' : '0.5rem',
+        }}>
+          {filtered.map((ws) => {
+            const fin = financials.find(f => f.workspace_id === ws.id);
+            const rag = ragData.find(r => r.workspace_id === ws.id);
+            const spentPct = fin && fin.contract_value > 0 ? Math.round((fin.spent / fin.contract_value) * 100) : null;
+            const sectorColor = sectorColors[ws.sector] ?? '#0EA5E9';
+            const spentBarColor = spentPct !== null ? (spentPct >= 95 ? '#EF4444' : spentPct >= 80 ? '#F59E0B' : '#10B981') : '#0EA5E9';
+            const progressGradient = ws.progress >= 80
+              ? 'linear-gradient(90deg, #059669, #10B981)'
+              : ws.progress >= 50
+              ? 'linear-gradient(90deg, #0EA5E9, #00D4FF)'
+              : 'linear-gradient(90deg, #F59E0B, #FCD34D)';
 
-          if (viewMode === 'list') {
+            // ── List row ────────────────────────────────────────────────
+            if (viewMode === 'list') {
+              return (
+                <div key={ws.id} style={{
+                  background: '#0C1220', border: '1px solid rgba(255,255,255,0.07)',
+                  borderRadius: '10px', cursor: 'pointer', overflow: 'hidden',
+                  display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.875rem 1.25rem',
+                  transition: 'all 0.2s',
+                }}
+                  onClick={() => navigate(`/workspaces/${ws.id}`)}
+                  onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = `${sectorColor}35`; el.style.background = '#0E1628'; }}
+                  onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = 'rgba(255,255,255,0.07)'; el.style.background = '#0C1220'; }}
+                >
+                  <div style={{ width: '3px', height: '42px', borderRadius: '9999px', background: sectorColor, flexShrink: 0, boxShadow: `0 0 8px ${sectorColor}50` }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#E2E8F0', marginBottom: '2px' }}>{ws.name}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#475569' }}>{ws.client}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.375rem', flexShrink: 0, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.65rem', padding: '2px 8px', borderRadius: '5px', background: `${sectorColor}18`, color: sectorColor, border: `1px solid ${sectorColor}28`, fontWeight: 600 }}>{ws.sector}</span>
+                    <span style={{ fontSize: '0.65rem', padding: '2px 8px', borderRadius: '5px', background: 'rgba(148,163,184,0.08)', color: '#94A3B8', border: '1px solid rgba(148,163,184,0.12)', fontWeight: 600 }}>{ws.type}</span>
+                  </div>
+                  {fin && <div style={{ flexShrink: 0, textAlign: 'right' }}><div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#F59E0B' }}>{fmtSAR(fin.contract_value)}</div><div style={{ fontSize: '0.68rem', color: '#475569' }}>{spentPct}% spent</div></div>}
+                  {rag && (
+                    <div style={{ display: 'flex', gap: '0.375rem', flexShrink: 0, alignItems: 'center' }}>
+                      {(['rag', 'budget', 'schedule', 'risk'] as const).map(k => (
+                        <div key={k} title={k.charAt(0).toUpperCase() + k.slice(1)} style={{ width: 8, height: 8, borderRadius: '50%', background: RAG_COLORS[rag[k]], boxShadow: `0 0 6px ${RAG_GLOW[rag[k]]}` }} />
+                      ))}
+                    </div>
+                  )}
+                  <div style={{ flexShrink: 0 }}>
+                    <div style={{ width: '80px', height: '4px', borderRadius: '9999px', background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${ws.progress}%`, background: progressGradient, borderRadius: '9999px' }} />
+                    </div>
+                    <div style={{ fontSize: '0.65rem', color: '#475569', marginTop: '3px', textAlign: 'right', fontWeight: 600 }}>{ws.progress}%</div>
+                  </div>
+                  <ChevronRight size={15} style={{ color: '#334155', flexShrink: 0 }} />
+                </div>
+              );
+            }
+
+            // ── Grid card ───────────────────────────────────────────────
             return (
-              <div key={ws.id} className="section-card" style={{ cursor: 'pointer', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem 1.25rem' }}
-                onClick={() => navigate(`/workspaces/${ws.id}`)}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = `${sectorColor}40`; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)'; }}
+              <div key={ws.id} style={{
+                background: '#0C1220', border: '1px solid rgba(255,255,255,0.07)',
+                borderRadius: '14px', cursor: 'pointer', overflow: 'hidden',
+                transition: 'all 0.25s', position: 'relative',
+              }}
+                onMouseEnter={e => {
+                  const el = e.currentTarget as HTMLElement;
+                  el.style.borderColor = `${sectorColor}35`;
+                  el.style.transform = 'translateY(-3px)';
+                  el.style.boxShadow = `0 12px 32px rgba(0,0,0,0.35), 0 0 0 1px ${sectorColor}20`;
+                }}
+                onMouseLeave={e => {
+                  const el = e.currentTarget as HTMLElement;
+                  el.style.borderColor = 'rgba(255,255,255,0.07)';
+                  el.style.transform = 'translateY(0)';
+                  el.style.boxShadow = 'none';
+                }}
               >
-                <div style={{ width: '4px', height: '44px', borderRadius: '9999px', background: sectorColor, flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#F1F5F9', marginBottom: '2px' }}>{ws.name}</div>
-                  <div style={{ fontSize: '0.75rem', color: '#475569' }}>{ws.client}</div>
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '0.65rem', padding: '2px 7px', borderRadius: '4px', background: `${sectorColor}18`, color: sectorColor, border: `1px solid ${sectorColor}30` }}>{ws.sector}</span>
-                  <span style={{ fontSize: '0.65rem', padding: '2px 7px', borderRadius: '4px', background: 'rgba(148,163,184,0.08)', color: '#94A3B8', border: '1px solid rgba(148,163,184,0.12)' }}>{ws.type}</span>
-                </div>
-                {fin && <div style={{ flexShrink: 0, textAlign: 'right' }}><div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#F59E0B' }}>{fmtSAR(fin.contract_value)}</div><div style={{ fontSize: '0.68rem', color: '#475569' }}>{spentPct}% spent</div></div>}
-                {rag && (
-                  <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
-                    {(['rag', 'budget', 'schedule', 'risk'] as const).map(k => (
-                      <div key={k} title={k.charAt(0).toUpperCase() + k.slice(1)} style={{ width: 8, height: 8, borderRadius: '50%', background: RAG_COLORS[rag[k]], boxShadow: `0 0 4px ${RAG_COLORS[rag[k]]}80` }} />
-                    ))}
-                  </div>
-                )}
-                <div style={{ flexShrink: 0 }}>
-                  <div style={{ width: '80px', height: '4px', borderRadius: '9999px', background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${ws.progress}%`, background: ws.progress >= 80 ? 'linear-gradient(90deg, #059669, #10B981)' : ws.progress >= 50 ? 'linear-gradient(90deg, #0EA5E9, #00D4FF)' : 'linear-gradient(90deg, #F59E0B, #FCD34D)', borderRadius: '9999px' }} />
-                  </div>
-                  <div style={{ fontSize: '0.65rem', color: '#475569', marginTop: '2px', textAlign: 'right' }}>{ws.progress}%</div>
-                </div>
-                <ChevronRight size={16} style={{ color: '#334155', flexShrink: 0 }} />
-              </div>
-            );
-          }
+                {/* Top accent bar */}
+                <div style={{ height: '3px', background: `linear-gradient(90deg, ${sectorColor}, ${sectorColor}30)` }} />
+                {/* Gradient overlay inside card */}
+                <div style={{ position: 'absolute', top: 3, left: 0, right: 0, height: '80px', background: `linear-gradient(180deg, ${sectorColor}09 0%, transparent 100%)`, pointerEvents: 'none' }} />
 
-          return (
-            <div key={ws.id} className="section-card" style={{ cursor: 'pointer', overflow: 'hidden', transition: 'all 0.2s' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = `${sectorColor}40`; (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 24px rgba(0,0,0,0.3)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}
-            >
-              <div style={{ height: '4px', background: `linear-gradient(90deg, ${sectorColor}, ${sectorColor}40)` }} />
-              <div style={{ padding: '1.125rem' }}>
-                {/* Header */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.625rem' }}>
-                  <div style={{ flex: 1, minWidth: 0, paddingRight: '0.5rem' }}>
-                    <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#F1F5F9', margin: 0, marginBottom: '3px', lineHeight: 1.3 }}>{ws.name}</h3>
-                    <p style={{ fontSize: '0.75rem', color: '#475569', margin: 0 }}>{ws.client}</p>
-                  </div>
-                  <ChevronRight size={14} style={{ color: '#334155', flexShrink: 0, marginTop: '3px' }} />
-                </div>
-
-                {/* Tags */}
-                <div style={{ display: 'flex', gap: '0.375rem', flexWrap: 'wrap', marginBottom: '0.875rem' }}>
-                  <span style={{ fontSize: '0.65rem', fontWeight: 600, padding: '2px 7px', borderRadius: '4px', background: `${sectorColor}18`, color: sectorColor, border: `1px solid ${sectorColor}30` }}>{ws.sector}</span>
-                  <span style={{ fontSize: '0.65rem', fontWeight: 600, padding: '2px 7px', borderRadius: '4px', background: langColors[ws.language]?.bg ?? 'rgba(14,165,233,0.1)', color: langColors[ws.language]?.text ?? '#38BDF8', border: `1px solid ${langColors[ws.language]?.border ?? 'rgba(14,165,233,0.2)'}` }}>{ws.language}</span>
-                  <span style={{ fontSize: '0.65rem', fontWeight: 600, padding: '2px 7px', borderRadius: '4px', background: 'rgba(148,163,184,0.08)', color: '#94A3B8', border: '1px solid rgba(148,163,184,0.12)' }}>{ws.type}</span>
-                </div>
-
-                {/* Financial Row */}
-                {fin && (
-                  <div style={{ marginBottom: '0.875rem', padding: '0.625rem', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.375rem' }}>
-                      <span style={{ fontSize: '0.68rem', color: '#475569' }}>Contract Value</span>
-                      <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#F59E0B' }}>{fmtSAR(fin.contract_value)}</span>
+                <div style={{ padding: '1.125rem 1.25rem', position: 'relative' }}>
+                  {/* Header */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                    <div style={{ flex: 1, minWidth: 0, paddingRight: '0.5rem' }}>
+                      <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#F1F5F9', margin: 0, marginBottom: '3px', lineHeight: 1.3, letterSpacing: '-0.01em' }}>{ws.name}</h3>
+                      <p style={{ fontSize: '0.75rem', color: '#64748B', margin: 0 }}>{ws.client}</p>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.375rem' }}>
-                      <span style={{ fontSize: '0.65rem', color: '#475569' }}>Spent {spentPct}%</span>
-                      <span style={{ fontSize: '0.65rem', color: fin.variance <= 0 ? '#34D399' : '#FCA5A5', fontWeight: 600 }}>
-                        {fin.variance === 0 ? 'On Budget' : (fin.variance > 0 ? '+' : '') + fmtSAR(Math.abs(fin.variance)) + ' variance'}
-                      </span>
+                    <span className={ws.status === 'Active' ? 'status-active' : 'status-pending'} style={{ fontSize: '0.62rem', flexShrink: 0 }}>{ws.status}</span>
+                  </div>
+
+                  {/* Tags */}
+                  <div style={{ display: 'flex', gap: '0.375rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '2px 8px', borderRadius: '5px', background: `${sectorColor}18`, color: sectorColor, border: `1px solid ${sectorColor}28` }}>{ws.sector}</span>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '2px 8px', borderRadius: '5px', background: langColors[ws.language]?.bg ?? 'rgba(14,165,233,0.1)', color: langColors[ws.language]?.text ?? '#38BDF8', border: `1px solid ${langColors[ws.language]?.border ?? 'rgba(14,165,233,0.2)'}` }}>{ws.language}</span>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '2px 8px', borderRadius: '5px', background: 'rgba(148,163,184,0.08)', color: '#94A3B8', border: '1px solid rgba(148,163,184,0.12)' }}>{ws.type}</span>
+                  </div>
+
+                  {/* Financial Row */}
+                  {fin && (
+                    <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'rgba(255,255,255,0.025)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 500 }}>Contract Value</span>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#F59E0B', textShadow: '0 0 12px rgba(245,158,11,0.3)' }}>{fmtSAR(fin.contract_value)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <span style={{ fontSize: '0.65rem', color: '#475569' }}>Spent {spentPct}%</span>
+                        <span style={{ fontSize: '0.65rem', color: fin.variance <= 0 ? '#34D399' : '#FCA5A5', fontWeight: 700 }}>
+                          {fin.variance === 0 ? 'On Budget' : (fin.variance > 0 ? '+' : '') + fmtSAR(Math.abs(fin.variance)) + ' variance'}
+                        </span>
+                      </div>
+                      <div style={{ height: '5px', borderRadius: '9999px', background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${spentPct ?? 0}%`, background: `linear-gradient(90deg, ${spentBarColor}, ${spentBarColor}cc)`, borderRadius: '9999px', transition: 'width 0.7s ease', boxShadow: `0 0 6px ${spentBarColor}60` }} />
+                      </div>
                     </div>
-                    <div style={{ height: '4px', borderRadius: '9999px', background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${spentPct ?? 0}%`, background: `linear-gradient(90deg, ${spentBarColor}, ${spentBarColor}cc)`, borderRadius: '9999px', transition: 'width 0.6s ease' }} />
+                  )}
+
+                  {/* RAG Indicators */}
+                  {rag && (
+                    <div style={{ display: 'flex', gap: '0.625rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                      {([['Overall', rag.rag], ['Budget', rag.budget], ['Schedule', rag.schedule], ['Risk', rag.risk]] as [string, string][]).map(([label, status]) => (
+                        <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                          <div style={{ width: 7, height: 7, borderRadius: '50%', background: RAG_COLORS[status], boxShadow: `0 0 6px ${RAG_GLOW[status]}` }} />
+                          <span style={{ fontSize: '0.62rem', color: '#475569', fontWeight: 500 }}>{label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Delivery Progress */}
+                  <div style={{ marginBottom: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.425rem' }}>
+                      <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 500 }}>Delivery Progress</span>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#E2E8F0' }}>{ws.progress}%</span>
+                    </div>
+                    <div style={{ height: '5px', borderRadius: '9999px', background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${ws.progress}%`, background: progressGradient, borderRadius: '9999px', transition: 'width 0.7s ease' }} />
                     </div>
                   </div>
-                )}
 
-                {/* RAG Indicators */}
-                {rag && (
-                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.875rem', flexWrap: 'wrap' }}>
-                    {([['Overall', rag.rag], ['Budget', rag.budget], ['Schedule', rag.schedule], ['Risk', rag.risk]] as [string, string][]).map(([label, status]) => (
-                      <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                        <div style={{ width: 7, height: 7, borderRadius: '50%', background: RAG_COLORS[status], boxShadow: `0 0 4px ${RAG_COLORS[status]}80` }} />
-                        <span style={{ fontSize: '0.62rem', color: '#475569' }}>{label}</span>
+                  {/* Stats row */}
+                  <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+                    {[
+                      { icon: <FileText size={12} />, count: ws.docs_count },
+                      { icon: <Video size={12} />, count: ws.meetings_count },
+                      { icon: <CheckSquare size={12} />, count: ws.tasks_count },
+                    ].map((item, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                        <span style={{ color: '#475569' }}>{item.icon}</span>
+                        <span style={{ fontSize: '0.75rem', color: '#94A3B8', fontWeight: 600 }}>{item.count}</span>
                       </div>
                     ))}
+                    <span style={{ fontSize: '0.65rem', color: '#334155', marginLeft: 'auto', alignSelf: 'center' }}>{ws.last_activity}</span>
                   </div>
-                )}
 
-                {/* Progress */}
-                <div style={{ marginBottom: '0.875rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.375rem' }}>
-                    <span style={{ fontSize: '0.72rem', color: '#475569' }}>Delivery Progress</span>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#F1F5F9' }}>{ws.progress}%</span>
-                  </div>
-                  <div className="progress-bar">
-                    <div className="progress-fill" style={{ width: `${ws.progress}%`, background: ws.progress >= 80 ? 'linear-gradient(90deg, #059669, #10B981)' : ws.progress >= 50 ? 'linear-gradient(90deg, #0EA5E9, #00D4FF)' : 'linear-gradient(90deg, #F59E0B, #FCD34D)' }} />
-                  </div>
-                </div>
-
-                {/* Stats */}
-                <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.875rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                    <FileText size={12} style={{ color: '#475569' }} />
-                    <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>{ws.docs_count}</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                    <Video size={12} style={{ color: '#475569' }} />
-                    <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>{ws.meetings_count}</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                    <CheckSquare size={12} style={{ color: '#475569' }} />
-                    <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>{ws.tasks_count}</span>
-                  </div>
-                  <div style={{ marginLeft: 'auto' }}>
-                    <span className={ws.status === 'Active' ? 'status-active' : 'status-pending'} style={{ fontSize: '0.62rem' }}>{ws.status}</span>
-                  </div>
-                </div>
-
-                {/* Contributors */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.875rem' }}>
-                  <div style={{ display: 'flex' }}>
+                  {/* Contributors */}
+                  <div style={{ display: 'flex', marginBottom: '1rem' }}>
                     {ws.contributors.slice(0, 4).map((c, i) => (
-                      <div key={i} style={{ width: '24px', height: '24px', borderRadius: '9999px', background: avatarColors[i % avatarColors.length], display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 700, color: 'white', border: '2px solid #0D1527', marginLeft: i > 0 ? '-6px' : 0 }}>
+                      <div key={i} title={c} style={{
+                        width: 26, height: 26, borderRadius: '50%',
+                        background: avatarColors[i % avatarColors.length],
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '0.6rem', fontWeight: 800, color: 'white',
+                        border: '2px solid #0C1220', marginLeft: i > 0 ? '-7px' : 0,
+                        zIndex: 5 - i,
+                      }}>
                         {c}
                       </div>
                     ))}
                     {ws.contributors.length > 4 && (
-                      <div style={{ width: '24px', height: '24px', borderRadius: '9999px', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 700, color: '#94A3B8', border: '2px solid #0D1527', marginLeft: '-6px' }}>
+                      <div style={{
+                        width: 26, height: 26, borderRadius: '50%',
+                        background: 'rgba(255,255,255,0.09)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '0.6rem', fontWeight: 700, color: '#94A3B8',
+                        border: '2px solid #0C1220', marginLeft: '-7px',
+                      }}>
                         +{ws.contributors.length - 4}
                       </div>
                     )}
                   </div>
-                  <span style={{ fontSize: '0.65rem', color: '#334155' }}>{ws.last_activity}</span>
-                </div>
 
-                {/* Action Buttons */}
-                <div style={{ display: 'flex', gap: '0.5rem', paddingTop: '0.875rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                  <button className="btn-primary" style={{ flex: 2, height: '30px', fontSize: '0.72rem', justifyContent: 'center' }} onClick={(e) => { e.stopPropagation(); navigate(`/workspaces/${ws.id}`); }}>
-                    Open Workspace
-                  </button>
-                  <button className="btn-ghost" style={{ flex: 1, height: '30px', fontSize: '0.72rem', justifyContent: 'center' }} onClick={(e) => { e.stopPropagation(); navigate(`/workspaces/${ws.id}`); }}>
-                    Financials
-                  </button>
+                  {/* Action buttons */}
+                  <div style={{ display: 'flex', gap: '0.5rem', paddingTop: '0.875rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                    <button className="btn-primary" style={{ flex: 2, height: '32px', fontSize: '0.72rem', justifyContent: 'center' }}
+                      onClick={(e) => { e.stopPropagation(); navigate(`/workspaces/${ws.id}`); }}
+                    >
+                      Open <ArrowRight size={12} />
+                    </button>
+                    <button style={{
+                      flex: 1, height: '32px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                      borderRadius: '8px', border: '1px solid rgba(255,255,255,0.09)', background: 'rgba(255,255,255,0.04)',
+                      color: '#94A3B8', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, transition: 'all 0.15s',
+                    }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'; e.currentTarget.style.color = '#F1F5F9'; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; e.currentTarget.style.color = '#94A3B8'; }}
+                      onClick={(e) => { e.stopPropagation(); navigate(`/workspaces/${ws.id}`); }}
+                    >
+                      Financials
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
-      {/* New Workspace Modal */}
+      {/* ── New Workspace Modal ──────────────────────────────────────────── */}
       {showNewModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
-          onClick={(e) => { if (e.target === e.currentTarget) setShowNewModal(false); }}>
-          <div style={{ background: '#0D1527', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', padding: '1.75rem', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.78)',
+          zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '1rem', backdropFilter: 'blur(8px)',
+        }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowNewModal(false); }}
+        >
+          <div style={{
+            background: '#0C1220', border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: '16px', padding: '2rem', width: '100%', maxWidth: '540px',
+            maxHeight: '90vh', overflowY: 'auto', position: 'relative', overflow: 'hidden',
+            boxShadow: '0 32px 80px rgba(0,0,0,0.7)',
+          }}>
+            {/* Modal ambient glow */}
+            <div style={{ position: 'absolute', top: -40, right: -40, width: 180, height: 180, borderRadius: '50%', background: 'radial-gradient(circle, rgba(0,212,255,0.06) 0%, transparent 70%)', pointerEvents: 'none' }} />
+
+            {/* Modal header */}
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.75rem' }}>
               <div>
-                <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#F1F5F9' }}>New Workspace</div>
-                <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '2px' }}>Create a new client engagement workspace</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '0.375rem' }}>
+                  <div style={{ padding: '0.5rem', borderRadius: '8px', background: 'rgba(0,212,255,0.1)', color: '#00D4FF' }}>
+                    <Briefcase size={15} />
+                  </div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#F1F5F9', letterSpacing: '-0.01em' }}>New Workspace</div>
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#64748B' }}>Create a new client engagement workspace</div>
               </div>
-              <button onClick={() => setShowNewModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><X size={18} /></button>
+              <button onClick={() => { setShowNewModal(false); setForm(defaultForm); setFormError(''); }} style={{
+                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '8px', cursor: 'pointer', color: '#64748B', padding: '6px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s',
+              }}
+                onMouseEnter={e => { e.currentTarget.style.color = '#94A3B8'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = '#64748B'; }}
+              >
+                <X size={16} />
+              </button>
             </div>
 
+            {/* Error */}
             {formError && (
-              <div style={{ padding: '0.75rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', color: '#FCA5A5', fontSize: '0.8rem', marginBottom: '1rem' }}>{formError}</div>
+              <div style={{
+                padding: '0.875rem 1rem', background: 'rgba(239,68,68,0.08)',
+                border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px',
+                color: '#FCA5A5', fontSize: '0.82rem', marginBottom: '1.25rem',
+                display: 'flex', alignItems: 'center', gap: '0.5rem',
+              }}>
+                <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                {formError}
+              </div>
             )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {[
-                { label: 'Workspace Name *', key: 'name' as const, placeholder: 'e.g. ADNOC Digital Transformation' },
-                { label: 'Client / Organization *', key: 'client' as const, placeholder: 'e.g. Abu Dhabi National Oil Company' },
-              ].map(({ label, key, placeholder }) => (
-                <div key={key}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', display: 'block', marginBottom: '0.375rem' }}>{label}</label>
-                  <input type="text" value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} placeholder={placeholder}
-                    style={{ width: '100%', padding: '0.625rem 0.75rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '0.5rem', color: '#F1F5F9', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
-                </div>
-              ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.125rem', overflowY: 'auto', maxHeight: 'calc(90vh - 180px)', paddingRight: '2px' }}>
+              {/* Name */}
+              <div>
+                <FieldLabel>Workspace Name *</FieldLabel>
+                <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                  placeholder="e.g. ADNOC Digital Transformation"
+                  style={inputStyle}
+                  onFocus={e => { e.currentTarget.style.borderColor = 'rgba(0,212,255,0.35)'; }}
+                  onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; }}
+                />
+              </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              {/* Client */}
+              <div>
+                <FieldLabel>Client / Organization *</FieldLabel>
+                <input type="text" value={form.client} onChange={e => setForm(f => ({ ...f, client: e.target.value }))}
+                  placeholder="e.g. Abu Dhabi National Oil Company"
+                  style={inputStyle}
+                  onFocus={e => { e.currentTarget.style.borderColor = 'rgba(0,212,255,0.35)'; }}
+                  onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; }}
+                />
+              </div>
+
+              {/* Sector + Type */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.875rem' }}>
                 <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', display: 'block', marginBottom: '0.375rem' }}>Sector</label>
+                  <FieldLabel>Sector</FieldLabel>
                   <select value={form.sector} onChange={e => setForm(f => ({ ...f, sector: e.target.value }))}
-                    style={{ width: '100%', padding: '0.625rem 0.75rem', background: '#0A0F1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '0.5rem', color: '#F1F5F9', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none' }}>
+                    style={{ ...inputStyle }}
+                    onFocus={e => { e.currentTarget.style.borderColor = 'rgba(0,212,255,0.35)'; }}
+                    onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; }}
+                  >
                     {SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', display: 'block', marginBottom: '0.375rem' }}>Type</label>
+                  <FieldLabel>Type</FieldLabel>
                   <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as typeof TYPES[number] }))}
-                    style={{ width: '100%', padding: '0.625rem 0.75rem', background: '#0A0F1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '0.5rem', color: '#F1F5F9', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none' }}>
+                    style={{ ...inputStyle }}
+                    onFocus={e => { e.currentTarget.style.borderColor = 'rgba(0,212,255,0.35)'; }}
+                    onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; }}
+                  >
                     {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', display: 'block', marginBottom: '0.375rem' }}>Language</label>
-                  <select value={form.language} onChange={e => setForm(f => ({ ...f, language: e.target.value as typeof LANGUAGES[number] }))}
-                    style={{ width: '100%', padding: '0.625rem 0.75rem', background: '#0A0F1E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '0.5rem', color: '#F1F5F9', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none' }}>
-                    {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
-                  </select>
+              </div>
+
+              {/* Language */}
+              <div style={{ maxWidth: '50%' }}>
+                <FieldLabel>Language</FieldLabel>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  {LANGUAGES.map(l => {
+                    const lc = langColors[l];
+                    const active = form.language === l;
+                    return (
+                      <button key={l} onClick={() => setForm(f => ({ ...f, language: l }))} style={{
+                        flex: 1, padding: '0.5rem', borderRadius: '8px', border: `1px solid ${active ? lc.border : 'rgba(255,255,255,0.09)'}`,
+                        background: active ? lc.bg : 'rgba(255,255,255,0.03)',
+                        color: active ? lc.text : '#64748B', cursor: 'pointer',
+                        fontFamily: 'inherit', fontSize: '0.78rem', fontWeight: 700,
+                        transition: 'all 0.15s',
+                      }}>
+                        {l}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
+              {/* Description */}
               <div>
-                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', display: 'block', marginBottom: '0.375rem' }}>Description</label>
-                <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Brief description of the engagement scope…" rows={3}
-                  style={{ width: '100%', padding: '0.625rem 0.75rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '0.5rem', color: '#F1F5F9', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }} />
+                <FieldLabel>Description</FieldLabel>
+                <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                  placeholder="Brief description of the engagement scope and key objectives…" rows={3}
+                  style={{ ...inputStyle, resize: 'vertical' }}
+                  onFocus={e => { e.currentTarget.style.borderColor = 'rgba(0,212,255,0.35)'; }}
+                  onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; }}
+                />
               </div>
 
-              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', paddingTop: '0.5rem' }}>
-                <button className="btn-ghost" onClick={() => { setShowNewModal(false); setForm(defaultForm); setFormError(''); }}>Cancel</button>
-                <button className="btn-primary" onClick={handleCreateWorkspace} disabled={saving}>
-                  {saving ? 'Creating…' : 'Create Workspace'}
+              {/* Footer buttons */}
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', paddingTop: '0.25rem' }}>
+                <button className="btn-ghost" onClick={() => { setShowNewModal(false); setForm(defaultForm); setFormError(''); }}>
+                  Cancel
+                </button>
+                <button className="btn-primary" onClick={handleCreateWorkspace} disabled={saving} style={{ minWidth: '140px', justifyContent: 'center' }}>
+                  {saving ? (
+                    <>
+                      <span style={{ width: 13, height: 13, border: '2px solid rgba(5,8,15,0.4)', borderTopColor: '#05080F', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                      Creating…
+                    </>
+                  ) : (
+                    <><Plus size={14} /> Create Workspace</>
+                  )}
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 }
