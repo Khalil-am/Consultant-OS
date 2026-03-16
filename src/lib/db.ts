@@ -110,6 +110,17 @@ export async function upsertDocument(doc: DocumentInsert): Promise<DocumentRow> 
   return data as DocumentRow;
 }
 
+export async function updateDocument(id: string, update: Partial<DocumentInsert>): Promise<DocumentRow> {
+  const { data, error } = await supabase.from('documents').update(update as Record<string, unknown>).eq('id', id).select().single();
+  if (error) throw error;
+  return data as DocumentRow;
+}
+
+export async function deleteDocument(id: string): Promise<void> {
+  const { error } = await supabase.from('documents').delete().eq('id', id);
+  if (error) throw error;
+}
+
 // ── Meetings ─────────────────────────────────────────────────
 export async function getMeetings(workspaceId?: string): Promise<MeetingRow[]> {
   let query = supabase.from('meetings').select('*').order('date', { ascending: false });
@@ -129,6 +140,17 @@ export async function upsertMeeting(mtg: MeetingInsert): Promise<MeetingRow> {
   const { data, error } = await supabase.from('meetings').upsert(mtg as Record<string, unknown>).select().single();
   if (error) throw error;
   return data as MeetingRow;
+}
+
+export async function updateMeeting(id: string, update: Partial<MeetingInsert>): Promise<MeetingRow> {
+  const { data, error } = await supabase.from('meetings').update(update as Record<string, unknown>).eq('id', id).select().single();
+  if (error) throw error;
+  return data as MeetingRow;
+}
+
+export async function deleteMeeting(id: string): Promise<void> {
+  const { error } = await supabase.from('meetings').delete().eq('id', id);
+  if (error) throw error;
 }
 
 // ── Tasks ────────────────────────────────────────────────────
@@ -152,6 +174,11 @@ export async function updateTask(id: string, update: TaskUpdate): Promise<TaskRo
   return data as TaskRow;
 }
 
+export async function deleteTask(id: string): Promise<void> {
+  const { error } = await supabase.from('tasks').delete().eq('id', id);
+  if (error) throw error;
+}
+
 // ── Risks ────────────────────────────────────────────────────
 export async function getRisks(workspaceId?: string): Promise<RiskRow[]> {
   let query = supabase.from('risks').select('*').order('date_identified', { ascending: false });
@@ -165,6 +192,27 @@ export async function upsertRisk(risk: RiskInsert): Promise<RiskRow> {
   const { data, error } = await supabase.from('risks').upsert(risk as Record<string, unknown>).select().single();
   if (error) throw error;
   return data as RiskRow;
+}
+
+export async function updateRisk(id: string, update: Partial<RiskInsert>): Promise<RiskRow> {
+  const { data, error } = await supabase.from('risks').update(update as Record<string, unknown>).eq('id', id).select().single();
+  if (error) throw error;
+  return data as RiskRow;
+}
+
+export async function deleteRisk(id: string): Promise<void> {
+  const { error } = await supabase.from('risks').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteMilestone(id: string): Promise<void> {
+  const { error } = await supabase.from('milestones').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteWorkspace(id: string): Promise<void> {
+  const { error } = await supabase.from('workspaces').delete().eq('id', id);
+  if (error) throw error;
 }
 
 // ── Reports ──────────────────────────────────────────────────
