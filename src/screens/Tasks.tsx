@@ -78,10 +78,10 @@ function heatmapBorder(impact: number, prob: number): string {
   return 'rgba(16,185,129,0.2)';
 }
 
-function fmtAED(val: number): string {
-  if (val >= 1000000) return `AED ${(val / 1000000).toFixed(1)}M`;
-  if (val >= 1000) return `AED ${(val / 1000).toFixed(0)}K`;
-  return `AED ${val.toLocaleString()}`;
+function fmtSAR(val: number): string {
+  if (val >= 1000000) return `SAR ${(val / 1000000).toFixed(1)}M`;
+  if (val >= 1000) return `SAR ${(val / 1000).toFixed(0)}K`;
+  return `SAR ${val.toLocaleString()}`;
 }
 
 const riskFinancialImpact: Record<string, number> = {
@@ -378,7 +378,7 @@ export default function Tasks() {
                 </div>
                 <div style={{ fontSize: '0.78rem', fontWeight: 700, color: cat.color }}>{cat.label} Risks</div>
                 <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-                  Exposure: {fmtAED(cat.count * riskFinancialImpact[cat.label])}
+                  Exposure: {fmtSAR(cat.count * riskFinancialImpact[cat.label])}
                 </div>
               </div>
             ))}
@@ -518,7 +518,7 @@ export default function Tasks() {
                       </td>
                       <td><span className={`status-risk-${risk.severity.toLowerCase()}`}>{risk.severity}</span></td>
                       <td style={{ fontSize: '0.72rem', fontWeight: 700, color: '#FCD34D' }}>
-                        {fmtAED(riskFinancialImpact[risk.severity] || 100000)}
+                        {fmtSAR(riskFinancialImpact[risk.severity] || 100000)}
                       </td>
                       <td>
                         <span className={risk.status === 'Mitigated' || risk.status === 'Closed' ? 'status-approved' : risk.status === 'Monitoring' ? 'status-review' : 'status-pending'} style={{ fontSize: '0.65rem' }}>

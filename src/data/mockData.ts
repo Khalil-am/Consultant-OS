@@ -222,7 +222,7 @@ export const workspaces: Workspace[] = [
     tasksCount: 93,
     contributors: ['AM', 'JL', 'AS', 'KP', 'RT'],
     lastActivity: '30 min ago',
-    description: 'Programme management office for AED 4.2B smart city infrastructure across 12 concurrent projects.',
+    description: 'Programme management office for SAR 4.2B smart city infrastructure across 12 concurrent projects.',
   },
   {
     id: 'ws-006',
@@ -1441,14 +1441,14 @@ export interface WorkspaceFinancials {
 }
 
 export const workspaceFinancials: WorkspaceFinancials[] = [
-  { workspaceId: 'ws-001', contractValue: 4200000, spent: 2856000, forecast: 4150000, variance: -50000, currency: 'AED', billingModel: 'Fixed Fee', lastInvoice: '15 Feb 2026', nextMilestoneValue: 840000 },
-  { workspaceId: 'ws-002', contractValue: 3500000, spent: 1575000, forecast: 3650000, variance: 150000, currency: 'AED', billingModel: 'Time & Material', lastInvoice: '01 Mar 2026', nextMilestoneValue: 700000 },
-  { workspaceId: 'ws-003', contractValue: 2800000, spent: 2576000, forecast: 2820000, variance: 20000, currency: 'AED', billingModel: 'Fixed Fee', lastInvoice: '28 Feb 2026', nextMilestoneValue: 224000 },
-  { workspaceId: 'ws-004', contractValue: 1950000, spent: 877500, forecast: 1930000, variance: -20000, currency: 'AED', billingModel: 'Retainer', lastInvoice: '01 Mar 2026', nextMilestoneValue: 390000 },
-  { workspaceId: 'ws-005', contractValue: 6800000, spent: 3060000, forecast: 7100000, variance: 300000, currency: 'AED', billingModel: 'Fixed Fee', lastInvoice: '10 Mar 2026', nextMilestoneValue: 1360000 },
-  { workspaceId: 'ws-006', contractValue: 1200000, spent: 1080000, forecast: 1250000, variance: 50000, currency: 'AED', billingModel: 'Fixed Fee', lastInvoice: '05 Mar 2026', nextMilestoneValue: 120000 },
-  { workspaceId: 'ws-007', contractValue: 890000, spent: 445000, forecast: 870000, variance: -20000, currency: 'AED', billingModel: 'T&M', lastInvoice: '01 Mar 2026', nextMilestoneValue: 178000 },
-  { workspaceId: 'ws-008', contractValue: 2100000, spent: 840000, forecast: 2100000, variance: 0, currency: 'AED', billingModel: 'Fixed Fee', lastInvoice: '20 Feb 2026', nextMilestoneValue: 525000 },
+  { workspaceId: 'ws-001', contractValue: 4200000, spent: 2856000, forecast: 4150000, variance: -50000, currency: 'SAR', billingModel: 'Fixed Fee', lastInvoice: '15 Feb 2026', nextMilestoneValue: 840000 },
+  { workspaceId: 'ws-002', contractValue: 3500000, spent: 1575000, forecast: 3650000, variance: 150000, currency: 'SAR', billingModel: 'Time & Material', lastInvoice: '01 Mar 2026', nextMilestoneValue: 700000 },
+  { workspaceId: 'ws-003', contractValue: 2800000, spent: 2576000, forecast: 2820000, variance: 20000, currency: 'SAR', billingModel: 'Fixed Fee', lastInvoice: '28 Feb 2026', nextMilestoneValue: 224000 },
+  { workspaceId: 'ws-004', contractValue: 1950000, spent: 877500, forecast: 1930000, variance: -20000, currency: 'SAR', billingModel: 'Retainer', lastInvoice: '01 Mar 2026', nextMilestoneValue: 390000 },
+  { workspaceId: 'ws-005', contractValue: 6800000, spent: 3060000, forecast: 7100000, variance: 300000, currency: 'SAR', billingModel: 'Fixed Fee', lastInvoice: '10 Mar 2026', nextMilestoneValue: 1360000 },
+  { workspaceId: 'ws-006', contractValue: 1200000, spent: 1080000, forecast: 1250000, variance: 50000, currency: 'SAR', billingModel: 'Fixed Fee', lastInvoice: '05 Mar 2026', nextMilestoneValue: 120000 },
+  { workspaceId: 'ws-007', contractValue: 890000, spent: 445000, forecast: 870000, variance: -20000, currency: 'SAR', billingModel: 'T&M', lastInvoice: '01 Mar 2026', nextMilestoneValue: 178000 },
+  { workspaceId: 'ws-008', contractValue: 2100000, spent: 840000, forecast: 2100000, variance: 0, currency: 'SAR', billingModel: 'Fixed Fee', lastInvoice: '20 Feb 2026', nextMilestoneValue: 525000 },
 ];
 
 export interface Milestone {
@@ -1486,9 +1486,9 @@ export interface PortfolioKPI {
 }
 
 export const portfolioKPIs: PortfolioKPI[] = [
-  { label: 'Total Portfolio Value', value: 'AED 23.4M', subValue: '8 active engagements', trend: '+12%', trendUp: true, color: '#00D4FF', icon: 'portfolio' },
-  { label: 'Revenue Recognized', value: 'AED 13.3M', subValue: '57% of portfolio', trend: '+8%', trendUp: true, color: '#10B981', icon: 'revenue' },
-  { label: 'Budget at Risk', value: 'AED 540K', subValue: '2 engagements over forecast', trend: '+AED 150K', trendUp: false, color: '#EF4444', icon: 'risk' },
+  { label: 'Total Portfolio Value', value: 'SAR 23.4M', subValue: '8 active engagements', trend: '+12%', trendUp: true, color: '#00D4FF', icon: 'portfolio' },
+  { label: 'Revenue Recognized', value: 'SAR 13.3M', subValue: '57% of portfolio', trend: '+8%', trendUp: true, color: '#10B981', icon: 'revenue' },
+  { label: 'Budget at Risk', value: 'SAR 540K', subValue: '2 engagements over forecast', trend: '+SAR 150K', trendUp: false, color: '#EF4444', icon: 'risk' },
   { label: 'Milestones Due (30d)', value: '6', subValue: '4 on track - 2 at risk', trend: '2 at risk', trendUp: false, color: '#F59E0B', icon: 'milestone' },
   { label: 'On-Time Delivery Rate', value: '87%', subValue: 'vs 82% last quarter', trend: '+5pp', trendUp: true, color: '#8B5CF6', icon: 'delivery' },
   { label: 'Client Satisfaction', value: '4.6/5', subValue: 'NPS +62 across 6 clients', trend: '+0.2', trendUp: true, color: '#EC4899', icon: 'satisfaction' },
@@ -1507,7 +1507,7 @@ export interface BoardDecision {
 }
 
 export const boardDecisions: BoardDecision[] = [
-  { id: 'BD-001', title: 'Approve NCA Phase 3 scope extension and AED 420K supplementary budget', committee: 'Steering Committee', date: '10 Mar 2026', status: 'Pending Implementation', owner: 'AM', dueDate: '20 Mar 2026', workspaceId: 'ws-001', priority: 'Critical' },
+  { id: 'BD-001', title: 'Approve NCA Phase 3 scope extension and SAR 420K supplementary budget', committee: 'Steering Committee', date: '10 Mar 2026', status: 'Pending Implementation', owner: 'AM', dueDate: '20 Mar 2026', workspaceId: 'ws-001', priority: 'Critical' },
   { id: 'BD-002', title: 'Award ADNOC ERP integration contract to Vendor B', committee: 'Procurement Committee', date: '05 Mar 2026', status: 'In Progress', owner: 'RT', dueDate: '15 Mar 2026', workspaceId: 'ws-002', priority: 'High' },
   { id: 'BD-003', title: 'Approve Smart City Package 3 mobilization plan and contractor change', committee: 'PMO Board', date: '28 Feb 2026', status: 'In Progress', owner: 'JL', dueDate: '01 Apr 2026', workspaceId: 'ws-005', priority: 'Critical' },
   { id: 'BD-004', title: 'Sign-off ENB UAT results and proceed to production deployment', committee: 'Steering Committee', date: '12 Mar 2026', status: 'Pending Implementation', owner: 'DN', dueDate: '25 Mar 2026', workspaceId: 'ws-003', priority: 'High' },

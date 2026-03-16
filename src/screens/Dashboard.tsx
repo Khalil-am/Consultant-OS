@@ -46,9 +46,9 @@ function RagDot({ status }: { status: 'Green' | 'Amber' | 'Red' }) {
 }
 
 function fmtSAR(val: number): string {
-  if (val >= 1000000) return `\u20C1${(val / 1000000).toFixed(1)}M`;
-  if (val >= 1000) return `\u20C1${(val / 1000).toFixed(0)}K`;
-  return `\u20C1${val.toLocaleString()}`;
+  if (val >= 1000000) return `SAR ${(val / 1000000).toFixed(1)}M`;
+  if (val >= 1000) return `SAR ${(val / 1000).toFixed(0)}K`;
+  return `SAR ${val.toLocaleString()}`;
 }
 
 type ApprovalStatus = 'pending' | 'approved' | 'rejected';
@@ -56,7 +56,7 @@ interface Approval { id: number; title: string; requester: string; type: string;
 
 const initialApprovals: Approval[] = [
   { id: 1, title: 'NCA BRD v2.3', requester: 'AM', type: 'Document Approval', urgency: 'High', status: 'pending' },
-  { id: 2, title: 'SC-10 Budget \u20C12.4M', requester: 'RT', type: 'Budget Approval', urgency: 'High', status: 'pending' },
+  { id: 2, title: 'SC-10 Budget SAR 2.4M', requester: 'RT', type: 'Budget Approval', urgency: 'High', status: 'pending' },
   { id: 3, title: 'MOCI Vendor Shortlist', requester: 'FH', type: 'Procurement Decision', urgency: 'Medium', status: 'pending' },
   { id: 4, title: 'Healthcare Strategy Report', requester: 'SK', type: 'Report Sign-off', urgency: 'Low', status: 'pending' },
 ];

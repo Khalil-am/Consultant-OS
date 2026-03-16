@@ -14,7 +14,7 @@ const tabs = ['Meeting Info', 'Agenda', 'Notes', 'Decisions', 'Action Items', 'A
 const decisionRows = [
   { id: 'DEC-001', decision: 'Proceed with Phase 2 integration work as planned in the architecture BRD', owner: 'AM', status: 'Ratified', dueDate: 'N/A' },
   { id: 'DEC-002', decision: 'Engage independent security consultant for penetration testing', owner: 'SK', status: 'Approved', dueDate: '2026-04-01' },
-  { id: 'DEC-003', decision: 'Approve additional budget of AED 180,000 for cloud infrastructure', owner: 'RT', status: 'Deferred', dueDate: 'Next SC' },
+  { id: 'DEC-003', decision: 'Approve additional budget of SAR 180,000 for cloud infrastructure', owner: 'RT', status: 'Deferred', dueDate: 'Next SC' },
   { id: 'DEC-004', decision: 'Accept risk register v4 with proposed mitigation plans', owner: 'JL', status: 'Approved', dueDate: 'N/A' },
 ];
 

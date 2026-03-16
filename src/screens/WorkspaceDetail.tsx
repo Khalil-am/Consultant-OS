@@ -49,9 +49,9 @@ const SECTOR_COLORS: Record<string, string> = {
 const BILLING_MODELS = ['Fixed Fee', 'Time & Material', 'Retainer', 'T&M'];
 
 function fmtSAR(val: number): string {
-  if (val >= 1_000_000) return `⃁${(val / 1_000_000).toFixed(1)}M`;
-  if (val >= 1_000) return `⃁${(val / 1_000).toFixed(0)}K`;
-  return `⃁${val.toLocaleString()}`;
+  if (val >= 1_000_000) return `SAR ${(val / 1_000_000).toFixed(1)}M`;
+  if (val >= 1_000) return `SAR ${(val / 1_000).toFixed(0)}K`;
+  return `SAR ${val.toLocaleString()}`;
 }
 
 // ── Shared styles ──────────────────────────────────────────────────────────

@@ -27,7 +27,7 @@ const newMenuItems = [
 const notifications = [
   { id: 1, title: 'BRD Generator completed',     detail: 'NCA Digital Transformation · 3 outputs',         time: '2h ago',  color: '#10B981', read: false },
   { id: 2, title: 'Risk Alert: Smart City PMO',  detail: '2 unmitigated critical risks flagged',            time: '4h ago',  color: '#EF4444', read: false },
-  { id: 3, title: 'Approval needed',             detail: 'SC-10 Budget ⃁2.4M awaiting review',             time: '5h ago',  color: '#F59E0B', read: false },
+  { id: 3, title: 'Approval needed',             detail: 'SC-10 Budget SAR 2.4M awaiting review',          time: '5h ago',  color: '#F59E0B', read: false },
   { id: 4, title: 'Meeting minutes ready',        detail: 'Banking Core Transformation · Generated',         time: '1d ago',  color: '#8B5CF6', read: true },
   { id: 5, title: 'Weekly digest ready',          detail: '4 workspaces · Executive summary',               time: '1d ago',  color: '#0EA5E9', read: true },
 ];

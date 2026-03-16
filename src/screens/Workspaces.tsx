@@ -37,9 +37,9 @@ const RAG_COLORS: Record<string, string> = { Green: '#10B981', Amber: '#F59E0B',
 const RAG_GLOW: Record<string, string> = { Green: 'rgba(16,185,129,0.55)', Amber: 'rgba(245,158,11,0.55)', Red: 'rgba(239,68,68,0.55)' };
 
 function fmtSAR(val: number): string {
-  if (val >= 1_000_000) return `\u20C1${(val / 1_000_000).toFixed(1)}M`;
-  if (val >= 1_000) return `\u20C1${(val / 1_000).toFixed(0)}K`;
-  return `\u20C1${val.toLocaleString()}`;
+  if (val >= 1_000_000) return `SAR ${(val / 1_000_000).toFixed(1)}M`;
+  if (val >= 1_000) return `SAR ${(val / 1_000).toFixed(0)}K`;
+  return `SAR ${val.toLocaleString()}`;
 }
 
 function LoadingSkeleton() {

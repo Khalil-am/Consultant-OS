@@ -505,7 +505,7 @@ export default function Admin() {
               {[
                 { trigger: 'Document marked "Final"', approvers: ['Workspace Admin', 'Client Contact'], sla: '48h', escalation: 'Programme Director', status: 'Active' },
                 { trigger: 'AI-generated report published', approvers: ['Consultant', 'Manager'], sla: '24h', escalation: 'Team Lead', status: 'Active' },
-                { trigger: 'Budget variance > AED 100K', approvers: ['PMO Director', 'Finance'], sla: '12h', escalation: 'Managing Partner', status: 'Active' },
+                { trigger: 'Budget variance > SAR 100K', approvers: ['PMO Director', 'Finance'], sla: '12h', escalation: 'Managing Partner', status: 'Active' },
                 { trigger: 'New vendor awarded (procurement)', approvers: ['Committee Chair', 'Legal'], sla: '72h', escalation: 'Board', status: 'Active' },
                 { trigger: 'Risk severity upgraded to Critical', approvers: ['Risk Owner', 'Programme Director'], sla: '6h', escalation: 'Board', status: 'Active' },
               ].map((rule, i) => (

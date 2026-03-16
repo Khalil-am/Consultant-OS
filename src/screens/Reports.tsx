@@ -31,7 +31,7 @@ const aiNarrative = {
     'Smart City Infrastructure PMO delivered 7 of 8 Q1 milestones on schedule',
   ],
   concerns: [
-    'Smart City Package 3 showing AED 240K budget variance – escalation recommended',
+    'Smart City Package 3 showing SAR 240K budget variance – escalation recommended',
     'ADNOC contract review is 3 days overdue – blocking vendor mobilisation',
     'NCA has 3 critical unmitigated risks approaching review deadline',
   ],
@@ -72,7 +72,7 @@ const boardPackTypes = [
   },
   {
     title: 'Risk & Issues Summary',
-    desc: 'RAID log consolidated view with AED financial exposure by severity',
+    desc: 'RAID log consolidated view with SAR financial exposure by severity',
     icon: <AlertTriangle size={20} />,
     color: '#EF4444',
   },
