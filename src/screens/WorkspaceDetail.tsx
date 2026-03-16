@@ -61,7 +61,7 @@ const inputStyle: React.CSSProperties = {
   borderRadius: '0.5rem', color: '#F1F5F9', fontSize: '0.85rem',
   fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
 };
-const selectStyle: React.CSSProperties = { ...inputStyle, background: '#0A0F1E' };
+const selectStyle: React.CSSProperties = { ...inputStyle, background: '#080C18' };
 const labelStyle: React.CSSProperties = {
   fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', display: 'block', marginBottom: '0.375rem',
 };
@@ -431,10 +431,10 @@ export default function WorkspaceDetail() {
           <div style={{ width: 16, height: 16, border: '2px solid #0EA5E9', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
           Loading workspace…
         </div>
-        <div style={{ height: '160px', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }} />
+        <div style={{ height: '160px', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }} />
         <div style={{ height: '40px', borderRadius: '0.5rem', background: 'rgba(255,255,255,0.03)' }} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-          {[1,2].map(i => <div key={i} style={{ height: '200px', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }} />)}
+          {[1,2].map(i => <div key={i} style={{ height: '200px', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }} />)}
         </div>
       </div>
     );
@@ -507,7 +507,7 @@ export default function WorkspaceDetail() {
             <button className="btn-primary" style={{ fontSize: '0.8rem' }} onClick={() => { setShowTaskModal(true); setActiveTab('Tasks'); }}><Plus size={14} /> Add Task</button>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: isMobile ? '1rem' : '2rem', marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: isMobile ? '1rem' : '2rem', marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
           {[
             { icon: <FileText size={13} />, value: docs.length || ws.docs_count, label: 'Documents', onClick: () => setActiveTab('Documents') },
             { icon: <Video size={13} />, value: meetings.length || ws.meetings_count, label: 'Meetings', onClick: () => setActiveTab('Meetings') },
@@ -529,7 +529,7 @@ export default function WorkspaceDetail() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid rgba(255,255,255,0.06)', overflowX: 'auto' }}>
+      <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid rgba(255,255,255,0.05)', overflowX: 'auto' }}>
         {tabs.map(tab => (
           <button key={tab} className={`tab-underline ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)} style={{ marginRight: '1.5rem', whiteSpace: 'nowrap' }}>
             {tab}
@@ -1184,7 +1184,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{ background: '#0D1527', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', padding: '1.75rem', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto' }}>
+      <div style={{ background: '#0C1220', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', padding: '1.75rem', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <div style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9' }}>{title}</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><X size={18} /></button>

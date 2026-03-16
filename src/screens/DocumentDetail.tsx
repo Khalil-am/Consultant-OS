@@ -115,7 +115,7 @@ export default function DocumentDetail() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 64px)', color: '#475569', gap: '0.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 60px)', color: '#475569', gap: '0.5rem' }}>
         <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> Loading document…
       </div>
     );
@@ -123,7 +123,7 @@ export default function DocumentDetail() {
 
   if (error || !doc) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 64px)', color: '#475569', gap: '1rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 60px)', color: '#475569', gap: '1rem' }}>
         <div style={{ color: '#FCA5A5' }}>{error || 'Document not found.'}</div>
         <button className="btn-ghost" onClick={() => navigate('/documents')}>
           <ArrowLeft size={14} /> Back to Documents
@@ -133,9 +133,9 @@ export default function DocumentDetail() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 60px)', overflow: 'hidden' }}>
       {/* Header */}
-      <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)', background: '#0D1527', flexShrink: 0 }}>
+      <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)', background: '#0C1220', flexShrink: 0 }}>
         <button
           onClick={() => navigate('/documents')}
           style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', background: 'none', border: 'none', cursor: 'pointer', color: '#475569', fontSize: '0.8rem', padding: 0, marginBottom: '0.75rem', fontFamily: 'inherit' }}
@@ -202,7 +202,7 @@ export default function DocumentDetail() {
       </div>
 
       {/* Tab bar */}
-      <div style={{ display: 'flex', gap: 0, padding: '0 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)', background: '#0A0F1E', flexShrink: 0 }}>
+      <div style={{ display: 'flex', gap: 0, padding: '0 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)', background: '#080C18', flexShrink: 0 }}>
         {tabs.map(tab => (
           <button
             key={tab}
@@ -467,7 +467,7 @@ export default function DocumentDetail() {
                   </div>
                 ))}
               </div>
-              <div style={{ padding: '1rem', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', gap: '0.75rem' }}>
+              <div style={{ padding: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', gap: '0.75rem' }}>
                 <input
                   type="text"
                   placeholder="Ask anything about this document…"

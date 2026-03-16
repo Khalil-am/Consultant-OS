@@ -102,16 +102,16 @@ export default function Knowledge() {
   const [chatInput, setChatInput] = useState('');
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 64px)', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: 'calc(100vh - 60px)', overflow: 'hidden' }}>
       {/* Left Filter Panel */}
       <div style={{
         width: isTablet ? '100%' : '220px', minWidth: isTablet ? undefined : '220px',
-        borderRight: isTablet ? 'none' : '1px solid rgba(255,255,255,0.06)',
+        borderRight: isTablet ? 'none' : '1px solid rgba(255,255,255,0.05)',
         display: isTablet ? 'none' : 'block',
-        padding: '1rem 0.875rem', overflowY: 'auto', background: '#0D1527',
+        padding: '1rem 0.875rem', overflowY: 'auto', background: '#0C1220',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-          <Filter size={13} style={{ color: '#475569' }} />
+          <Filter size={13} style={{ color: '#64748B' }} />
           <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Filters</span>
         </div>
 
@@ -133,13 +133,13 @@ export default function Knowledge() {
                   background: i === 0 ? 'rgba(0,212,255,0.2)' : 'rgba(255,255,255,0.04)',
                   border: `1px solid ${i === 0 ? 'rgba(0,212,255,0.4)' : 'rgba(255,255,255,0.08)'}`,
                 }} />
-                <span style={{ fontSize: '0.75rem', color: i === 0 ? '#94A3B8' : '#475569' }}>{opt}</span>
+                <span style={{ fontSize: '0.75rem', color: i === 0 ? '#94A3B8' : '#64748B' }}>{opt}</span>
               </div>
             ))}
           </div>
         ))}
 
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.875rem' }}>
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.875rem' }}>
           <div style={{ fontSize: '0.68rem', color: '#334155', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem' }}>
             Knowledge Stats
           </div>
@@ -151,7 +151,7 @@ export default function Knowledge() {
           ].map(stat => (
             <div key={stat.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.25rem 0' }}>
               <span style={{ fontSize: '0.72rem', color: '#334155' }}>{stat.label}</span>
-              <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#475569' }}>{stat.value}</span>
+              <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748B' }}>{stat.value}</span>
             </div>
           ))}
         </div>
@@ -160,7 +160,7 @@ export default function Knowledge() {
       {/* Main Content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Search Bar */}
-        <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+        <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)', flexShrink: 0 }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: '0.75rem',
             padding: '0.75rem 1rem',
@@ -186,7 +186,7 @@ export default function Knowledge() {
             </button>
           </div>
           {hasResults && (
-            <div style={{ fontSize: '0.72rem', color: '#475569', marginTop: '0.5rem', paddingLeft: '0.25rem' }}>
+            <div style={{ fontSize: '0.72rem', color: '#64748B', marginTop: '0.5rem', paddingLeft: '0.25rem' }}>
               Showing {searchResults.length} results for "<span style={{ color: '#00D4FF' }}>{query}</span>" · Semantic search across 847 documents
             </div>
           )}
@@ -200,7 +200,7 @@ export default function Knowledge() {
               className="section-card"
               style={{ padding: '1rem', cursor: 'pointer' }}
               onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.12)'}
-              onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)'}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.05)'}
             >
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
@@ -212,7 +212,7 @@ export default function Knowledge() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0 }}>
                   {/* Relevance bar */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                    <div style={{ width: '48px', height: '4px', borderRadius: '2px', background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                    <div style={{ width: '48px', height: '4px', borderRadius: '2px', background: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
                       <div style={{ height: '100%', width: `${result.relevance}%`, background: '#8B5CF6', borderRadius: '2px' }} />
                     </div>
                     <span style={{ fontSize: '0.68rem', color: '#8B5CF6', fontWeight: 600 }}>{result.relevance}%</span>
@@ -225,13 +225,13 @@ export default function Knowledge() {
                 <span style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '3px', background: `${result.typeColor}12`, color: result.typeColor, border: `1px solid ${result.typeColor}20` }}>
                   {result.type}
                 </span>
-                <span style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '3px', background: 'rgba(255,255,255,0.04)', color: '#475569', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <span style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '3px', background: 'rgba(255,255,255,0.04)', color: '#64748B', border: '1px solid rgba(255,255,255,0.05)' }}>
                   {result.workspace}
                 </span>
                 <span style={{ fontSize: '0.65rem', color: '#334155', marginLeft: 'auto' }}>{result.date}</span>
               </div>
 
-              <p style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.6, margin: 0, marginBottom: '0.5rem' }}>
+              <p style={{ fontSize: '0.8rem', color: '#64748B', lineHeight: 1.6, margin: 0, marginBottom: '0.5rem' }}>
                 {result.snippet}
               </p>
 
@@ -247,14 +247,14 @@ export default function Knowledge() {
       {/* Right AI Answer Panel */}
       <div style={{
         width: isTablet ? '100%' : '320px', minWidth: isTablet ? undefined : '320px',
-        borderLeft: isTablet ? 'none' : '1px solid rgba(255,255,255,0.06)',
-        display: isTablet ? 'none' : 'flex', flexDirection: 'column', overflowY: 'auto', background: '#0D1527',
+        borderLeft: isTablet ? 'none' : '1px solid rgba(255,255,255,0.05)',
+        display: isTablet ? 'none' : 'flex', flexDirection: 'column', overflowY: 'auto', background: '#0C1220',
       }}>
         {/* AI Answer */}
         <div style={{
           padding: '1rem',
           borderBottom: '1px solid rgba(139,92,246,0.15)',
-          background: 'linear-gradient(160deg, #0D1527, #130D2A)',
+          background: 'linear-gradient(160deg, #0C1220, #130D2A)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.875rem' }}>
             <div style={{ padding: '0.3rem', borderRadius: '6px', background: 'rgba(139,92,246,0.15)' }}>
@@ -275,7 +275,7 @@ export default function Knowledge() {
             <div style={{ fontSize: '0.68rem', color: '#334155', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.375rem' }}>Sources</div>
             {aiAnswer.sources.map((s, i) => (
               <div key={i} style={{ display: 'flex', gap: '0.5rem', padding: '0.25rem 0', cursor: 'pointer' }}>
-                <FileText size={11} style={{ color: '#475569', flexShrink: 0, marginTop: '2px' }} />
+                <FileText size={11} style={{ color: '#64748B', flexShrink: 0, marginTop: '2px' }} />
                 <div>
                   <div style={{ fontSize: '0.72rem', color: '#94A3B8' }}>{s.title}</div>
                   <div style={{ fontSize: '0.65rem', color: '#334155' }}>{s.page}</div>
@@ -307,12 +307,12 @@ export default function Knowledge() {
                 onClick={() => setChatInput(suggestion)}
                 style={{
                   textAlign: 'left', padding: '0.5rem 0.625rem', borderRadius: '6px', fontSize: '0.75rem',
-                  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
-                  color: '#475569', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+                  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)',
+                  color: '#64748B', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
                   display: 'flex', alignItems: 'center', gap: '0.375rem',
                 }}
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(139,92,246,0.08)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(139,92,246,0.2)'; (e.currentTarget as HTMLElement).style.color = '#94A3B8'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)'; (e.currentTarget as HTMLElement).style.color = '#475569'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.05)'; (e.currentTarget as HTMLElement).style.color = '#64748B'; }}
               >
                 <ArrowRight size={10} style={{ flexShrink: 0 }} />
                 {suggestion}

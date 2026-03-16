@@ -21,7 +21,7 @@ function AppShell() {
   const { sidebarOpen, setSidebarOpen, isTablet } = useLayout();
 
   return (
-    <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden', background: '#0A0F1E', position: 'relative' }}>
+    <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden', background: '#080C18', position: 'relative' }}>
       {/* Mobile overlay */}
       {isTablet && sidebarOpen && (
         <div
@@ -37,7 +37,7 @@ function AppShell() {
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
         <TopBar />
-        <main style={{ flex: 1, overflowY: 'auto', background: '#0A0F1E' }}>
+        <main style={{ flex: 1, overflowY: 'auto', background: '#080C18' }}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/workspaces" element={<Workspaces />} />

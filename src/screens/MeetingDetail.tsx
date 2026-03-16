@@ -49,18 +49,23 @@ export default function MeetingDetail() {
       <div>
         <button
           onClick={() => navigate('/meetings')}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', background: 'none', border: 'none', cursor: 'pointer', color: '#475569', fontSize: '0.8rem', padding: 0, marginBottom: '1rem', fontFamily: 'inherit' }}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', background: 'none', border: 'none', cursor: 'pointer', color: '#64748B', fontSize: '0.78rem', fontWeight: 500, padding: '0.375rem 0', marginBottom: '0.875rem', fontFamily: 'inherit', transition: 'color 0.15s' }}
+          onMouseEnter={e => (e.currentTarget.style.color = '#94A3B8')}
+          onMouseLeave={e => (e.currentTarget.style.color = '#64748B')}
         >
-          <ArrowLeft size={14} /> Back to Meetings
+          <ArrowLeft size={13} /> Back to Meetings
         </button>
 
         {/* Header Card */}
         <div style={{
           padding: '1.5rem',
-          borderRadius: '0.875rem',
-          background: 'linear-gradient(135deg, #0D1527 0%, #111B35 100%)',
-          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: '14px',
+          background: 'linear-gradient(135deg, #0D1628 0%, #101828 60%, #0F1D30 100%)',
+          border: '1px solid rgba(255,255,255,0.07)',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
+          position: 'relative', overflow: 'hidden',
         }}>
+          <div style={{ position: 'absolute', top: -40, right: -40, width: 160, height: 160, borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.06) 0%, transparent 70%)', pointerEvents: 'none' }} />
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', gap: '1rem', flex: 1 }}>
               <div style={{
@@ -106,7 +111,7 @@ export default function MeetingDetail() {
                     meeting.location && { icon: <MapPin size={12} />, text: meeting.location },
                     { icon: <Users size={12} />, text: `${meeting.participants.length} participants` },
                   ].filter(Boolean).map((item: any, i) => (
-                    <span key={i} style={{ fontSize: '0.75rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <span key={i} style={{ fontSize: '0.75rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                       {item.icon} {item.text}
                     </span>
                   ))}
@@ -138,7 +143,7 @@ export default function MeetingDetail() {
           {isCommittee && (
             <div style={{
               display: 'flex', gap: '1.5rem', marginTop: '1rem', paddingTop: '1rem',
-              borderTop: '1px solid rgba(255,255,255,0.06)',
+              borderTop: '1px solid rgba(255,255,255,0.05)',
             }}>
               {[
                 { label: 'Circular No.', value: 'SC-10/2026' },
@@ -157,7 +162,7 @@ export default function MeetingDetail() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.06)', overflowX: 'auto' }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.05)', overflowX: 'auto' }}>
         {tabs.map(tab => (
           <button
             key={tab}
@@ -191,7 +196,7 @@ export default function MeetingDetail() {
                 ] : []),
               ].map(field => (
                 <div key={field.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.625rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                  <span style={{ fontSize: '0.8rem', color: '#475569' }}>{field.label}</span>
+                  <span style={{ fontSize: '0.8rem', color: '#64748B' }}>{field.label}</span>
                   <span style={{ fontSize: '0.8rem', fontWeight: 500, color: '#94A3B8' }}>{field.value}</span>
                 </div>
               ))}
@@ -201,7 +206,7 @@ export default function MeetingDetail() {
           <div className="section-card">
             <div className="section-card-header">
               <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Participants</span>
-              <span style={{ fontSize: '0.72rem', color: '#475569' }}>{meeting.participants.length} members</span>
+              <span style={{ fontSize: '0.72rem', color: '#64748B' }}>{meeting.participants.length} members</span>
             </div>
             <div style={{ padding: '1rem' }}>
               {meeting.participants.map((p, i) => (
@@ -251,7 +256,7 @@ export default function MeetingDetail() {
               {sampleAgenda.map((item, i) => (
                 <tr key={i}>
                   <td style={{ fontFamily: 'monospace', color: '#00D4FF' }}>{item.time}</td>
-                  <td style={{ color: '#475569' }}>{item.duration}</td>
+                  <td style={{ color: '#64748B' }}>{item.duration}</td>
                   <td style={{ color: '#F1F5F9', fontWeight: 500 }}>{item.item}</td>
                   <td>
                     <div className="avatar" style={{ width: '22px', height: '22px', fontSize: '0.6rem', display: 'inline-flex' }}>
@@ -301,7 +306,7 @@ export default function MeetingDetail() {
                       {d.status}
                     </span>
                   </td>
-                  <td style={{ fontSize: '0.75rem', color: '#475569' }}>{d.dueDate}</td>
+                  <td style={{ fontSize: '0.75rem', color: '#64748B' }}>{d.dueDate}</td>
                 </tr>
               ))}
             </tbody>
@@ -420,7 +425,7 @@ export default function MeetingDetail() {
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F1F5F9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</div>
-                  <div style={{ fontSize: '0.7rem', color: '#475569' }}>{file.size} · Uploaded {file.uploaded} by {file.uploader}</div>
+                  <div style={{ fontSize: '0.7rem', color: '#64748B' }}>{file.size} · Uploaded {file.uploaded} by {file.uploader}</div>
                 </div>
                 <button style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.2)', borderRadius: '6px', padding: '0.25rem 0.625rem', color: '#38BDF8', fontSize: '0.72rem', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>Download</button>
               </div>
@@ -455,7 +460,7 @@ export default function MeetingDetail() {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#F1F5F9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{output.name}</div>
-                    <div style={{ fontSize: '0.7rem', color: '#475569' }}>{output.pages} pages · Generated {output.generated}</div>
+                    <div style={{ fontSize: '0.7rem', color: '#64748B' }}>{output.pages} pages · Generated {output.generated}</div>
                   </div>
                   <span style={{ fontSize: '0.65rem', padding: '2px 7px', borderRadius: '4px', background: output.status === 'Ready' ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', color: output.status === 'Ready' ? '#34D399' : '#FCD34D', border: `1px solid ${output.status === 'Ready' ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.2)'}`, flexShrink: 0 }}>{output.status}</span>
                   <button style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.2)', borderRadius: '6px', padding: '0.25rem 0.625rem', color: '#38BDF8', fontSize: '0.72rem', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>Download</button>

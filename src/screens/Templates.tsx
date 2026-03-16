@@ -68,7 +68,7 @@ export default function Templates() {
         ].map(s => (
           <div key={s.label} className="metric-card" style={{ padding: '1rem' }}>
             <div style={{ fontSize: '1.5rem', fontWeight: 800, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: '0.72rem', color: '#475569', marginTop: '2px' }}>{s.label}</div>
+            <div style={{ fontSize: '0.72rem', color: '#64748B', marginTop: '2px' }}>{s.label}</div>
           </div>
         ))}
       </div>
@@ -90,7 +90,7 @@ export default function Templates() {
                 className="section-card"
                 style={{ cursor: 'pointer', overflow: 'hidden', position: 'relative' }}
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = `${color}30`; (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.05)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; }}
               >
                 <div style={{ height: '3px', background: `linear-gradient(90deg, ${color}, transparent)` }} />
                 <div style={{ padding: '1rem' }}>
@@ -103,7 +103,7 @@ export default function Templates() {
                   <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#F1F5F9', margin: 0, marginBottom: '0.375rem', lineHeight: 1.3 }}>
                     {tpl.name}
                   </h3>
-                  <p style={{ fontSize: '0.72rem', color: '#475569', margin: 0, marginBottom: '0.75rem', lineHeight: 1.5 }}>
+                  <p style={{ fontSize: '0.72rem', color: '#64748B', margin: 0, marginBottom: '0.75rem', lineHeight: 1.5 }}>
                     {tpl.description.slice(0, 80)}...
                   </p>
                   <div style={{ display: 'flex', gap: '0.375rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
@@ -135,7 +135,7 @@ export default function Templates() {
 
       {/* Filter + Search */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
-        <div style={{ display: 'flex', gap: '0.25rem', background: 'rgba(255,255,255,0.03)', padding: '0.25rem', borderRadius: '0.625rem', border: '1px solid rgba(255,255,255,0.06)', overflowX: 'auto' }}>
+        <div style={{ display: 'flex', gap: '0.25rem', background: 'rgba(255,255,255,0.03)', padding: '0.25rem', borderRadius: '0.625rem', border: '1px solid rgba(255,255,255,0.05)', overflowX: 'auto' }}>
           {filterTabs.map(tab => (
             <button
               key={tab}
@@ -149,7 +149,7 @@ export default function Templates() {
         </div>
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0 0.75rem', height: '34px', borderRadius: '0.5rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', width: '220px' }}>
-            <Search size={13} style={{ color: '#475569' }} />
+            <Search size={13} style={{ color: '#64748B' }} />
             <input
               type="text"
               placeholder="Search templates..."
@@ -175,7 +175,7 @@ export default function Templates() {
               className="section-card"
               style={{ cursor: 'pointer', overflow: 'hidden' }}
               onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = `${color}25`}
-              onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)'}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.05)'}
             >
               <div style={{ padding: '1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
@@ -206,7 +206,7 @@ export default function Templates() {
                   </button>
                 </div>
 
-                <p style={{ fontSize: '0.75rem', color: '#475569', lineHeight: 1.5, margin: 0, marginBottom: '0.75rem' }}>
+                <p style={{ fontSize: '0.75rem', color: '#64748B', lineHeight: 1.5, margin: 0, marginBottom: '0.75rem' }}>
                   {tpl.description.slice(0, 90)}...
                 </p>
 

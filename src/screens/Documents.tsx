@@ -190,12 +190,12 @@ export default function Documents() {
   }
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 64px)', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: 'calc(100vh - 60px)', overflow: 'hidden' }}>
       {/* Left sidebar */}
       {!isTablet && (
         <div style={{
-          width: '200px', minWidth: '200px', borderRight: '1px solid rgba(255,255,255,0.06)',
-          display: 'flex', flexDirection: 'column', overflowY: 'auto', background: '#0D1527',
+          width: '200px', minWidth: '200px', borderRight: '1px solid rgba(255,255,255,0.05)',
+          display: 'flex', flexDirection: 'column', overflowY: 'auto', background: '#0C1220',
           padding: '1rem 0.75rem',
         }}>
           <div style={{ fontSize: '0.68rem', color: '#334155', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.625rem', paddingLeft: '0.25rem' }}>
@@ -229,9 +229,9 @@ export default function Documents() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
         {/* Toolbar */}
         <div style={{
-          padding: '0.875rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.06)',
+          padding: '0.875rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)',
           display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0,
-          background: '#0A0F1E', flexWrap: 'wrap',
+          background: '#080C18', flexWrap: 'wrap',
         }}>
           <button className="btn-primary" style={{ height: '34px', fontSize: '0.8rem' }} onClick={() => setShowUpload(true)}>
             <Upload size={13} /> Upload
@@ -287,7 +287,7 @@ export default function Documents() {
             </div>
           ) : (
             <table className="data-table" style={{ tableLayout: 'fixed' }}>
-              <thead style={{ position: 'sticky', top: 0, background: '#0A0F1E', zIndex: 1 }}>
+              <thead style={{ position: 'sticky', top: 0, background: '#080C18', zIndex: 1 }}>
                 <tr>
                   <th style={{ width: '32%' }}>Document</th>
                   <th style={{ width: '14%' }}>Workspace</th>
@@ -411,8 +411,8 @@ export default function Documents() {
       {/* Right Preview Panel */}
       {selected && (
         <div style={{
-          width: '280px', minWidth: '280px', borderLeft: '1px solid rgba(255,255,255,0.06)',
-          display: 'flex', flexDirection: 'column', overflowY: 'auto', background: '#0D1527',
+          width: '280px', minWidth: '280px', borderLeft: '1px solid rgba(255,255,255,0.05)',
+          display: 'flex', flexDirection: 'column', overflowY: 'auto', background: '#0C1220',
           padding: '1rem', animation: 'fadeIn 0.2s ease-out',
         }}>
           <div style={{ marginBottom: '1rem' }}>
@@ -425,7 +425,7 @@ export default function Documents() {
             <p style={{ fontSize: '0.72rem', color: '#475569', margin: 0 }}>{selected.workspace}</p>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', marginBottom: '1rem', padding: '0.75rem', borderRadius: '0.5rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', marginBottom: '1rem', padding: '0.75rem', borderRadius: '0.5rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
             {[
               { label: 'Type', value: selected.type },
               { label: 'Author', value: selected.author },
@@ -506,7 +506,7 @@ export default function Documents() {
       {/* Upload Modal */}
       {showUpload && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
-          <div style={{ background: '#0D1527', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.75rem', padding: '1.5rem', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div style={{ background: '#0C1220', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.75rem', padding: '1.5rem', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#F1F5F9' }}>Upload Document</h2>
               <button onClick={() => { setShowUpload(false); setUploadError(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569' }}>

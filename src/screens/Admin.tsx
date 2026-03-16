@@ -63,12 +63,12 @@ export default function Admin() {
   const [activeSection, setActiveSection] = useState('users');
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 64px)', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: 'calc(100vh - 60px)', overflow: 'hidden' }}>
       {/* Left Sidebar */}
       <div style={{
-        width: '220px', minWidth: '220px', borderRight: '1px solid rgba(255,255,255,0.06)',
+        width: '220px', minWidth: '220px', borderRight: '1px solid rgba(255,255,255,0.05)',
         padding: '1rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '2px',
-        background: '#0D1527',
+        background: '#0C1220',
       }}>
         <div className="sidebar-section-label" style={{ marginBottom: '0.375rem' }}>Administration</div>
         {adminSections.map(section => (
@@ -92,7 +92,7 @@ export default function Admin() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9', margin: 0, marginBottom: '0.25rem' }}>Users & Roles</h2>
-                <p style={{ fontSize: '0.8rem', color: '#475569', margin: 0 }}>{users.length} users · 4 roles</p>
+                <p style={{ fontSize: '0.8rem', color: '#64748B', margin: 0 }}>{users.length} users · 4 roles</p>
               </div>
               <button className="btn-primary" style={{ height: '34px', fontSize: '0.8rem' }}>
                 <Plus size={13} /> Invite User
@@ -145,12 +145,12 @@ export default function Admin() {
                           }}>
                             <div style={{
                               position: 'absolute', width: '10px', height: '10px', borderRadius: '9999px',
-                              background: user.status === 'Active' ? '#10B981' : '#475569',
+                              background: user.status === 'Active' ? '#10B981' : '#64748B',
                               top: '2px', left: user.status === 'Active' ? '15px' : '2px',
                               transition: 'left 0.2s',
                             }} />
                           </div>
-                          <span style={{ fontSize: '0.72rem', color: user.status === 'Active' ? '#34D399' : '#475569' }}>
+                          <span style={{ fontSize: '0.72rem', color: user.status === 'Active' ? '#34D399' : '#64748B' }}>
                             {user.status}
                           </span>
                         </div>
@@ -222,7 +222,7 @@ export default function Admin() {
           <div>
             <div style={{ marginBottom: '1.25rem' }}>
               <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9', margin: 0, marginBottom: '0.25rem' }}>Integrations</h2>
-              <p style={{ fontSize: '0.8rem', color: '#475569', margin: 0 }}>
+              <p style={{ fontSize: '0.8rem', color: '#64748B', margin: 0 }}>
                 {integrations.filter(i => i.status === 'Connected').length} connected · {integrations.filter(i => i.status === 'Disconnected').length} available
               </p>
             </div>
@@ -247,7 +247,7 @@ export default function Admin() {
                           <span style={{
                             fontSize: '0.65rem', padding: '2px 6px', borderRadius: '9999px',
                             background: integration.status === 'Connected' ? 'rgba(16,185,129,0.12)' : 'rgba(148,163,184,0.08)',
-                            color: integration.status === 'Connected' ? '#34D399' : '#475569',
+                            color: integration.status === 'Connected' ? '#34D399' : '#64748B',
                             border: `1px solid ${integration.status === 'Connected' ? 'rgba(16,185,129,0.2)' : 'rgba(148,163,184,0.1)'}`,
                           }}>
                             {integration.status}
@@ -293,7 +293,7 @@ export default function Admin() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.875rem' }}>
                     <div>
                       <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#F1F5F9', margin: 0, marginBottom: '2px' }}>{model.name}</h3>
-                      <span style={{ fontSize: '0.72rem', color: '#475569' }}>{model.provider}</span>
+                      <span style={{ fontSize: '0.72rem', color: '#64748B' }}>{model.provider}</span>
                     </div>
                     <span style={{
                       fontSize: '0.7rem', padding: '2px 7px', borderRadius: '4px',
@@ -327,7 +327,7 @@ export default function Admin() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
               <div>
                 <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9', margin: 0, marginBottom: '0.25rem' }}>Audit Logs</h2>
-                <p style={{ fontSize: '0.8rem', color: '#475569', margin: 0 }}>All system activity logs</p>
+                <p style={{ fontSize: '0.8rem', color: '#64748B', margin: 0 }}>All system activity logs</p>
               </div>
               <button className="btn-ghost" style={{ height: '34px', fontSize: '0.8rem' }}>
                 <ExternalLink size={13} /> Export Logs
@@ -377,7 +377,7 @@ export default function Admin() {
                   <thead>
                     <tr>
                       {['Workspace Name', 'Type', 'Members', 'Language', 'Confidentiality', 'Status', 'Actions'].map(h => (
-                        <th key={h} style={{ padding: '0.625rem 1rem', textAlign: 'left', fontSize: '0.65rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid rgba(255,255,255,0.06)', whiteSpace: 'nowrap' }}>{h}</th>
+                        <th key={h} style={{ padding: '0.625rem 1rem', textAlign: 'left', fontSize: '0.65rem', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid rgba(255,255,255,0.05)', whiteSpace: 'nowrap' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -431,7 +431,7 @@ export default function Admin() {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#F1F5F9' }}>{prompt.name}</div>
-                      <div style={{ fontSize: '0.72rem', color: '#475569' }}>{prompt.category} · {prompt.model} · ~{prompt.tokens} tokens</div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748B' }}>{prompt.category} · {prompt.model} · ~{prompt.tokens} tokens</div>
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
                       <div style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 600 }}>{prompt.uses} uses</div>
@@ -474,9 +474,9 @@ export default function Admin() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
-                      <span style={{ fontSize: '0.72rem', color: rule.enabled ? '#34D399' : '#475569' }}>{rule.enabled ? 'Enabled' : 'Disabled'}</span>
+                      <span style={{ fontSize: '0.72rem', color: rule.enabled ? '#34D399' : '#64748B' }}>{rule.enabled ? 'Enabled' : 'Disabled'}</span>
                       <div style={{ width: '36px', height: '20px', borderRadius: '10px', background: rule.enabled ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.08)', cursor: 'pointer', position: 'relative', border: `1px solid ${rule.enabled ? 'rgba(16,185,129,0.5)' : 'rgba(255,255,255,0.1)'}` }}>
-                        <div style={{ position: 'absolute', top: '3px', left: rule.enabled ? '18px' : '3px', width: '12px', height: '12px', borderRadius: '50%', background: rule.enabled ? '#10B981' : '#475569', transition: 'left 0.2s ease' }} />
+                        <div style={{ position: 'absolute', top: '3px', left: rule.enabled ? '18px' : '3px', width: '12px', height: '12px', borderRadius: '50%', background: rule.enabled ? '#10B981' : '#64748B', transition: 'left 0.2s ease' }} />
                       </div>
                     </div>
                   </div>
@@ -504,21 +504,21 @@ export default function Admin() {
                 <div key={i} className="section-card" style={{ padding: '0.875rem 1.125rem' }}>
                   <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
                     <div style={{ flex: 1, minWidth: '200px' }}>
-                      <div style={{ fontSize: '0.68rem', color: '#475569', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Trigger</div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748B', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Trigger</div>
                       <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#F1F5F9' }}>{rule.trigger}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.68rem', color: '#475569', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Approvers</div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748B', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Approvers</div>
                       <div style={{ display: 'flex', gap: '0.375rem', flexWrap: 'wrap' }}>
                         {rule.approvers.map(a => <span key={a} style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: 'rgba(139,92,246,0.1)', color: '#C4B5FD', border: '1px solid rgba(139,92,246,0.2)' }}>{a}</span>)}
                       </div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.68rem', color: '#475569', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>SLA</div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748B', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>SLA</div>
                       <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#FCD34D' }}>{rule.sla}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.68rem', color: '#475569', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Escalation</div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748B', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Escalation</div>
                       <div style={{ fontSize: '0.78rem', color: '#FCA5A5' }}>{rule.escalation}</div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center' }}>
