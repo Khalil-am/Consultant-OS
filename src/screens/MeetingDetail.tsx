@@ -1,547 +1,529 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLayout } from '../hooks/useLayout';
 import {
-  ArrowLeft, Video, Users, Clock, MapPin, Calendar,
-  Sparkles, CheckSquare, FileText, Plus, Check, AlertCircle
+  ArrowLeft, Upload, FileText, Download, Trash2,
+  Calendar, Clock, MapPin, Users, Video,
+  CheckCircle, AlertCircle, Loader2, X, RefreshCw,
 } from 'lucide-react';
-import { getMeeting, updateMeeting } from '../lib/db';
-import type { MeetingRow } from '../lib/db';
-import { chatWithDocument } from '../lib/openrouter';
+import { getMeeting, updateMeeting, upsertDocument, getDocuments, deleteDocument } from '../lib/db';
+import type { MeetingRow, DocumentRow } from '../lib/db';
+import { supabase } from '../lib/supabase';
 
-const tabs = ['Meeting Info', 'Agenda', 'Notes', 'Decisions', 'Action Items', 'Attachments', 'Generated Outputs'];
+// ── Helpers ───────────────────────────────────────────────────
 
-const decisionRows = [
-  { id: 'DEC-001', decision: 'Proceed with Phase 2 integration work as planned in the architecture BRD', owner: 'AM', status: 'Ratified', dueDate: 'N/A' },
-  { id: 'DEC-002', decision: 'Engage independent security consultant for penetration testing', owner: 'SK', status: 'Approved', dueDate: '2026-04-01' },
-  { id: 'DEC-003', decision: 'Approve additional budget of SAR 180,000 for cloud infrastructure', owner: 'RT', status: 'Deferred', dueDate: 'Next SC' },
-  { id: 'DEC-004', decision: 'Accept risk register v4 with proposed mitigation plans', owner: 'JL', status: 'Approved', dueDate: 'N/A' },
-];
+function fmtSize(bytes: number): string {
+  if (bytes >= 1_048_576) return `${(bytes / 1_048_576).toFixed(1)} MB`;
+  if (bytes >= 1_024) return `${(bytes / 1_024).toFixed(0)} KB`;
+  return `${bytes} B`;
+}
 
-const actionItems = [
-  { id: 'ACT-001', title: 'Distribute revised integration architecture to NCA IT team', owner: 'AM', dueDate: '2026-03-20', status: 'Open', priority: 'High' },
-  { id: 'ACT-002', title: 'Prepare RFP for security consultant services', owner: 'SK', dueDate: '2026-03-25', status: 'Open', priority: 'Medium' },
-  { id: 'ACT-003', title: 'Prepare budget justification memo for deferred decision', owner: 'RT', dueDate: '2026-03-22', status: 'Open', priority: 'High' },
-  { id: 'ACT-004', title: 'Update project schedule with Phase 2 milestones', owner: 'JL', dueDate: '2026-03-18', status: 'Completed', priority: 'Medium' },
-  { id: 'ACT-005', title: 'Share BRD v2.3 with steering committee members', owner: 'AM', dueDate: '2026-03-19', status: 'Open', priority: 'High' },
-];
+function fmtDate(d: string): string {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
 
-const sampleAgenda = [
-  { time: '09:00', duration: '10 min', item: 'Welcome and quorum confirmation', facilitator: 'AM' },
-  { time: '09:10', duration: '15 min', item: 'Review and approval of previous minutes (SC-08)', facilitator: 'AM' },
-  { time: '09:25', duration: '30 min', item: 'Phase 2 Architecture Review – BRD presentation', facilitator: 'SK' },
-  { time: '09:55', duration: '20 min', item: 'Risk register update and escalations', facilitator: 'JL' },
-  { time: '10:15', duration: '15 min', item: 'Budget discussion – cloud infrastructure request', facilitator: 'RT' },
-  { time: '10:30', duration: '20 min', item: 'Decision items and voting', facilitator: 'AM' },
-  { time: '10:50', duration: '10 min', item: 'AOB and next meeting date', facilitator: 'AM' },
-];
+function fmtDateTime(d: string): string {
+  if (!d) return '—';
+  return new Date(d).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+function fileExt(name: string): string {
+  return (name.split('.').pop() ?? '').toUpperCase();
+}
+
+const EXT_COLOR: Record<string, { bg: string; text: string }> = {
+  PDF:  { bg: 'rgba(239,68,68,0.12)',   text: '#FCA5A5' },
+  DOCX: { bg: 'rgba(14,165,233,0.12)',  text: '#38BDF8' },
+  DOC:  { bg: 'rgba(14,165,233,0.12)',  text: '#38BDF8' },
+  XLSX: { bg: 'rgba(16,185,129,0.12)',  text: '#34D399' },
+  XLS:  { bg: 'rgba(16,185,129,0.12)',  text: '#34D399' },
+  PPTX: { bg: 'rgba(245,158,11,0.12)',  text: '#FCD34D' },
+  PPT:  { bg: 'rgba(245,158,11,0.12)',  text: '#FCD34D' },
+  TXT:  { bg: 'rgba(148,163,184,0.1)',  text: '#94A3B8' },
+};
+
+const TYPE_COLORS: Record<string, string> = {
+  Workshop: '#0EA5E9', Committee: '#8B5CF6', Steering: '#EF4444',
+  Review: '#10B981', Kickoff: '#00D4FF', Standup: '#475569',
+};
+const STATUS_COLORS: Record<string, { text: string; bg: string }> = {
+  Upcoming:    { text: '#38BDF8', bg: 'rgba(14,165,233,0.1)' },
+  'In Progress': { text: '#FCD34D', bg: 'rgba(245,158,11,0.1)' },
+  Completed:   { text: '#34D399', bg: 'rgba(16,185,129,0.1)' },
+};
+
+// ── Main Component ────────────────────────────────────────────
 
 export default function MeetingDetail() {
-  const { width, isMobile, isTablet } = useLayout();
-  const { id } = useParams();
+  const { isMobile } = useLayout();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('Meeting Info');
-  const [meeting, setMeeting] = useState<MeetingRow | null>(null);
-  const [loadingMeeting, setLoadingMeeting] = useState(true);
-  const [generatingMinutes, setGeneratingMinutes] = useState(false);
-  const [generatedMinutes, setGeneratedMinutes] = useState('');
-  const [minutesError, setMinutesError] = useState('');
 
+  const [meeting, setMeeting]     = useState<MeetingRow | null>(null);
+  const [loading, setLoading]     = useState(true);
+  const [attachments, setAttachments] = useState<DocumentRow[]>([]);
+  const [attLoading, setAttLoading]   = useState(false);
+
+  // Upload state
+  const [dragging, setDragging]   = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadPct, setUploadPct] = useState(0);
+  const [uploadError, setUploadError] = useState('');
+  const [uploadSuccess, setUploadSuccess] = useState('');
+
+  // Delete state
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Load meeting ──────────────────────────────────────────
   useEffect(() => {
-    if (id) {
-      getMeeting(id)
-        .then(data => { setMeeting(data); setLoadingMeeting(false); })
-        .catch(() => setLoadingMeeting(false));
-    }
+    if (!id) return;
+    setLoading(true);
+    getMeeting(id)
+      .then(data => { setMeeting(data); setLoading(false); })
+      .catch(() => setLoading(false));
   }, [id]);
 
-  if (loadingMeeting) {
-    return <div style={{ padding: '2rem', color: 'var(--text-muted)', fontSize: '0.875rem' }}>Loading meeting…</div>;
-  }
-  if (!meeting) {
-    return <div style={{ padding: '2rem', color: 'var(--text-muted)', fontSize: '0.875rem' }}>Meeting not found.</div>;
-  }
-
-  const isCommittee = meeting.type === 'Committee' || meeting.type === 'Steering';
-
-  async function handleGenerateMinutes() {
-    if (!meeting) return;
-    setGeneratingMinutes(true);
-    setGeneratedMinutes('');
-    setMinutesError('');
-    setActiveTab('Generated Outputs');
+  // ── Load attachments ──────────────────────────────────────
+  const loadAttachments = useCallback(async (wsId: string, meetingId: string) => {
+    setAttLoading(true);
     try {
-      const agendaText = sampleAgenda.map(a => `${a.time} (${a.duration}) – ${a.item} [${a.facilitator}]`).join('\n');
-      const decisionText = decisionRows.map(d => `${d.id}: ${d.decision} — ${d.status}`).join('\n');
-      const actionText = actionItems.map(a => `${a.id}: ${a.title} (Owner: ${a.owner}, Due: ${a.dueDate})`).join('\n');
-      const systemPrompt = `You are a professional meeting secretary. Generate formal, structured meeting minutes in markdown format. Be concise and professional.`;
-      const userMsg = `Generate meeting minutes for:\n\nMeeting: ${meeting.title}\nDate: ${meeting.date} at ${meeting.time}\nDuration: ${meeting.duration}\nWorkspace: ${meeting.workspace}\nType: ${meeting.type}\nParticipants: ${meeting.participants.join(', ')}\nLocation: ${meeting.location || 'Not specified'}\nQuorum Status: ${meeting.quorum_status || 'N/A'}\n\nAGENDA:\n${agendaText}\n\nDECISIONS MADE:\n${decisionText}\n\nACTION ITEMS:\n${actionText}\n\nGenerate formal meeting minutes with sections: Opening, Attendees, Agenda Items (with key points), Decisions, Action Items, and Close.`;
-      const result = await chatWithDocument([{ role: 'user', content: userMsg }], systemPrompt);
-      setGeneratedMinutes(result);
-      // Mark minutes as generated in DB
+      const docs = await getDocuments(wsId);
+      // Filter by type and tag containing this meeting's id
+      setAttachments(docs.filter(d =>
+        d.type === 'Meeting Minutes' && (d.tags ?? []).includes(meetingId)
+      ));
+    } catch { /* ignore */ }
+    finally { setAttLoading(false); }
+  }, []);
+
+  useEffect(() => {
+    if (meeting?.workspace_id && meeting?.id) {
+      loadAttachments(meeting.workspace_id, meeting.id);
+    }
+  }, [meeting, loadAttachments]);
+
+  // ── Upload handler ─────────────────────────────────────────
+  const handleUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0 || !meeting) return;
+    const file = files[0];
+    setUploading(true);
+    setUploadError('');
+    setUploadSuccess('');
+    setUploadPct(0);
+
+    try {
+      // 1. Upload file to Supabase storage
+      const timestamp = Date.now();
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const storagePath = `${meeting.workspace_id}/meetings/${timestamp}_${safeName}`;
+
+      // Simulate progress during upload (Supabase JS v2 doesn't give progress natively)
+      const progressTimer = setInterval(() => {
+        setUploadPct(p => Math.min(p + 12, 85));
+      }, 200);
+
+      const { error: storageError } = await supabase.storage
+        .from('workspace-docs')
+        .upload(storagePath, file, { cacheControl: '3600', upsert: false });
+
+      clearInterval(progressTimer);
+
+      if (storageError) throw new Error(storageError.message);
+
+      setUploadPct(90);
+
+      // 2. Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('workspace-docs')
+        .getPublicUrl(storagePath);
+
+      // 3. Save document record
+      const docId = `doc-${timestamp}`;
+      await upsertDocument({
+        id: docId,
+        name: `${meeting.title} – Minutes`,
+        type: 'Meeting Minutes',
+        type_color: '#10B981',
+        workspace: meeting.workspace,
+        workspace_id: meeting.workspace_id,
+        date: new Date().toISOString().slice(0, 10),
+        language: 'EN',
+        status: 'Draft',
+        size: fmtSize(file.size),
+        author: 'AM',
+        pages: 1,
+        summary: `Meeting minutes for ${meeting.title} (${meeting.date})`,
+        tags: [meeting.id, 'meeting-minutes'],
+        file_url: publicUrl,
+      });
+
+      setUploadPct(100);
+
+      // 4. Mark meeting as having minutes
       await updateMeeting(meeting.id, { minutes_generated: true });
       setMeeting(prev => prev ? { ...prev, minutes_generated: true } : prev);
+
+      // 5. Refresh list
+      await loadAttachments(meeting.workspace_id, meeting.id);
+      setUploadSuccess(`"${file.name}" uploaded successfully.`);
+      setTimeout(() => setUploadSuccess(''), 4000);
     } catch (e) {
-      setMinutesError(e instanceof Error ? e.message : 'Failed to generate minutes');
+      setUploadError(e instanceof Error ? e.message : 'Upload failed. Please try again.');
     } finally {
-      setGeneratingMinutes(false);
+      setUploading(false);
+      setUploadPct(0);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  // ── Download handler ───────────────────────────────────────
+  async function handleDownload(doc: DocumentRow) {
+    if (!doc.file_url) return;
+    try {
+      const parts = doc.file_url.split('/workspace-docs/');
+      if (parts.length >= 2) {
+        const path = decodeURIComponent(parts[1]);
+        const { data: signed, error } = await supabase.storage
+          .from('workspace-docs')
+          .createSignedUrl(path, 300);
+        if (!error && signed?.signedUrl) {
+          const a = document.createElement('a');
+          a.href = signed.signedUrl;
+          a.download = doc.name;
+          a.target = '_blank';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          return;
+        }
+      }
+    } catch { /* fall through */ }
+    window.open(doc.file_url!, '_blank');
+  }
+
+  // ── Delete handler ─────────────────────────────────────────
+  async function handleDelete(doc: DocumentRow) {
+    if (!meeting) return;
+    setDeletingId(doc.id);
+    try {
+      // Remove from storage
+      if (doc.file_url) {
+        const parts = doc.file_url.split('/workspace-docs/');
+        if (parts.length >= 2) {
+          await supabase.storage
+            .from('workspace-docs')
+            .remove([decodeURIComponent(parts[1])]);
+        }
+      }
+      await deleteDocument(doc.id);
+      setAttachments(prev => prev.filter(d => d.id !== doc.id));
+      // If no more minutes, un-flag the meeting
+      if (attachments.length <= 1) {
+        await updateMeeting(meeting.id, { minutes_generated: false });
+        setMeeting(prev => prev ? { ...prev, minutes_generated: false } : prev);
+      }
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Delete failed');
+    } finally {
+      setDeletingId(null);
     }
   }
 
-  // suppress unused warning
-  void width;
+  // ── Drag & drop ────────────────────────────────────────────
+  function onDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    setDragging(true);
+  }
+  function onDragLeave() { setDragging(false); }
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragging(false);
+    handleUpload(e.dataTransfer.files);
+  }
 
-  return (
-    <div style={{ padding: isMobile ? '0.875rem' : '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      {/* Back */}
-      <div>
-        <button
-          onClick={() => navigate('/meetings')}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', background: 'none', border: 'none', cursor: 'pointer', color: '#64748B', fontSize: '0.78rem', fontWeight: 500, padding: '0.375rem 0', marginBottom: '0.875rem', fontFamily: 'inherit', transition: 'color 0.15s' }}
-          onMouseEnter={e => (e.currentTarget.style.color = '#94A3B8')}
-          onMouseLeave={e => (e.currentTarget.style.color = '#64748B')}
-        >
+  // ── Render guards ──────────────────────────────────────────
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', flexDirection: 'column', gap: '0.75rem' }}>
+        <Loader2 size={24} style={{ color: '#38BDF8' }} className="animate-spin" />
+        <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Loading meeting…</span>
+      </div>
+    );
+  }
+  if (!meeting) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', flexDirection: 'column', gap: '0.75rem' }}>
+        <AlertCircle size={24} style={{ color: '#EF4444' }} />
+        <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Meeting not found.</span>
+        <button className="btn-ghost" style={{ fontSize: '0.78rem' }} onClick={() => navigate('/meetings')}>
           <ArrowLeft size={13} /> Back to Meetings
         </button>
+      </div>
+    );
+  }
 
-        {/* Header Card */}
-        <div style={{
-          padding: '1.5rem',
-          borderRadius: '14px',
-          background: 'linear-gradient(135deg, #0D1628 0%, #101828 60%, #0F1D30 100%)',
-          border: '1px solid rgba(255,255,255,0.07)',
-          boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
-          position: 'relative', overflow: 'hidden',
-        }}>
-          <div style={{ position: 'absolute', top: -40, right: -40, width: 160, height: 160, borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.06) 0%, transparent 70%)', pointerEvents: 'none' }} />
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', gap: '1rem', flex: 1 }}>
-              <div style={{
-                width: '48px', height: '48px', borderRadius: '12px', flexShrink: 0,
-                background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.25)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <Video size={22} style={{ color: '#8B5CF6' }} />
-              </div>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '0.375rem' }}>
-                  <span style={{
-                    fontSize: '0.7rem', padding: '2px 7px', borderRadius: '4px',
-                    background: 'rgba(139,92,246,0.15)', color: '#A78BFA', border: '1px solid rgba(139,92,246,0.25)',
-                  }}>
-                    {meeting.type}
-                  </span>
-                  <span style={{
-                    fontSize: '0.7rem', padding: '2px 7px', borderRadius: '4px',
-                    background: meeting.status === 'Upcoming' ? 'rgba(14,165,233,0.1)' : meeting.status === 'Completed' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
-                    color: meeting.status === 'Upcoming' ? '#38BDF8' : meeting.status === 'Completed' ? '#34D399' : '#FCA5A5',
-                  }}>
-                    {meeting.status}
-                  </span>
-                  {isCommittee && meeting.quorum_status && (
-                    <span style={{
-                      fontSize: '0.7rem', padding: '2px 7px', borderRadius: '4px',
-                      background: meeting.quorum_status === 'Met' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
-                      color: meeting.quorum_status === 'Met' ? '#34D399' : '#FCA5A5',
-                      border: `1px solid ${meeting.quorum_status === 'Met' ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`,
-                    }}>
-                      Quorum {meeting.quorum_status}
-                    </span>
-                  )}
-                </div>
-                <h1 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#F1F5F9', margin: 0, marginBottom: '0.5rem' }}>
-                  {meeting.title}
-                </h1>
-                <div style={{ display: 'flex', gap: '1.25rem' }}>
-                  {[
-                    { icon: <Calendar size={12} />, text: meeting.date },
-                    { icon: <Clock size={12} />, text: `${meeting.time} · ${meeting.duration}` },
-                    meeting.location && { icon: <MapPin size={12} />, text: meeting.location },
-                    { icon: <Users size={12} />, text: `${meeting.participants.length} participants` },
-                  ].filter(Boolean).map((item: any, i) => (
-                    <span key={i} style={{ fontSize: '0.75rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      {item.icon} {item.text}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
+  const tc = TYPE_COLORS[meeting.type] ?? '#94A3B8';
+  const sc = STATUS_COLORS[meeting.status] ?? STATUS_COLORS.Upcoming;
 
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              {meeting.status === 'Completed' && (
-                <>
-                  <button className="btn-ghost" style={{ fontSize: '0.78rem', height: '32px' }}>
-                    <FileText size={13} /> View Minutes
-                  </button>
-                  <button className="btn-ghost" style={{ fontSize: '0.78rem', height: '32px' }}>
-                    <CheckSquare size={13} /> View Actions
-                  </button>
-                </>
+  return (
+    <div style={{ padding: isMobile ? '0.875rem' : '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', maxWidth: '900px' }}>
+
+      {/* ── Back ───────────────────────────────────────────── */}
+      <button
+        onClick={() => navigate('/meetings')}
+        style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.78rem', fontWeight: 500, padding: 0, fontFamily: 'inherit', width: 'fit-content', transition: 'color 0.15s' }}
+        onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+        onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
+      >
+        <ArrowLeft size={13} /> Back to Meetings
+      </button>
+
+      {/* ── Meeting Header ─────────────────────────────────── */}
+      <div style={{
+        background: 'linear-gradient(135deg, rgba(14,22,40,0.98) 0%, var(--bg-elevated) 60%, rgba(15,29,48,0.95) 100%)',
+        border: '1px solid rgba(255,255,255,0.07)',
+        borderRadius: 'var(--radius-lg)',
+        padding: '1.5rem',
+        position: 'relative', overflow: 'hidden',
+      }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(90deg, ${tc}, transparent)` }} />
+        <div style={{ position: 'absolute', top: -30, right: -30, width: 120, height: 120, borderRadius: '50%', background: `radial-gradient(circle, ${tc}08 0%, transparent 70%)`, pointerEvents: 'none' }} />
+
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
+          {/* Icon */}
+          <div style={{ width: '44px', height: '44px', borderRadius: '10px', flexShrink: 0, background: `${tc}18`, border: `1px solid ${tc}30`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Video size={20} style={{ color: tc }} />
+          </div>
+
+          {/* Info */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {/* Badges */}
+            <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: '4px', background: `${tc}18`, color: tc, border: `1px solid ${tc}28`, fontWeight: 600 }}>
+                {meeting.type}
+              </span>
+              <span style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: '4px', background: sc.bg, color: sc.text, fontWeight: 600 }}>
+                {meeting.status}
+              </span>
+              {meeting.minutes_generated && (
+                <span style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: '4px', background: 'rgba(16,185,129,0.1)', color: '#34D399', border: '1px solid rgba(16,185,129,0.22)', display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 600 }}>
+                  <CheckCircle size={9} /> Minutes Uploaded
+                </span>
               )}
-              <button className="btn-ai" style={{ fontSize: '0.78rem', height: '32px' }} onClick={handleGenerateMinutes} disabled={generatingMinutes}>
-                <Sparkles size={13} /> {generatingMinutes ? 'Generating…' : 'Generate Minutes'}
-              </button>
-              <button className="btn-primary" style={{ fontSize: '0.78rem', height: '32px' }}>
-                <CheckSquare size={13} /> Extract Actions
-              </button>
+            </div>
+
+            {/* Title */}
+            <h1 style={{ fontSize: isMobile ? '1.05rem' : '1.2rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, marginBottom: '0.625rem' }}>
+              {meeting.title}
+            </h1>
+
+            {/* Meta row */}
+            <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
+              {[
+                { icon: <Calendar size={11} />, text: fmtDate(meeting.date) },
+                { icon: <Clock size={11} />, text: `${meeting.time} · ${meeting.duration}` },
+                meeting.location ? { icon: <MapPin size={11} />, text: meeting.location } : null,
+                { icon: <Users size={11} />, text: `${meeting.participants.length} participants` },
+              ].filter(Boolean).map((item, i) => (
+                <span key={i} style={{ fontSize: '0.73rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  {(item as { icon: React.ReactNode; text: string }).icon}
+                  {(item as { icon: React.ReactNode; text: string }).text}
+                </span>
+              ))}
             </div>
           </div>
 
-          {/* Committee specifics */}
-          {isCommittee && (
-            <div style={{
-              display: 'flex', gap: '1.5rem', marginTop: '1rem', paddingTop: '1rem',
-              borderTop: '1px solid rgba(255,255,255,0.05)',
-            }}>
-              {[
-                { label: 'Circular No.', value: 'SC-10/2026' },
-                { label: 'Resolution Ref.', value: 'RES-2026-031' },
-                { label: 'Quorum Required', value: '5 members' },
-                { label: 'Members Present', value: `${meeting.participants.length} of 7` },
-              ].map(item => (
-                <div key={item.label}>
-                  <div style={{ fontSize: '0.65rem', color: '#334155', marginBottom: '2px' }}>{item.label}</div>
-                  <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#94A3B8' }}>{item.value}</div>
-                </div>
-              ))}
-            </div>
-          )}
+          {/* Workspace chip */}
+          <div style={{ padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-md)', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-subtle)', fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+            {meeting.workspace}
+          </div>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.05)', overflowX: 'auto' }}>
-        {tabs.map(tab => (
-          <button
-            key={tab}
-            className={`tab-underline ${activeTab === tab ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab)}
-            style={{ marginRight: '1.25rem', fontSize: '0.82rem' }}
+      {/* ── Upload Section ─────────────────────────────────── */}
+      <div className="section-card" style={{ overflow: 'hidden' }}>
+        <div className="section-card-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Upload size={14} style={{ color: '#38BDF8' }} />
+            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>Upload Meeting Minutes</span>
+          </div>
+          <span style={{ fontSize: '0.7rem', color: 'var(--text-faint)' }}>PDF, DOCX, PPTX, XLSX, TXT accepted</span>
+        </div>
+
+        <div style={{ padding: '1.25rem' }}>
+          {/* Drop Zone */}
+          <div
+            onDragOver={onDragOver}
+            onDragLeave={onDragLeave}
+            onDrop={onDrop}
+            onClick={() => !uploading && fileInputRef.current?.click()}
+            style={{
+              border: `2px dashed ${dragging ? '#38BDF8' : uploading ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.1)'}`,
+              borderRadius: 'var(--radius-lg)',
+              padding: '2.5rem 1.5rem',
+              textAlign: 'center',
+              cursor: uploading ? 'default' : 'pointer',
+              transition: 'all 0.2s',
+              background: dragging ? 'rgba(14,165,233,0.05)' : uploading ? 'rgba(139,92,246,0.04)' : 'rgba(255,255,255,0.02)',
+            }}
           >
-            {tab}
-          </button>
-        ))}
-      </div>
-
-      {/* Meeting Info */}
-      {activeTab === 'Meeting Info' && (
-        <div style={{ display: 'grid', gridTemplateColumns: isTablet ? '1fr' : '2fr 1fr', gap: '1.25rem' }}>
-          <div className="section-card">
-            <div className="section-card-header">
-              <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Meeting Details</span>
-            </div>
-            <div style={{ padding: '1.25rem' }}>
-              {[
-                { label: 'Workspace', value: meeting.workspace },
-                { label: 'Meeting Type', value: meeting.type },
-                { label: 'Date & Time', value: `${meeting.date} at ${meeting.time}` },
-                { label: 'Duration', value: meeting.duration },
-                { label: 'Location', value: meeting.location || 'Virtual' },
-                { label: 'Status', value: meeting.status },
-                ...(isCommittee ? [
-                  { label: 'Quorum Status', value: meeting.quorum_status || 'Pending' },
-                  { label: 'Circular Number', value: 'SC-10/2026' },
-                ] : []),
-              ].map(field => (
-                <div key={field.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.625rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                  <span style={{ fontSize: '0.8rem', color: '#64748B' }}>{field.label}</span>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 500, color: '#94A3B8' }}>{field.value}</span>
+            {uploading ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.875rem' }}>
+                <Loader2 size={28} style={{ color: '#8B5CF6' }} className="animate-spin" />
+                <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Uploading…</div>
+                {/* Progress bar */}
+                <div style={{ width: '220px', height: '4px', background: 'rgba(255,255,255,0.07)', borderRadius: '9999px', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${uploadPct}%`, background: 'linear-gradient(90deg, #8B5CF6, #38BDF8)', borderRadius: '9999px', transition: 'width 0.2s' }} />
                 </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="section-card">
-            <div className="section-card-header">
-              <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Participants</span>
-              <span style={{ fontSize: '0.72rem', color: '#64748B' }}>{meeting.participants.length} members</span>
-            </div>
-            <div style={{ padding: '1rem' }}>
-              {meeting.participants.map((p, i) => (
-                <div key={i} style={{
-                  display: 'flex', alignItems: 'center', gap: '0.625rem',
-                  padding: '0.5rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)',
-                }}>
-                  <div className="avatar" style={{ width: '28px', height: '28px', fontSize: '0.62rem' }}>{p}</div>
-                  <div>
-                    <div style={{ fontSize: '0.78rem', fontWeight: 500, color: '#F1F5F9' }}>
-                      {p === 'AM' ? 'Ahmed Al-Mahmoud' : p === 'SK' ? 'Sara Al-Khalidi' : p === 'RT' ? 'Rania Taher' : p === 'JL' ? 'James Liu' : p === 'MK' ? 'Mohammed Al-Karim' : p === 'DN' ? 'David Nkosi' : p === 'FH' ? 'Fatima Hassan' : p}
-                    </div>
-                    <div style={{ fontSize: '0.68rem', color: '#334155' }}>
-                      {isCommittee ? 'Committee Member' : 'Project Team'}
-                    </div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-faint)' }}>{uploadPct}%</div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: dragging ? 'rgba(14,165,233,0.12)' : 'rgba(255,255,255,0.05)', border: `1px solid ${dragging ? 'rgba(14,165,233,0.3)' : 'rgba(255,255,255,0.1)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
+                  <Upload size={20} style={{ color: dragging ? '#38BDF8' : 'var(--text-muted)' }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.875rem', fontWeight: 600, color: dragging ? '#38BDF8' : 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                    {dragging ? 'Drop to upload' : 'Drag & drop your minutes file here'}
                   </div>
-                  <div style={{ marginLeft: 'auto' }}>
-                    <Check size={13} style={{ color: '#10B981' }} />
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-faint)' }}>
+                    or <span style={{ color: '#38BDF8', textDecoration: 'underline' }}>click to browse</span>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Agenda */}
-      {activeTab === 'Agenda' && (
-        <div className="section-card">
-          <div className="section-card-header">
-            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Meeting Agenda</span>
-            <button className="btn-ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.625rem' }}>
-              <Plus size={12} /> Add Item
-            </button>
-          </div>
-          <div style={{ overflowX: 'auto' }}>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th style={{ width: '10%' }}>Time</th>
-                <th style={{ width: '10%' }}>Duration</th>
-                <th>Agenda Item</th>
-                <th style={{ width: '15%' }}>Facilitator</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sampleAgenda.map((item, i) => (
-                <tr key={i}>
-                  <td style={{ fontFamily: 'monospace', color: '#00D4FF' }}>{item.time}</td>
-                  <td style={{ color: '#64748B' }}>{item.duration}</td>
-                  <td style={{ color: '#F1F5F9', fontWeight: 500 }}>{item.item}</td>
-                  <td>
-                    <div className="avatar" style={{ width: '22px', height: '22px', fontSize: '0.6rem', display: 'inline-flex' }}>
-                      {item.facilitator}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          </div>
-        </div>
-      )}
-
-      {/* Decisions */}
-      {activeTab === 'Decisions' && (
-        <div className="section-card">
-          <div className="section-card-header">
-            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Decisions Log</span>
-            <button className="btn-ai" style={{ fontSize: '0.75rem', padding: '0.25rem 0.75rem' }}>
-              <Sparkles size={12} /> AI Extract Decisions
-            </button>
-          </div>
-          <div style={{ overflowX: 'auto' }}>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Ref</th>
-                <th>Decision</th>
-                <th>Owner</th>
-                <th>Status</th>
-                <th>Follow-up</th>
-              </tr>
-            </thead>
-            <tbody>
-              {decisionRows.map(d => (
-                <tr key={d.id}>
-                  <td style={{ color: '#8B5CF6', fontWeight: 500 }}>{d.id}</td>
-                  <td style={{ color: '#94A3B8', maxWidth: '350px' }}>
-                    <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.82rem' }}>{d.decision}</div>
-                  </td>
-                  <td>
-                    <div className="avatar" style={{ width: '24px', height: '24px', fontSize: '0.62rem' }}>{d.owner}</div>
-                  </td>
-                  <td>
-                    <span className={d.status === 'Approved' || d.status === 'Ratified' ? 'status-approved' : 'status-pending'} style={{ fontSize: '0.65rem' }}>
-                      {d.status}
-                    </span>
-                  </td>
-                  <td style={{ fontSize: '0.75rem', color: '#64748B' }}>{d.dueDate}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          </div>
-        </div>
-      )}
-
-      {/* Action Items */}
-      {activeTab === 'Action Items' && (
-        <div className="section-card">
-          <div className="section-card-header">
-            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Action Items</span>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button className="btn-ai" style={{ fontSize: '0.75rem', padding: '0.25rem 0.75rem' }}>
-                <Sparkles size={12} /> Extract Actions
-              </button>
-              <button className="btn-ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.625rem' }}>
-                <Plus size={12} /> Add Action
-              </button>
-            </div>
-          </div>
-          <div style={{ overflowX: 'auto' }}>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Action</th>
-                <th>Owner</th>
-                <th>Priority</th>
-                <th>Due Date</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {actionItems.map(a => (
-                <tr key={a.id}>
-                  <td style={{ color: '#0EA5E9', fontWeight: 500 }}>{a.id}</td>
-                  <td style={{ color: '#94A3B8', maxWidth: '300px', fontSize: '0.82rem' }}>
-                    <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.title}</div>
-                  </td>
-                  <td>
-                    <div className="avatar" style={{ width: '24px', height: '24px', fontSize: '0.62rem' }}>{a.owner}</div>
-                  </td>
-                  <td>
-                    <span style={{
-                      fontSize: '0.68rem', padding: '1px 5px', borderRadius: '3px',
-                      background: a.priority === 'High' ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.1)',
-                      color: a.priority === 'High' ? '#FCA5A5' : '#FCD34D',
-                    }}>
-                      {a.priority}
-                    </span>
-                  </td>
-                  <td style={{ fontSize: '0.78rem', color: '#94A3B8' }}>{a.dueDate}</td>
-                  <td>
-                    <span className={a.status === 'Completed' ? 'status-approved' : 'status-pending'} style={{ fontSize: '0.65rem' }}>
-                      {a.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          </div>
-        </div>
-      )}
-
-      {/* Notes */}
-      {activeTab === 'Notes' && (
-        <div className="section-card">
-          <div className="section-card-header">
-            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Meeting Notes / Transcript</span>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button className="btn-ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.625rem' }}>
-                <Plus size={12} /> Upload Transcript
-              </button>
-              <button className="btn-ai" style={{ fontSize: '0.75rem', padding: '0.25rem 0.75rem' }}>
-                <Sparkles size={12} /> Summarize Notes
-              </button>
-            </div>
-          </div>
-          <div style={{ padding: '1.25rem' }}>
-            <textarea
-              style={{
-                width: '100%', minHeight: '300px', background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.08)', borderRadius: '0.5rem',
-                color: '#94A3B8', fontSize: '0.875rem', lineHeight: 1.7,
-                padding: '1rem', fontFamily: 'inherit', resize: 'vertical', outline: 'none',
-              }}
-              placeholder="Paste meeting transcript or notes here..."
-              defaultValue={meeting.status === 'Completed' ? `Meeting commenced at ${meeting.time}.\n\nChair: ${meeting.title} — let's begin.\n\nItem 1: Previous minutes were reviewed and approved with one minor correction to action ACT-007 owner.\n\nItem 2: Phase 2 architecture was presented by the technical team. Key points discussed included the API gateway capacity planning and the need for a dedicated DBA resource during migration.\n\nDecision: The committee resolved to proceed with the proposed architecture subject to a final security review.\n\n[... Additional meeting notes ...]` : ''}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Attachments Tab */}
-      {activeTab === 'Attachments' && (
-        <div className="section-card">
-          <div className="section-card-header">
-            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Meeting Attachments</span>
-            <button className="btn-ghost" style={{ padding: '0.25rem 0.75rem', fontSize: '0.72rem', height: '28px', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-              <FileText size={12} /> Upload
-            </button>
-          </div>
-          <div style={{ padding: '0.5rem 0' }}>
-            {[
-              { name: 'NCA Enterprise Architecture BRD v2.3.pdf', size: '4.2 MB', type: 'PDF', uploaded: '12 Mar 2026', uploader: 'AM' },
-              { name: 'SC-09 Meeting Minutes APPROVED.docx', size: '1.1 MB', type: 'DOCX', uploaded: '11 Mar 2026', uploader: 'DN' },
-              { name: 'Phase 2 Architecture Slides.pptx', size: '8.7 MB', type: 'PPTX', uploaded: '12 Mar 2026', uploader: 'SK' },
-              { name: 'Budget Variance Analysis Q1.xlsx', size: '0.9 MB', type: 'XLSX', uploaded: '10 Mar 2026', uploader: 'RT' },
-            ].map((file, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem 1.25rem', borderBottom: i < 3 ? '1px solid rgba(255,255,255,0.04)' : 'none', cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                <div style={{ padding: '0.5rem', borderRadius: '6px', background: file.type === 'PDF' ? 'rgba(239,68,68,0.1)' : file.type === 'PPTX' ? 'rgba(245,158,11,0.1)' : file.type === 'XLSX' ? 'rgba(16,185,129,0.1)' : 'rgba(14,165,233,0.1)', color: file.type === 'PDF' ? '#FCA5A5' : file.type === 'PPTX' ? '#FCD34D' : file.type === 'XLSX' ? '#34D399' : '#38BDF8', flexShrink: 0, fontSize: '0.6rem', fontWeight: 700 }}>
-                  {file.type}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F1F5F9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</div>
-                  <div style={{ fontSize: '0.7rem', color: '#64748B' }}>{file.size} · Uploaded {file.uploaded} by {file.uploader}</div>
-                </div>
-                <button style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.2)', borderRadius: '6px', padding: '0.25rem 0.625rem', color: '#38BDF8', fontSize: '0.72rem', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>Download</button>
               </div>
-            ))}
+            )}
           </div>
-        </div>
-      )}
 
-      {/* Generated Outputs Tab */}
-      {activeTab === 'Generated Outputs' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {/* AI Minutes result */}
-          {(generatingMinutes || generatedMinutes || minutesError) && (
-            <div className="section-card" style={{ border: '1px solid rgba(139,92,246,0.25)' }}>
-              <div className="section-card-header">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Sparkles size={14} style={{ color: '#8B5CF6' }} />
-                  <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>AI Meeting Minutes</span>
-                </div>
-                {generatedMinutes && (
-                  <button className="btn-ghost" style={{ height: '28px', fontSize: '0.72rem' }} onClick={() => navigator.clipboard.writeText(generatedMinutes)}>
-                    Copy
-                  </button>
-                )}
-              </div>
-              <div style={{ padding: '1rem 1.25rem' }}>
-                {generatingMinutes && <div style={{ color: '#A78BFA', fontSize: '0.82rem' }}>Generating minutes with AI…</div>}
-                {minutesError && <div style={{ color: '#FCA5A5', fontSize: '0.82rem' }}>{minutesError}</div>}
-                {generatedMinutes && (
-                  <pre style={{ margin: 0, fontSize: '0.8rem', lineHeight: 1.65, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{generatedMinutes}</pre>
-                )}
-              </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+            style={{ display: 'none' }}
+            onChange={e => handleUpload(e.target.files)}
+          />
+
+          {/* Feedback messages */}
+          {uploadSuccess && (
+            <div style={{ marginTop: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.625rem 0.875rem', borderRadius: 'var(--radius-md)', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.22)' }} className="animate-fade-in">
+              <CheckCircle size={14} style={{ color: '#34D399', flexShrink: 0 }} />
+              <span style={{ fontSize: '0.78rem', color: '#34D399', fontWeight: 500 }}>{uploadSuccess}</span>
             </div>
           )}
-
-          <div className="section-card">
-            <div className="section-card-header">
+          {uploadError && (
+            <div style={{ marginTop: '0.875rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', padding: '0.625rem 0.875rem', borderRadius: 'var(--radius-md)', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.22)' }} className="animate-fade-in">
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Sparkles size={14} style={{ color: '#8B5CF6' }} />
-                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>AI-Generated Outputs</span>
+                <AlertCircle size={14} style={{ color: '#FCA5A5', flexShrink: 0 }} />
+                <span style={{ fontSize: '0.78rem', color: '#FCA5A5' }}>{uploadError}</span>
               </div>
-              <button className="btn-ai" style={{ padding: '0.25rem 0.875rem', fontSize: '0.72rem', height: '28px', display: 'flex', alignItems: 'center', gap: '0.375rem' }} onClick={handleGenerateMinutes} disabled={generatingMinutes}>
-                <Sparkles size={11} /> {generatingMinutes ? 'Generating…' : 'Regenerate'}
+              <button onClick={() => setUploadError('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FCA5A5', display: 'flex', alignItems: 'center', padding: 0 }}>
+                <X size={13} />
               </button>
             </div>
-            <div style={{ padding: '0.5rem 0' }}>
-              {[
-                { name: 'SC-09 Meeting Minutes – Final.docx', type: 'Minutes', status: 'Ready', generated: '12 Mar 2026 14:32', pages: 8, color: '#10B981' },
-                { name: 'Action Items Register – SC-09.xlsx', type: 'Action Items', status: 'Ready', generated: '12 Mar 2026 14:33', pages: 2, color: '#0EA5E9' },
-                { name: 'Decision Log Update – March 2026.docx', type: 'Decision Log', status: 'Ready', generated: '12 Mar 2026 14:34', pages: 4, color: '#8B5CF6' },
-                { name: 'SC-09 Executive Summary.pdf', type: 'Executive Summary', status: 'Draft', generated: '12 Mar 2026 14:35', pages: 3, color: '#F59E0B' },
-              ].map((output, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.875rem 1.25rem', borderBottom: i < 3 ? '1px solid rgba(255,255,255,0.04)' : 'none', cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                  <div style={{ padding: '0.375rem', borderRadius: '6px', background: `${output.color}15`, color: output.color, flexShrink: 0 }}>
-                    <FileText size={14} />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#F1F5F9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{output.name}</div>
-                    <div style={{ fontSize: '0.7rem', color: '#64748B' }}>{output.pages} pages · Generated {output.generated}</div>
-                  </div>
-                  <span style={{ fontSize: '0.65rem', padding: '2px 7px', borderRadius: '4px', background: output.status === 'Ready' ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', color: output.status === 'Ready' ? '#34D399' : '#FCD34D', border: `1px solid ${output.status === 'Ready' ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.2)'}`, flexShrink: 0 }}>{output.status}</span>
-                  <button style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.2)', borderRadius: '6px', padding: '0.25rem 0.625rem', color: '#38BDF8', fontSize: '0.72rem', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>Download</button>
-                </div>
-              ))}
-            </div>
-          </div>
+          )}
         </div>
-      )}
+      </div>
+
+      {/* ── Attachments List ───────────────────────────────── */}
+      <div className="section-card" style={{ overflow: 'hidden' }}>
+        <div className="section-card-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <FileText size={14} style={{ color: '#10B981' }} />
+            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>Uploaded Minutes</span>
+            {attachments.length > 0 && (
+              <span style={{ fontSize: '0.62rem', fontWeight: 700, padding: '1px 6px', borderRadius: '9999px', background: 'rgba(16,185,129,0.12)', color: '#34D399', border: '1px solid rgba(16,185,129,0.22)' }}>
+                {attachments.length}
+              </span>
+            )}
+          </div>
+          <button
+            className="btn-ghost"
+            style={{ height: '28px', fontSize: '0.72rem' }}
+            onClick={() => meeting && loadAttachments(meeting.workspace_id, meeting.id)}
+            disabled={attLoading}
+          >
+            <RefreshCw size={11} className={attLoading ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        </div>
+
+        {attLoading ? (
+          <div style={{ padding: '2.5rem', textAlign: 'center' }}>
+            <Loader2 size={20} style={{ color: '#38BDF8' }} className="animate-spin" />
+          </div>
+        ) : attachments.length === 0 ? (
+          <div style={{ padding: '2.5rem', textAlign: 'center' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.75rem' }}>
+              <FileText size={18} style={{ color: 'var(--text-faint)' }} />
+            </div>
+            <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.25rem' }}>No minutes uploaded yet</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-faint)' }}>Upload a file above to save it to this meeting's workspace folder</div>
+          </div>
+        ) : (
+          <div>
+            {attachments.map((doc, i) => {
+              const ext = fileExt(doc.name.split('/').pop() ?? doc.name);
+              const ec = EXT_COLOR[ext] ?? EXT_COLOR.TXT;
+              const isDeleting = deletingId === doc.id;
+              return (
+                <div
+                  key={doc.id}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.875rem',
+                    padding: '0.875rem 1.25rem',
+                    borderBottom: i < attachments.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  {/* File type badge */}
+                  <div style={{ width: '38px', height: '38px', flexShrink: 0, borderRadius: '8px', background: ec.bg, border: `1px solid ${ec.text}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.55rem', fontWeight: 800, color: ec.text, letterSpacing: '0.03em' }}>
+                    {ext || 'FILE'}
+                  </div>
+
+                  {/* Info */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {doc.name}
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-faint)', marginTop: '2px', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                      <span>{doc.size}</span>
+                      <span>·</span>
+                      <span>Uploaded {fmtDateTime(doc.created_at)}</span>
+                      <span>·</span>
+                      <span style={{ color: '#34D399' }}>Saved to workspace</span>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
+                    <button
+                      onClick={() => handleDownload(doc)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.3rem 0.625rem', borderRadius: '6px', background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.22)', color: '#38BDF8', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(14,165,233,0.18)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'rgba(14,165,233,0.1)')}
+                    >
+                      <Download size={11} /> Download
+                    </button>
+                    <button
+                      onClick={() => handleDelete(doc)}
+                      disabled={isDeleting}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.3rem 0.5rem', borderRadius: '6px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#FCA5A5', fontSize: '0.72rem', cursor: isDeleting ? 'default' : 'pointer', fontFamily: 'inherit', transition: 'all 0.15s', opacity: isDeleting ? 0.5 : 1 }}
+                      onMouseEnter={e => { if (!isDeleting) (e.currentTarget.style.background = 'rgba(239,68,68,0.14)'); }}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.08)')}
+                    >
+                      {isDeleting ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
