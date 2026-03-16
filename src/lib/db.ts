@@ -100,7 +100,7 @@ export async function getDocuments(workspaceId?: string): Promise<DocumentRow[]>
 
 export async function getDocument(id: string): Promise<DocumentRow | null> {
   const { data, error } = await supabase.from('documents').select('*').eq('id', id).single();
-  if (error) throw error;
+  if (error && error.code !== 'PGRST116') throw error;
   return data as DocumentRow | null;
 }
 

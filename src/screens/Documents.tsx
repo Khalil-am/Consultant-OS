@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLayout } from '../hooks/useLayout';
 import {
-  Search, Upload, FileText, Download, Filter,
+  Search, Upload, FileText, Download,
   ExternalLink, Sparkles, Eye, Trash2, Plus, X, Loader2,
 } from 'lucide-react';
 import {
@@ -11,6 +11,33 @@ import {
 } from '../lib/db';
 import type { DocumentRow, WorkspaceRow } from '../lib/db';
 import { supabase } from '../lib/supabase';
+
+async function downloadFile(doc: DocumentRow) {
+  if (!doc.file_url) {
+    alert('No file attached to this document.');
+    return;
+  }
+  try {
+    const parts = doc.file_url.split('/workspace-docs/');
+    if (parts.length >= 2) {
+      const path = decodeURIComponent(parts[1]);
+      const { data: signed, error } = await supabase.storage
+        .from('workspace-docs')
+        .createSignedUrl(path, 300);
+      if (!error && signed?.signedUrl) {
+        const a = document.createElement('a');
+        a.href = signed.signedUrl;
+        a.download = doc.name;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        return;
+      }
+    }
+  } catch { /* fall through */ }
+  window.open(doc.file_url, '_blank');
+}
 
 const DOC_TYPES = [
   'BRD', 'FRD', 'Meeting Minutes', 'Proposals', 'Evaluations',
@@ -182,11 +209,7 @@ export default function Documents() {
   }
 
   function handleDownload(doc: DocumentRow) {
-    if (doc.file_url) {
-      window.open(doc.file_url, '_blank');
-    } else {
-      alert('No file attached to this document.');
-    }
+    downloadFile(doc);
   }
 
   return (
