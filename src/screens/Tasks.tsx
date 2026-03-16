@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useLayout } from '../hooks/useLayout';
 import {
   Search, ExternalLink, RefreshCw, Filter, CheckSquare,
@@ -6,7 +6,8 @@ import {
   ChevronDown, TrendingUp, X, BarChart2,
 } from 'lucide-react';
 import { BA_CARDS, BA_LISTS } from '../data/baTraffic';
-import type { BACard } from '../data/baTraffic';
+import { fetchBATrafficBoard } from '../lib/trello';
+import type { BACard } from '../lib/trello';
 
 // ── Constants ─────────────────────────────────────────────────
 
@@ -36,10 +37,7 @@ const PRODUCT_META: Record<string, { color: string; bg: string; border: string }
   'Meeting': { color: '#CBD5E1', bg: 'rgba(100,116,139,0.12)', border: 'rgba(100,116,139,0.22)' },
 };
 
-const ACTIVE_LISTS = BA_LISTS.filter(l => l !== 'Done (Business)');
-
-const ALL_PMS = Array.from(new Set(BA_CARDS.map(c => c.pm).filter(Boolean))).sort();
-const ALL_CLIENTS = Array.from(new Set(BA_CARDS.map(c => c.client).filter(Boolean))).sort();
+const DONE_LIST = 'Done (Business)';
 
 function isOverdue(card: BACard): boolean {
   if (!card.dueDate || card.dueComplete) return false;
@@ -189,10 +187,46 @@ export default function Tasks() {
   const [showDone, setShowDone] = useState(false);
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [showFilters, setShowFilters] = useState(false);
-  const [lastSync] = useState('From CSV export · 16 Mar 2026');
 
-  const activeCards = useMemo(() => BA_CARDS.filter(c => c.listName !== 'Done (Business)'), []);
-  const doneCards = useMemo(() => BA_CARDS.filter(c => c.listName === 'Done (Business)'), []);
+  // Live Trello state
+  const [cards, setCards] = useState<BACard[]>(BA_CARDS);
+  const [trelloLists, setTrelloLists] = useState<string[]>(BA_LISTS);
+  const [loading, setLoading] = useState(false);
+  const [syncError, setSyncError] = useState('');
+  const [lastSync, setLastSync] = useState('Loading from Trello…');
+
+  const sync = useCallback(async () => {
+    setLoading(true);
+    setSyncError('');
+    try {
+      const data = await fetchBATrafficBoard();
+      setCards(data.cards);
+      // Derive unique list names in order from live data
+      const seen = new Set<string>();
+      const liveLists: string[] = [];
+      for (const l of data.lists) {
+        if (!seen.has(l.name)) { seen.add(l.name); liveLists.push(l.name); }
+      }
+      setTrelloLists(liveLists);
+      const now = new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+      setLastSync(`Live · synced ${now}`);
+    } catch (e) {
+      setSyncError((e as Error).message ?? 'Trello sync failed');
+      setLastSync('Trello unavailable · using CSV snapshot');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { sync(); }, [sync]);
+
+  const activeLists = useMemo(() => trelloLists.filter(l => l !== DONE_LIST), [trelloLists]);
+
+  const activeCards = useMemo(() => cards.filter(c => c.listName !== DONE_LIST), [cards]);
+  const doneCards = useMemo(() => cards.filter(c => c.listName === DONE_LIST), [cards]);
+
+  const ALL_PMS = useMemo(() => Array.from(new Set(activeCards.map(c => c.pm).filter(Boolean))).sort(), [activeCards]);
+  const ALL_CLIENTS = useMemo(() => Array.from(new Set(cards.map(c => c.client).filter(Boolean))).sort(), [cards]);
 
   const filtered = useMemo(() => {
     const pool = showDone ? doneCards : activeCards;
@@ -203,7 +237,7 @@ export default function Tasks() {
       if (filterClient && c.client !== filterClient) return false;
       if (search) {
         const q = search.toLowerCase();
-        return c.name.toLowerCase().includes(q) || c.client.toLowerCase().includes(q) || c.pm.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q);
+        return c.name.toLowerCase().includes(q) || (c.client ?? '').toLowerCase().includes(q) || (c.pm ?? '').toLowerCase().includes(q) || (c.desc ?? '').toLowerCase().includes(q);
       }
       return true;
     });
@@ -255,13 +289,22 @@ export default function Tasks() {
             </div>
             <div>
               <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>BA Traffic Board</div>
-              <div style={{ fontSize: '0.67rem', color: 'var(--text-faint)', marginTop: '1px', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                <RefreshCw size={9} />
+              <div style={{ fontSize: '0.67rem', color: syncError ? '#FCA5A5' : 'var(--text-faint)', marginTop: '1px', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                <RefreshCw size={9} className={loading ? 'animate-spin' : ''} />
                 {lastSync}
               </div>
             </div>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <button
+              className="btn-ghost"
+              style={{ height: '32px', fontSize: '0.75rem' }}
+              onClick={sync}
+              disabled={loading}
+              title="Sync from Trello">
+              <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+              {loading ? 'Syncing…' : 'Sync'}
+            </button>
             <button
               className={`btn-ghost`}
               style={{ height: '32px', fontSize: '0.75rem', background: showDone ? 'rgba(16,185,129,0.1)' : undefined, color: showDone ? '#34D399' : undefined, border: showDone ? '1px solid rgba(16,185,129,0.22)' : undefined }}
@@ -306,9 +349,9 @@ export default function Tasks() {
 
         {/* List filter tabs */}
         <div style={{ display: 'flex', gap: '0.2rem', background: 'rgba(255,255,255,0.03)', padding: '0.2rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', overflowX: 'auto', maxWidth: '100%' }}>
-          {(showDone ? ['All Done'] : ['All Active', ...ACTIVE_LISTS]).map(list => {
+          {(showDone ? ['All Done'] : ['All Active', ...activeLists]).map(list => {
             const lm = LIST_META[list];
-            const cnt = list === 'All Active' ? activeCards.length : list === 'All Done' ? doneCards.length : BA_CARDS.filter(c => c.listName === list).length;
+            const cnt = list === 'All Active' ? activeCards.length : list === 'All Done' ? doneCards.length : cards.filter(c => c.listName === list).length;
             return (
               <button key={list} onClick={() => setActiveList(list)}
                 style={{ padding: '0.25rem 0.625rem', fontSize: '0.7rem', fontWeight: 600, borderRadius: '5px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s',
@@ -366,7 +409,7 @@ export default function Tasks() {
       {viewMode === 'kanban' && !showDone && (
         <div style={{ overflowX: 'auto', paddingBottom: '0.5rem' }}>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', minWidth: 'max-content' }}>
-            {ACTIVE_LISTS.filter(list => activeList === 'All Active' || list === activeList).map(list => {
+            {activeLists.filter(list => activeList === 'All Active' || list === activeList).map(list => {
               const lm = LIST_META[list] || LIST_META['Backlog'];
               const colCards = filtered.filter(c => c.listName === list);
               return (

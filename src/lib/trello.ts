@@ -204,6 +204,194 @@ export async function findBABoard(): Promise<TrelloBoard | null> {
   return ba ?? boards[0] ?? null; // fallback to first board
 }
 
+// ── BA Traffic Board – Custom Fields & Live Fetch ─────────────
+
+interface TrelloCustomFieldOption {
+  id: string;
+  value: { text: string };
+  color?: string;
+}
+
+interface TrelloCustomField {
+  id: string;
+  name: string;
+  type: 'text' | 'number' | 'date' | 'list' | 'checkbox';
+  options?: TrelloCustomFieldOption[];
+}
+
+interface TrelloCustomFieldItem {
+  id: string;
+  idCustomField: string;
+  value?: { text?: string; number?: string; date?: string; checked?: string };
+  idValue?: string; // for list-type fields
+}
+
+interface TrelloCardWithCF extends TrelloCard {
+  customFieldItems?: TrelloCustomFieldItem[];
+  badges?: {
+    comments?: number;
+    attachments?: number;
+    checkItems?: number;
+    checkItemsChecked?: number;
+  };
+}
+
+export interface BACard {
+  id: string;
+  name: string;
+  url: string;
+  desc: string;
+  labels: string[];
+  client: string;
+  products: string[];
+  members: string[];
+  dueDate: string;
+  listName: string;
+  priority: string;
+  pm: string;
+  estimation: string;
+  deliveryDate: string;
+  relatedToPayment: boolean;
+  dueComplete: boolean;
+  commentCount: number;
+  attachmentCount: number;
+  checklistTotal: number;
+  checklistDone: number;
+  lastActivity: string;
+}
+
+export interface BATrafficData {
+  cards: BACard[];
+  lists: TrelloList[];
+  members: TrelloMember[];
+  boardName: string;
+}
+
+const BA_TRAFFIC_BOARD_ID = '66c5d907fffd4029f08565a4';
+
+async function getBoardCustomFields(boardId: string): Promise<TrelloCustomField[]> {
+  return trelloFetch<TrelloCustomField[]>(`/boards/${boardId}/customFields`);
+}
+
+async function getCardsWithCustomFields(boardId: string): Promise<TrelloCardWithCF[]> {
+  return trelloFetch<TrelloCardWithCF[]>(`/boards/${boardId}/cards`, {
+    filter: 'all',
+    fields: 'name,desc,due,dueComplete,idList,idBoard,labels,idMembers,url,closed,shortUrl,pos,dateLastActivity,badges',
+    members: 'true',
+    member_fields: 'fullName,initials,username,avatarUrl',
+    customFieldItems: 'true',
+  });
+}
+
+function extractClient(name: string, labels: TrelloLabel[]): string {
+  // Try [CLIENT] prefix pattern
+  const m = name.match(/^\[([^\]]+)\]/);
+  if (m) return m[1].trim();
+  // Try label names that look like client names (not product/priority labels)
+  const skip = new Set(['p+', 's+', 'meeting', 'highest', 'high', 'medium', 'low', 'lowest', 'risk', 'issue']);
+  for (const l of labels) {
+    const n = (l.name ?? '').trim();
+    if (n && !skip.has(n.toLowerCase()) && n.length > 1) return n;
+  }
+  return '';
+}
+
+function extractProducts(labels: TrelloLabel[]): string[] {
+  const products: string[] = [];
+  for (const l of labels) {
+    const n = (l.name ?? '').trim().toLowerCase();
+    if (n === 'p+') products.push('P+');
+    else if (n === 's+') products.push('S+');
+    else if (n === 'meeting') products.push('Meeting');
+  }
+  return products;
+}
+
+function resolveCustomFields(
+  items: TrelloCustomFieldItem[],
+  fields: TrelloCustomField[],
+): { priority: string; pm: string; estimation: string; deliveryDate: string; relatedToPayment: boolean } {
+  const result = { priority: '', pm: '', estimation: '', deliveryDate: '', relatedToPayment: false };
+  const fieldMap = Object.fromEntries(fields.map(f => [f.id, f]));
+
+  for (const item of items) {
+    const field = fieldMap[item.idCustomField];
+    if (!field) continue;
+    const n = field.name.toLowerCase();
+
+    if (n.includes('priority')) {
+      if (field.type === 'list' && item.idValue && field.options) {
+        const opt = field.options.find(o => o.id === item.idValue);
+        if (opt) result.priority = opt.value.text;
+      } else if (item.value?.text) {
+        result.priority = item.value.text;
+      }
+    } else if (n === 'pm' || n.includes('project manager')) {
+      result.pm = item.value?.text ?? '';
+    } else if (n.includes('estimation') || n.includes('hours')) {
+      result.estimation = item.value?.number ?? '';
+    } else if (n.includes('delivery') || n.includes('plan')) {
+      result.deliveryDate = item.value?.date ? item.value.date.slice(0, 10) : '';
+    } else if (n.includes('payment')) {
+      result.relatedToPayment = item.value?.checked === 'true';
+    }
+  }
+  return result;
+}
+
+export async function fetchBATrafficBoard(): Promise<BATrafficData> {
+  // Fetch board details, lists, all cards with custom fields, board members, and custom field defs in parallel
+  const board = await getTrelloBoard(BA_TRAFFIC_BOARD_ID);
+
+  const [lists, rawCards, members, customFields] = await Promise.all([
+    getTrelloLists(board.id),
+    getCardsWithCustomFields(board.id),
+    getTrelloBoardMembers(board.id),
+    getBoardCustomFields(board.id),
+  ]);
+
+  const listMap = Object.fromEntries(lists.map(l => [l.id, l.name]));
+  // Include closed/done lists too
+  const allLists = await trelloFetch<TrelloList[]>(`/boards/${board.id}/lists`, {
+    filter: 'all',
+    fields: 'name,closed,pos',
+  });
+  const fullListMap = Object.fromEntries(allLists.map(l => [l.id, l.name]));
+
+  const cards: BACard[] = rawCards.map(card => {
+    const listName = fullListMap[card.idList] ?? listMap[card.idList] ?? 'Backlog';
+    const cf = resolveCustomFields(card.customFieldItems ?? [], customFields);
+    const memberNames = (card.members ?? []).map(m => m.fullName || m.username);
+    const badges = (card as TrelloCardWithCF).badges ?? {};
+
+    return {
+      id: card.id,
+      name: card.name,
+      url: card.url,
+      desc: card.desc,
+      labels: card.labels.map(l => l.name).filter(Boolean),
+      client: extractClient(card.name, card.labels),
+      products: extractProducts(card.labels),
+      members: memberNames,
+      dueDate: card.due ? card.due.slice(0, 10) : '',
+      listName,
+      priority: cf.priority,
+      pm: cf.pm,
+      estimation: cf.estimation,
+      deliveryDate: cf.deliveryDate,
+      relatedToPayment: cf.relatedToPayment,
+      dueComplete: card.dueComplete,
+      commentCount: badges.comments ?? 0,
+      attachmentCount: badges.attachments ?? 0,
+      checklistTotal: badges.checkItems ?? 0,
+      checklistDone: badges.checkItemsChecked ?? 0,
+      lastActivity: card.dateLastActivity,
+    };
+  });
+
+  return { cards, lists: allLists, members, boardName: board.name };
+}
+
 // ── Full board fetch + mapping ───────────────────────────────
 export interface BoardData {
   board:    TrelloBoard;
