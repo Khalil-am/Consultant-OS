@@ -801,85 +801,186 @@ export default function Tasks() {
 
       {/* Trello Board View */}
       {activeView === 'Trello' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }} className="animate-fade-in">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} className="animate-fade-in">
 
-          {/* Trello Connect Banner */}
+          {/* Connect Banner */}
           {!trelloData && !trelloLoading && !trelloError && (
             <div style={{
-              background: 'linear-gradient(135deg, rgba(0,82,204,0.12) 0%, var(--bg-elevated) 60%, rgba(0,121,191,0.08) 100%)',
-              border: '1px solid rgba(0,121,191,0.25)', borderRadius: 'var(--radius-lg)',
-              padding: '2.5rem 2rem', textAlign: 'center',
+              background: 'linear-gradient(135deg, rgba(0,82,204,0.14) 0%, var(--bg-elevated) 55%, rgba(0,121,191,0.08) 100%)',
+              border: '1px solid rgba(0,121,191,0.28)', borderRadius: 'var(--radius-lg)',
+              padding: '3rem 2rem', textAlign: 'center', position: 'relative', overflow: 'hidden',
             }}>
-              <div style={{ width: '56px', height: '56px', background: 'rgba(0,121,191,0.15)', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem', border: '1px solid rgba(0,121,191,0.3)' }}>
-                <svg viewBox="0 0 32 32" width="28" height="28" fill="none"><rect x="2" y="2" width="12" height="28" rx="3" fill="#0052CC"/><rect x="18" y="2" width="12" height="18" rx="3" fill="#0052CC"/></svg>
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg, #0052CC, #0079BF, transparent)' }} />
+              <div style={{ width: '64px', height: '64px', background: 'linear-gradient(135deg, rgba(0,82,204,0.2), rgba(0,121,191,0.1))', borderRadius: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem', border: '1px solid rgba(0,121,191,0.35)', boxShadow: '0 8px 24px rgba(0,82,204,0.2)' }}>
+                <svg viewBox="0 0 32 32" width="32" height="32" fill="none"><rect x="2" y="2" width="12" height="28" rx="3" fill="#0052CC"/><rect x="18" y="2" width="12" height="18" rx="3" fill="#0079BF"/></svg>
               </div>
-              <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>Connect to Trello BA Board</div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.5rem', maxWidth: '420px', margin: '0 auto 1.5rem' }}>
-                Sync your Trello board to import tasks and risks directly into your RAID log. Cards are automatically mapped to status, priority, and risk category.
+              <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Sync your Trello BA Board</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', maxWidth: '440px', margin: '0 auto 1.75rem', lineHeight: 1.6 }}>
+                Pull all cards from your Trello board directly into this RAID log. Tasks and risks are automatically mapped by list name and label color.
               </div>
-              <button className="btn-primary" onClick={syncTrello} style={{ fontSize: '0.85rem', padding: '0.6rem 1.5rem' }}>
-                <RefreshCw size={14} /> Sync BA Board
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', marginBottom: '1.75rem', flexWrap: 'wrap' }}>
+                {[['✓', 'Status mapped from list name'], ['✓', 'Priority from label colour'], ['✓', 'Risks auto-detected'], ['✓', 'One-click import to RAID']].map(([icon, text]) => (
+                  <div key={text} style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <span style={{ color: '#10B981', fontWeight: 700 }}>{icon}</span>{text}
+                  </div>
+                ))}
+              </div>
+              <button className="btn-primary" onClick={syncTrello} style={{ fontSize: '0.875rem', padding: '0.65rem 1.75rem', boxShadow: '0 4px 16px rgba(0,82,204,0.3)' }}>
+                <RefreshCw size={14} /> Connect & Sync Board
               </button>
             </div>
           )}
 
           {/* Loading */}
           {trelloLoading && (
-            <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', padding: '2rem', textAlign: 'center' }}>
-              <RefreshCw size={20} style={{ color: '#0052CC', animation: 'spin 1s linear infinite', margin: '0 auto 0.75rem', display: 'block' }} />
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Connecting to Trello…</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Fetching board data</div>
+            <div style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(0,121,191,0.2)', borderRadius: 'var(--radius-lg)', padding: '3rem', textAlign: 'center' }}>
+              <div style={{ position: 'relative', width: '48px', height: '48px', margin: '0 auto 1rem' }}>
+                <svg viewBox="0 0 32 32" width="48" height="48" fill="none" style={{ opacity: 0.9 }}><rect x="2" y="2" width="12" height="28" rx="3" fill="#0052CC"/><rect x="18" y="2" width="12" height="18" rx="3" fill="#0079BF"/></svg>
+              </div>
+              <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: 700, marginBottom: '0.35rem' }}>Connecting to Trello…</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Fetching lists, cards and members</div>
+              <div style={{ width: '160px', height: '3px', background: 'rgba(0,121,191,0.15)', borderRadius: '9999px', margin: '1.25rem auto 0', overflow: 'hidden' }}>
+                <div style={{ height: '100%', background: 'linear-gradient(90deg, #0052CC, #0079BF)', borderRadius: '9999px', animation: 'shimmerBar 1.4s ease-in-out infinite' }} />
+              </div>
             </div>
           )}
 
           {/* Error */}
           {trelloError && (
-            <div style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.22)', borderRadius: 'var(--radius-lg)', padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontSize: '0.82rem', color: '#FCA5A5' }}>{trelloError}</div>
-              <button className="btn-ghost" onClick={syncTrello} style={{ fontSize: '0.75rem', height: '30px' }}><RefreshCw size={12} /> Retry</button>
+            <div style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.22)', borderRadius: 'var(--radius-lg)', padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                <AlertTriangle size={16} style={{ color: '#EF4444', flexShrink: 0 }} />
+                <div style={{ fontSize: '0.82rem', color: '#FCA5A5' }}>{trelloError}</div>
+              </div>
+              <button className="btn-ghost" onClick={syncTrello} style={{ fontSize: '0.75rem', height: '30px', flexShrink: 0 }}><RefreshCw size={12} /> Retry</button>
             </div>
           )}
 
           {/* Board Data */}
           {trelloData && !trelloLoading && (
             <>
-              {/* Board Header */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <div style={{ width: '32px', height: '32px', background: 'rgba(0,82,204,0.15)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(0,82,204,0.3)' }}>
-                    <svg viewBox="0 0 32 32" width="18" height="18" fill="none"><rect x="2" y="2" width="12" height="28" rx="3" fill="#0052CC"/><rect x="18" y="2" width="12" height="18" rx="3" fill="#0052CC"/></svg>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>{trelloData.board.name}</div>
-                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-                      {trelloData.tasks.length} tasks · {trelloData.risks.length} risks · {trelloData.members.length} members
-                      {trelloLastSync && <span style={{ marginLeft: '0.5rem', color: 'var(--text-faint)' }}>· Last synced {trelloLastSync}</span>}
+              {/* Board Hero Header */}
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(0,82,204,0.1) 0%, var(--bg-elevated) 50%, rgba(0,121,191,0.06) 100%)',
+                border: '1px solid rgba(0,121,191,0.22)', borderRadius: 'var(--radius-lg)',
+                padding: '1.25rem 1.5rem', position: 'relative', overflow: 'hidden',
+              }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg, #0052CC, #0079BF 60%, transparent)' }} />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div style={{ width: '44px', height: '44px', background: 'linear-gradient(135deg, rgba(0,82,204,0.2), rgba(0,121,191,0.1))', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(0,121,191,0.3)', flexShrink: 0 }}>
+                      <svg viewBox="0 0 32 32" width="24" height="24" fill="none"><rect x="2" y="2" width="12" height="28" rx="3" fill="#0052CC"/><rect x="18" y="2" width="12" height="18" rx="3" fill="#0079BF"/></svg>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{trelloData.board.name}</div>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        Trello Board
+                        {trelloLastSync && <span style={{ marginLeft: '0.625rem', color: 'var(--text-faint)' }}>· Synced at {trelloLastSync}</span>}
+                      </div>
                     </div>
                   </div>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button className="btn-ghost" onClick={syncTrello} style={{ height: '32px', fontSize: '0.75rem' }}>
+                      <RefreshCw size={12} /> Refresh
+                    </button>
+                    <a href={trelloData.board.url} target="_blank" rel="noopener noreferrer"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', height: '32px', padding: '0 0.875rem', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', fontWeight: 600, color: '#38BDF8', background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)', textDecoration: 'none' }}>
+                      <ExternalLink size={11} /> Open in Trello
+                    </a>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <button className="btn-ghost" onClick={syncTrello} style={{ height: '32px', fontSize: '0.75rem' }}>
-                    <RefreshCw size={12} /> Refresh
-                  </button>
-                  <a href={trelloData.board.url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', height: '32px', padding: '0 0.875rem', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', fontWeight: 600, color: '#38BDF8', background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)', textDecoration: 'none' }}>
-                    <ExternalLink size={11} /> Open in Trello
-                  </a>
+
+                {/* Board Stat Chips */}
+                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.125rem', flexWrap: 'wrap' }}>
+                  {[
+                    { label: 'Total Cards', value: trelloData.cards.length, color: '#0079BF' },
+                    { label: 'Tasks', value: trelloData.tasks.length, color: '#0EA5E9' },
+                    { label: 'Risks', value: trelloData.risks.length, color: '#EF4444' },
+                    { label: 'Lists', value: trelloData.lists.length, color: '#8B5CF6' },
+                    { label: 'Members', value: trelloData.members.length, color: '#10B981' },
+                  ].map(s => (
+                    <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.35rem 0.875rem', background: `${s.color}12`, border: `1px solid ${s.color}28`, borderRadius: '9999px' }}>
+                      <span style={{ fontSize: '0.95rem', fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.value}</span>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.02em' }}>{s.label}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
 
               {/* Import Success */}
               {importedCount && (
                 <div style={{ background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.22)', borderRadius: 'var(--radius-md)', padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: '#34D399' }}>
-                  <CheckSquare size={14} /> Imported {importedCount.tasks} task{importedCount.tasks !== 1 ? 's' : ''} and {importedCount.risks} risk{importedCount.risks !== 1 ? 's' : ''} into your RAID log
+                  <CheckSquare size={14} />
+                  Imported <strong>{importedCount.tasks}</strong> task{importedCount.tasks !== 1 ? 's' : ''} and <strong>{importedCount.risks}</strong> risk{importedCount.risks !== 1 ? 's' : ''} into your RAID log
                   <button onClick={() => setImportedCount(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#34D399', display: 'flex', alignItems: 'center' }}><X size={13} /></button>
                 </div>
               )}
 
+              {/* Board Columns – visual kanban-style overview */}
+              <div style={{ overflowX: 'auto', paddingBottom: '0.25rem' }}>
+                <div style={{ display: 'flex', gap: '0.75rem', minWidth: 'max-content' }}>
+                  {trelloData.lists.map((list, li) => {
+                    const listCards = trelloData.cards.filter(c => c.idList === list.id && !c.closed);
+                    const colColors = ['#0079BF', '#0EA5E9', '#8B5CF6', '#10B981', '#F59E0B', '#EF4444', '#EC4899', '#14B8A6'];
+                    const col = colColors[li % colColors.length];
+                    return (
+                      <div key={list.id} style={{ width: '210px', flexShrink: 0 }}>
+                        {/* Column header */}
+                        <div style={{
+                          background: `${col}14`, border: `1px solid ${col}28`, borderRadius: 'var(--radius-md)',
+                          padding: '0.6rem 0.875rem', marginBottom: '0.5rem',
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                            <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: col, boxShadow: `0 0 6px ${col}80` }} />
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>{list.name}</span>
+                          </div>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '1px 6px', borderRadius: '9999px', background: `${col}20`, color: col, border: `1px solid ${col}35` }}>{listCards.length}</span>
+                        </div>
+                        {/* Card stubs */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+                          {listCards.slice(0, 4).map(card => {
+                            const isRisk = trelloData.risks.some(r => r.trelloId === card.id);
+                            return (
+                              <div key={card.id} style={{
+                                background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)',
+                                borderLeft: `3px solid ${isRisk ? '#EF4444' : col}`,
+                                borderRadius: '6px', padding: '0.5rem 0.625rem',
+                              }}>
+                                <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.4, marginBottom: '0.3rem' }}>
+                                  {card.name.slice(0, 42)}{card.name.length > 42 ? '…' : ''}
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', flexWrap: 'wrap' }}>
+                                  {isRisk && <span style={{ fontSize: '0.58rem', fontWeight: 700, padding: '1px 5px', borderRadius: '3px', background: 'rgba(239,68,68,0.12)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.22)' }}>RISK</span>}
+                                  {card.due && <span style={{ fontSize: '0.6rem', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: '2px' }}><Clock size={8} />{card.due.slice(0, 10)}</span>}
+                                  {card.labels.slice(0, 2).map(lbl => lbl.color && (
+                                    <span key={lbl.id} style={{ width: '10px', height: '10px', borderRadius: '2px', background: lbl.color === 'red' ? '#EF4444' : lbl.color === 'green' ? '#10B981' : lbl.color === 'orange' ? '#F59E0B' : lbl.color === 'yellow' ? '#EAB308' : lbl.color === 'blue' ? '#0EA5E9' : lbl.color === 'purple' ? '#8B5CF6' : '#94A3B8', flexShrink: 0 }} />
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {listCards.length > 4 && (
+                            <div style={{ fontSize: '0.68rem', color: 'var(--text-faint)', textAlign: 'center', padding: '0.25rem 0' }}>+{listCards.length - 4} more cards</div>
+                          )}
+                          {listCards.length === 0 && (
+                            <div style={{ fontSize: '0.68rem', color: 'var(--text-faint)', textAlign: 'center', padding: '0.75rem 0', borderRadius: '6px', border: '1px dashed var(--border-subtle)' }}>Empty</div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Tasks Section */}
-              <div className="section-card">
+              <div className="section-card" style={{ border: '1px solid rgba(14,165,233,0.18)' }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #0EA5E9, transparent)', borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0' }} />
                 <div className="section-card-header">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <CheckSquare size={14} style={{ color: '#0EA5E9' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                    <div style={{ padding: '5px', background: 'rgba(14,165,233,0.12)', borderRadius: '7px', border: '1px solid rgba(14,165,233,0.22)' }}>
+                      <CheckSquare size={13} style={{ color: '#38BDF8', display: 'block' }} />
+                    </div>
                     <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>Tasks from Trello</span>
                     <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '1px 7px', borderRadius: '9999px', background: 'rgba(14,165,233,0.12)', color: '#38BDF8', border: '1px solid rgba(14,165,233,0.22)' }}>{trelloData.tasks.length}</span>
                   </div>
@@ -887,36 +988,42 @@ export default function Tasks() {
                     onClick={() => handleImportTrelloTasks(trelloData.tasks)}
                     disabled={importingTasks || trelloData.tasks.length === 0}>
                     {importingTasks ? <RefreshCw size={11} className="animate-spin" /> : <Download size={11} />}
-                    {importingTasks ? 'Importing…' : 'Import All Tasks'}
+                    {importingTasks ? 'Importing…' : 'Import All to RAID'}
                   </button>
                 </div>
                 {trelloData.tasks.length === 0 ? (
-                  <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-faint)', fontSize: '0.8rem' }}>No task cards found on this board</div>
+                  <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-faint)', fontSize: '0.8rem' }}>No task cards found on this board</div>
                 ) : (
                   <div style={{ overflowX: 'auto' }}>
                     <table className="data-table" style={{ minWidth: '680px' }}>
                       <thead>
                         <tr>
                           <th>Card Title</th>
-                          <th style={{ width: '120px' }}>List / Status</th>
+                          <th style={{ width: '130px' }}>List</th>
                           <th style={{ width: '90px' }}>Priority</th>
                           <th style={{ width: '110px' }}>Due Date</th>
-                          <th style={{ width: '90px' }}>Assignees</th>
-                          <th style={{ width: '60px' }}>Link</th>
+                          <th style={{ width: '80px' }}>Assignees</th>
+                          <th style={{ width: '48px' }} />
                         </tr>
                       </thead>
                       <tbody>
                         {trelloData.tasks.map((t: MappedTask) => {
                           const pc = priorityConfig[t.priority === 'Critical' ? 'High' : t.priority] || priorityConfig.Low;
                           const sc = kanbanColumns.find(c => c.key === t.status);
+                          const isOverdue = t.dueDate && new Date(t.dueDate) < new Date();
                           return (
-                            <tr key={t.trelloId}>
+                            <tr key={t.trelloId} style={{ borderLeft: `3px solid ${sc?.color ?? '#475569'}40` }}>
                               <td>
-                                <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>{t.title}</div>
-                                {t.description && <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '2px', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.description}</div>}
+                                <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '2px' }}>{t.title}</div>
+                                {t.description && <div style={{ fontSize: '0.67rem', color: 'var(--text-faint)', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.description}</div>}
+                                {t.labels.length > 0 && (
+                                  <div style={{ display: 'flex', gap: '3px', marginTop: '4px', flexWrap: 'wrap' }}>
+                                    {t.labels.map((lbl, i) => <span key={i} style={{ fontSize: '0.58rem', padding: '1px 5px', borderRadius: '3px', background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }}>{lbl}</span>)}
+                                  </div>
+                                )}
                               </td>
                               <td>
-                                <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 7px', borderRadius: '9999px', background: `${sc?.color ?? '#475569'}18`, color: sc?.color ?? '#94A3B8', border: `1px solid ${sc?.color ?? '#475569'}30` }}>
+                                <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 7px', borderRadius: '9999px', background: `${sc?.color ?? '#475569'}15`, color: sc?.color ?? '#94A3B8', border: `1px solid ${sc?.color ?? '#475569'}30`, whiteSpace: 'nowrap' }}>
                                   {t.listName}
                                 </span>
                               </td>
@@ -925,16 +1032,22 @@ export default function Tasks() {
                                   {t.priority}
                                 </span>
                               </td>
-                              <td style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{t.dueDate ?? '—'}</td>
                               <td>
-                                <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
-                                  {t.assignees.length ? t.assignees.map((a, i) => (
+                                <span style={{ fontSize: '0.75rem', color: isOverdue ? '#FCA5A5' : 'var(--text-secondary)', fontWeight: isOverdue ? 600 : 400 }}>
+                                  {t.dueDate ?? '—'}
+                                </span>
+                              </td>
+                              <td>
+                                <div style={{ display: 'flex', gap: '3px' }}>
+                                  {t.assignees.length ? t.assignees.slice(0, 3).map((a, i) => (
                                     <div key={i} className="avatar" style={{ width: '22px', height: '22px', fontSize: '0.55rem' }}>{a}</div>
                                   )) : <span style={{ color: 'var(--text-faint)', fontSize: '0.72rem' }}>—</span>}
                                 </div>
                               </td>
                               <td>
-                                <a href={t.trelloUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#38BDF8', display: 'flex', alignItems: 'center' }}>
+                                <a href={t.trelloUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-faint)', display: 'flex', alignItems: 'center', transition: 'color 0.15s' }}
+                                  onMouseEnter={e => (e.currentTarget.style.color = '#38BDF8')}
+                                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-faint)')}>
                                   <ExternalLink size={12} />
                                 </a>
                               </td>
@@ -948,65 +1061,70 @@ export default function Tasks() {
               </div>
 
               {/* Risks Section */}
-              <div className="section-card">
+              <div className="section-card" style={{ border: '1px solid rgba(239,68,68,0.18)', position: 'relative' }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #EF4444, transparent)', borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0' }} />
                 <div className="section-card-header">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <AlertTriangle size={14} style={{ color: '#EF4444' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                    <div style={{ padding: '5px', background: 'rgba(239,68,68,0.1)', borderRadius: '7px', border: '1px solid rgba(239,68,68,0.22)' }}>
+                      <AlertTriangle size={13} style={{ color: '#FCA5A5', display: 'block' }} />
+                    </div>
                     <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>Risks from Trello</span>
                     <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '1px 7px', borderRadius: '9999px', background: 'rgba(239,68,68,0.12)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.25)' }}>{trelloData.risks.length}</span>
                   </div>
-                  <button className="btn-primary" style={{ height: '30px', fontSize: '0.75rem', background: 'rgba(239,68,68,0.15)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.3)' }}
+                  <button style={{ height: '30px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.375rem', padding: '0 0.875rem', borderRadius: 'var(--radius-sm)', fontWeight: 600, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.28)' }}
                     onClick={() => handleImportTrelloRisks(trelloData.risks)}
                     disabled={importingRisks || trelloData.risks.length === 0}>
                     {importingRisks ? <RefreshCw size={11} className="animate-spin" /> : <Download size={11} />}
-                    {importingRisks ? 'Importing…' : 'Import All Risks'}
+                    {importingRisks ? 'Importing…' : 'Import All to RAID'}
                   </button>
                 </div>
                 {trelloData.risks.length === 0 ? (
-                  <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-faint)', fontSize: '0.8rem' }}>No risk cards found — label cards with "Risk" to surface them here</div>
+                  <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-faint)', fontSize: '0.8rem' }}>No risk cards found — add a "Risk" label or create a list named "Risks" on your Trello board</div>
                 ) : (
                   <div style={{ overflowX: 'auto' }}>
                     <table className="data-table" style={{ minWidth: '680px' }}>
                       <thead>
                         <tr>
                           <th>Risk Title</th>
-                          <th style={{ width: '100px' }}>Category</th>
+                          <th style={{ width: '110px' }}>Category</th>
                           <th style={{ width: '90px' }}>Severity</th>
                           <th style={{ width: '110px' }}>Due Date</th>
-                          <th style={{ width: '90px' }}>Assignees</th>
-                          <th style={{ width: '60px' }}>Link</th>
+                          <th style={{ width: '80px' }}>Assignees</th>
+                          <th style={{ width: '48px' }} />
                         </tr>
                       </thead>
                       <tbody>
                         {trelloData.risks.map((r: MappedRisk) => {
-                          const sevColor = r.severity === 'Critical' ? { color: '#FCA5A5', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.25)' }
-                            : r.severity === 'High' ? { color: '#FCD34D', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.25)' }
-                            : r.severity === 'Medium' ? { color: '#38BDF8', bg: 'rgba(14,165,233,0.1)', border: 'rgba(14,165,233,0.22)' }
-                            : { color: '#34D399', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.22)' };
+                          const sevColor = r.severity === 'Critical' ? { color: '#FCA5A5', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.25)', left: '#EF4444' }
+                            : r.severity === 'High' ? { color: '#FCD34D', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.25)', left: '#F59E0B' }
+                            : r.severity === 'Medium' ? { color: '#38BDF8', bg: 'rgba(14,165,233,0.1)', border: 'rgba(14,165,233,0.22)', left: '#0EA5E9' }
+                            : { color: '#34D399', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.22)', left: '#10B981' };
                           return (
-                            <tr key={r.trelloId}>
+                            <tr key={r.trelloId} style={{ borderLeft: `3px solid ${sevColor.left}55` }}>
                               <td>
-                                <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>{r.title}</div>
-                                {r.description && <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '2px', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description}</div>}
+                                <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '2px' }}>{r.title}</div>
+                                {r.description && <div style={{ fontSize: '0.67rem', color: 'var(--text-faint)', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description}</div>}
                               </td>
                               <td>
-                                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', padding: '1px 6px', background: 'rgba(255,255,255,0.04)', borderRadius: '4px', border: '1px solid var(--border-subtle)' }}>{r.category}</span>
+                                <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)', padding: '2px 7px', background: 'rgba(255,255,255,0.04)', borderRadius: '5px', border: '1px solid var(--border-subtle)' }}>{r.category}</span>
                               </td>
                               <td>
                                 <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 7px', borderRadius: '9999px', background: sevColor.bg, color: sevColor.color, border: `1px solid ${sevColor.border}` }}>
                                   {r.severity}
                                 </span>
                               </td>
-                              <td style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{r.dueDate ?? '—'}</td>
+                              <td style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{r.dueDate ?? '—'}</td>
                               <td>
-                                <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
-                                  {r.assignees.length ? r.assignees.map((a, i) => (
+                                <div style={{ display: 'flex', gap: '3px' }}>
+                                  {r.assignees.length ? r.assignees.slice(0, 3).map((a, i) => (
                                     <div key={i} className="avatar" style={{ width: '22px', height: '22px', fontSize: '0.55rem' }}>{a}</div>
                                   )) : <span style={{ color: 'var(--text-faint)', fontSize: '0.72rem' }}>—</span>}
                                 </div>
                               </td>
                               <td>
-                                <a href={r.trelloUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#38BDF8', display: 'flex', alignItems: 'center' }}>
+                                <a href={r.trelloUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-faint)', display: 'flex', alignItems: 'center', transition: 'color 0.15s' }}
+                                  onMouseEnter={e => (e.currentTarget.style.color = '#38BDF8')}
+                                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-faint)')}>
                                   <ExternalLink size={12} />
                                 </a>
                               </td>
@@ -1019,23 +1137,26 @@ export default function Tasks() {
                 )}
               </div>
 
-              {/* Lists overview */}
-              <div className="section-card">
-                <div className="section-card-header">
-                  <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>Board Lists</span>
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  {trelloData.lists.map(list => {
-                    const count = trelloData.cards.filter(c => c.idList === list.id && !c.closed).length;
-                    return (
-                      <div key={list.id} style={{ padding: '0.5rem 0.875rem', background: 'rgba(255,255,255,0.04)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{list.name}</span>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '1px 6px', borderRadius: '9999px', background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }}>{count}</span>
+              {/* Members strip */}
+              {trelloData.members.length > 0 && (
+                <div className="section-card">
+                  <div className="section-card-header">
+                    <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>Board Members</span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{trelloData.members.length} members</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    {trelloData.members.map(m => (
+                      <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.375rem 0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
+                        <div className="avatar" style={{ width: '26px', height: '26px', fontSize: '0.6rem', flexShrink: 0 }}>{m.initials || m.fullName.slice(0, 2)}</div>
+                        <div>
+                          <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)' }}>{m.fullName}</div>
+                          <div style={{ fontSize: '0.62rem', color: 'var(--text-faint)' }}>@{m.username}</div>
+                        </div>
                       </div>
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </>
           )}
         </div>
