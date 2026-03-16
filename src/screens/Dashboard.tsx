@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Briefcase, FileText, Zap, CheckSquare, Clock, AlertTriangle,
@@ -11,11 +11,12 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts';
 import {
-  automationRunsData, documentsByTypeData, activities, meetings,
+  automationRunsData, documentsByTypeData,
   portfolioKPIs, ragStatusData, deliveryTrendData, boardDecisions,
-  workspaceFinancials, milestones,
   type PortfolioKPI, type BoardDecision,
 } from '../data/mockData';
+import { getActivities, getMilestones, getWorkspaceFinancials } from '../lib/db';
+import type { ActivityRow, MilestoneRow, WorkspaceFinancialRow } from '../lib/db';
 import { useLayout } from '../hooks/useLayout';
 
 type Period = 'today' | 'week' | 'month';
@@ -142,6 +143,17 @@ export default function Dashboard() {
   const [completedDecisions, setCompletedDecisions] = useState<Set<string>>(new Set());
   const [hoveredRagRow, setHoveredRagRow] = useState<number | null>(null);
 
+  // Live Supabase data
+  const [activities, setActivities] = useState<ActivityRow[]>([]);
+  const [milestones, setMilestones] = useState<MilestoneRow[]>([]);
+  const [workspaceFinancials, setWorkspaceFinancials] = useState<WorkspaceFinancialRow[]>([]);
+
+  useEffect(() => {
+    getActivities(30).then(setActivities).catch(() => {});
+    getMilestones().then(setMilestones).catch(() => {});
+    getWorkspaceFinancials().then(setWorkspaceFinancials).catch(() => {});
+  }, []);
+
   const handleApprove = (id: number) => setApprovals(prev => prev.map(a => a.id === id ? { ...a, status: 'approved' as const } : a));
   const handleReject = (id: number) => setApprovals(prev => prev.map(a => a.id === id ? { ...a, status: 'rejected' as const } : a));
   const dismissRec = (id: number) => setRecommendations(prev => prev.filter(r => r.id !== id));
@@ -169,7 +181,7 @@ export default function Dashboard() {
   const upcomingMilestones = [...milestones].filter(m => m.status !== 'Completed').slice(0, 5);
   const activeBoardDecisions = boardDecisions.filter(d => d.status !== 'Closed' && !completedDecisions.has(d.id));
 
-  const totalContract = workspaceFinancials.reduce((s, w) => s + w.contractValue, 0);
+  const totalContract = workspaceFinancials.reduce((s, w) => s + w.contract_value, 0);
   const totalSpent = workspaceFinancials.reduce((s, w) => s + w.spent, 0);
   const totalVariance = workspaceFinancials.reduce((s, w) => s + w.variance, 0);
 
@@ -187,7 +199,6 @@ export default function Dashboard() {
   // Suppress unused import warnings for data we keep but may not render
   void automationRunsData;
   void documentsByTypeData;
-  void meetings;
 
   return (
     <div style={{ padding: p, display: 'flex', flexDirection: 'column', gap, background: '#080C18', minHeight: '100%' }}>
@@ -518,7 +529,7 @@ export default function Dashboard() {
                         {ms.title}
                       </div>
                       <div style={{ fontSize: '0.65rem', color: '#475569', marginTop: '2px' }}>
-                        {wsNames[ms.workspaceId] || ms.workspaceId}
+                        {wsNames[ms.workspace_id] || ms.workspace_id}
                       </div>
                     </div>
                     <span style={{ fontSize: '0.6rem', padding: '2px 6px', borderRadius: '4px', background: `${sc}15`, color: sc, border: `1px solid ${sc}25`, whiteSpace: 'nowrap', flexShrink: 0, fontWeight: 700 }}>
@@ -527,13 +538,13 @@ export default function Dashboard() {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.375rem' }}>
                     <div className="milestone-bar" style={{ flex: 1, height: '5px', borderRadius: '9999px', background: 'rgba(255,255,255,0.06)' }}>
-                      <div className={fillClass} style={{ width: `${ms.completionPct}%`, height: '100%', borderRadius: '9999px', transition: 'width 0.8s ease' }} />
+                      <div className={fillClass} style={{ width: `${ms.completion_pct}%`, height: '100%', borderRadius: '9999px', transition: 'width 0.8s ease' }} />
                     </div>
-                    <span style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 700, flexShrink: 0 }}>{ms.completionPct}%</span>
+                    <span style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 700, flexShrink: 0 }}>{ms.completion_pct}%</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '0.65rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                      <Calendar size={9} /> {ms.dueDate}
+                      <Calendar size={9} /> {ms.due_date}
                     </span>
                     <span style={{ fontSize: '0.65rem', color: '#F59E0B', fontWeight: 700 }}>
                       {fmtSAR(ms.value)}
@@ -702,19 +713,19 @@ export default function Dashboard() {
               </thead>
               <tbody>
                 {workspaceFinancials.map((wf) => {
-                  const spentPct = Math.round((wf.spent / wf.contractValue) * 100);
+                  const spentPct = Math.round((wf.spent / wf.contract_value) * 100);
                   const varColor = wf.variance <= 0 ? '#34D399' : '#FCA5A5';
                   return (
-                    <tr key={wf.workspaceId} style={{ cursor: 'pointer', borderTop: '1px solid rgba(255,255,255,0.04)', transition: 'background 0.15s' }}
+                    <tr key={wf.workspace_id} style={{ cursor: 'pointer', borderTop: '1px solid rgba(255,255,255,0.04)', transition: 'background 0.15s' }}
                       onClick={() => navigate('/workspaces')}
                       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.025)'; }}
                       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                     >
                       <td style={{ padding: '0.55rem 0.875rem', fontSize: '0.72rem', color: '#94A3B8', fontWeight: 500, maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {wsNames[wf.workspaceId] || wf.workspaceId}
+                        {wf.workspace_name}
                       </td>
                       <td style={{ padding: '0.55rem 0.875rem', textAlign: 'right', fontSize: '0.72rem', color: '#F1F5F9', fontWeight: 700 }}>
-                        {fmtSAR(wf.contractValue)}
+                        {fmtSAR(wf.contract_value)}
                       </td>
                       <td style={{ padding: '0.55rem 0.875rem', textAlign: 'right', fontSize: '0.72rem' }}>
                         <span style={{ color: spentPct >= 95 ? '#FCA5A5' : spentPct >= 80 ? '#FCD34D' : '#34D399', fontWeight: 700 }}>

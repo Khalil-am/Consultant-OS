@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLayout } from '../hooks/useLayout';
 import {
   BarChart3, Download, Share, Eye, Plus, Calendar,
@@ -8,7 +8,8 @@ import {
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell
 } from 'recharts';
-import { reports } from '../data/mockData';
+import { getReports } from '../lib/db';
+import type { ReportRow } from '../lib/db';
 
 const categoryTabs = ['All Reports', 'Weekly Status', 'Monthly', 'Steering Committee', 'Procurement', 'Board Summaries'];
 
@@ -117,6 +118,14 @@ export default function Reports() {
   const [generatedPacks, setGeneratedPacks] = useState<Set<string>>(new Set());
   const [hoveredReport, setHoveredReport] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [reports, setReports] = useState<ReportRow[]>([]);
+
+  useEffect(() => {
+    getReports().then(setReports).catch(() => {});
+  }, []);
+
+  // suppress unused warning
+  void isMobile;
 
   const filtered = reports.filter(r => {
     const matchesCat = activeCategory === 'All Reports'           ? true
@@ -268,7 +277,7 @@ export default function Reports() {
                   className="section-card"
                   style={{ cursor: 'pointer', overflow: 'hidden', transition: 'all var(--transition-base)', position: 'relative' }}
                   onMouseEnter={e => {
-                    (e.currentTarget as HTMLElement).style.borderColor = `${report.typeColor}35`;
+                    (e.currentTarget as HTMLElement).style.borderColor = `${report.type_color}35`;
                     (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)';
                     (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 28px rgba(0,0,0,0.35)';
                     setHoveredReport(report.id);
@@ -281,13 +290,13 @@ export default function Reports() {
                   }}
                 >
                   {/* Top accent */}
-                  <div style={{ height: '2px', background: `linear-gradient(90deg, ${report.typeColor} 0%, ${report.typeColor}55 60%, transparent 100%)` }} />
+                  <div style={{ height: '2px', background: `linear-gradient(90deg, ${report.type_color} 0%, ${report.type_color}55 60%, transparent 100%)` }} />
 
                   <div style={{ padding: '1rem' }}>
                     {/* Header row */}
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.875rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <div style={{ padding: '0.5rem', borderRadius: '8px', background: `${report.typeColor}12`, color: report.typeColor }}>
+                        <div style={{ padding: '0.5rem', borderRadius: '8px', background: `${report.type_color}12`, color: report.type_color }}>
                           <BarChart3 size={15} />
                         </div>
                         <span style={{ fontSize: '0.62rem', fontWeight: 600, padding: '2px 6px', borderRadius: '9999px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}>

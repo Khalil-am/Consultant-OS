@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLayout } from '../hooks/useLayout';
 import {
   Plus, Video, Users, Clock, CheckCircle, FileText,
   ChevronRight, Calendar, MapPin, Activity, TrendingUp, Search,
 } from 'lucide-react';
-import { meetings } from '../data/mockData';
+import { getMeetings, updateMeeting } from '../lib/db';
+import type { MeetingRow } from '../lib/db';
 
 const filterTabs = ['All', 'Upcoming', 'In Progress', 'Completed', 'Committee'];
 
@@ -46,13 +47,6 @@ const governanceMetrics = [
   { label: 'Avg. Attendance', value: '7.3', unit: 'participants', color: '#F59E0B' },
 ];
 
-const statsCards = [
-  { label: 'Meetings This Month', value: '12', color: '#8B5CF6', trend: '+3' },
-  { label: 'Decisions Logged', value: '28', color: '#0EA5E9', trend: '+7' },
-  { label: 'Actions Extracted', value: '67', color: '#10B981', trend: '+12' },
-  { label: 'Avg Resolution Time', value: '4.2d', color: '#F59E0B', trend: '-0.8d' },
-];
-
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { bg: string; color: string; border: string; dot: string }> = {
     'Upcoming':    { bg: 'rgba(14,165,233,0.1)',  color: '#38BDF8',  border: 'rgba(14,165,233,0.22)',  dot: '#38BDF8' },
@@ -80,6 +74,20 @@ export default function Meetings() {
   const { width, isMobile, isTablet } = useLayout();
   const [activeFilter, setActiveFilter] = useState('All');
   const [search, setSearch] = useState('');
+  const [meetings, setMeetings] = useState<MeetingRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getMeetings().then(data => { setMeetings(data); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const statsCards = [
+    { label: 'Total Meetings', value: String(meetings.length), color: '#8B5CF6', trend: '+' + meetings.filter(m => m.status === 'Upcoming').length + ' upcoming' },
+    { label: 'Decisions Logged', value: String(meetings.reduce((s, m) => s + (m.decisions_logged ?? 0), 0)), color: '#0EA5E9', trend: 'cumulative' },
+    { label: 'Actions Extracted', value: String(meetings.reduce((s, m) => s + (m.actions_extracted ?? 0), 0)), color: '#10B981', trend: 'from minutes' },
+    { label: 'Completed', value: String(meetings.filter(m => m.status === 'Completed').length), color: '#F59E0B', trend: 'this quarter' },
+  ];
 
   const filtered = meetings.filter(m => {
     const matchesFilter = activeFilter === 'All'
@@ -90,6 +98,9 @@ export default function Meetings() {
     const matchesSearch = !search || m.title.toLowerCase().includes(search.toLowerCase()) || m.workspace.toLowerCase().includes(search.toLowerCase());
     return matchesFilter && matchesSearch;
   });
+
+  // suppress unused import warning
+  void updateMeeting;
 
   return (
     <div className="screen-container animate-fade-in">
@@ -162,7 +173,12 @@ export default function Meetings() {
 
           {/* Meeting Cards */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
-            {filtered.length === 0 && (
+            {loading && (
+              <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                Loading meetings…
+              </div>
+            )}
+            {!loading && filtered.length === 0 && (
               <div style={{ textAlign: 'center', padding: '3rem 1rem', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-lg)', border: '1px dashed var(--border-default)' }}>
                 <Video size={32} style={{ color: 'var(--text-faint)', marginBottom: '0.75rem', margin: '0 auto 0.75rem' }} />
                 <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>No meetings found</div>
@@ -223,7 +239,7 @@ export default function Meetings() {
                           }}>{meeting.type}</span>
                           {/* Status badge */}
                           <StatusBadge status={meeting.status} />
-                          {meeting.status === 'Completed' && meeting.minutesGenerated && (
+                          {meeting.status === 'Completed' && meeting.minutes_generated && (
                             <span style={{
                               fontSize: '0.65rem', fontWeight: 600, padding: '2px 6px', borderRadius: '9999px',
                               background: 'rgba(16,185,129,0.1)', color: '#34D399',
@@ -282,24 +298,24 @@ export default function Meetings() {
                           {/* Completed action/decision counts */}
                           {meeting.status === 'Completed' && (
                             <div style={{ display: 'flex', gap: '0.375rem' }}>
-                              {meeting.actionsExtracted && (
+                              {meeting.actions_extracted && (
                                 <span style={{
                                   fontSize: '0.65rem', fontWeight: 600, padding: '2px 6px', borderRadius: '4px',
                                   background: 'rgba(245,158,11,0.1)', color: '#FCD34D',
                                   display: 'inline-flex', alignItems: 'center', gap: '3px',
                                   border: '1px solid rgba(245,158,11,0.2)',
                                 }}>
-                                  <CheckCircle size={9} /> {meeting.actionsExtracted}a
+                                  <CheckCircle size={9} /> {meeting.actions_extracted}a
                                 </span>
                               )}
-                              {meeting.decisionsLogged && (
+                              {meeting.decisions_logged && (
                                 <span style={{
                                   fontSize: '0.65rem', fontWeight: 600, padding: '2px 6px', borderRadius: '4px',
                                   background: 'rgba(14,165,233,0.1)', color: '#38BDF8',
                                   display: 'inline-flex', alignItems: 'center', gap: '3px',
                                   border: '1px solid rgba(14,165,233,0.2)',
                                 }}>
-                                  <TrendingUp size={9} /> {meeting.decisionsLogged}d
+                                  <TrendingUp size={9} /> {meeting.decisions_logged}d
                                 </span>
                               )}
                             </div>

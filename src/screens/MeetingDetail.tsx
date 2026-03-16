@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLayout } from '../hooks/useLayout';
 import {
   ArrowLeft, Video, Users, Clock, MapPin, Calendar,
   Sparkles, CheckSquare, FileText, Plus, Check, AlertCircle
 } from 'lucide-react';
-import { meetings } from '../data/mockData';
+import { getMeeting } from '../lib/db';
+import type { MeetingRow } from '../lib/db';
 
 const tabs = ['Meeting Info', 'Agenda', 'Notes', 'Decisions', 'Action Items', 'Attachments', 'Generated Outputs'];
 
@@ -39,9 +40,28 @@ export default function MeetingDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('Meeting Info');
+  const [meeting, setMeeting] = useState<MeetingRow | null>(null);
+  const [loadingMeeting, setLoadingMeeting] = useState(true);
 
-  const meeting = meetings.find(m => m.id === id) || meetings[0];
+  useEffect(() => {
+    if (id) {
+      getMeeting(id)
+        .then(data => { setMeeting(data); setLoadingMeeting(false); })
+        .catch(() => setLoadingMeeting(false));
+    }
+  }, [id]);
+
+  if (loadingMeeting) {
+    return <div style={{ padding: '2rem', color: 'var(--text-muted)', fontSize: '0.875rem' }}>Loading meeting…</div>;
+  }
+  if (!meeting) {
+    return <div style={{ padding: '2rem', color: 'var(--text-muted)', fontSize: '0.875rem' }}>Meeting not found.</div>;
+  }
+
   const isCommittee = meeting.type === 'Committee' || meeting.type === 'Steering';
+
+  // suppress unused warning
+  void width;
 
   return (
     <div style={{ padding: isMobile ? '0.875rem' : '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -90,14 +110,14 @@ export default function MeetingDetail() {
                   }}>
                     {meeting.status}
                   </span>
-                  {isCommittee && meeting.quorumStatus && (
+                  {isCommittee && meeting.quorum_status && (
                     <span style={{
                       fontSize: '0.7rem', padding: '2px 7px', borderRadius: '4px',
-                      background: meeting.quorumStatus === 'Met' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
-                      color: meeting.quorumStatus === 'Met' ? '#34D399' : '#FCA5A5',
-                      border: `1px solid ${meeting.quorumStatus === 'Met' ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`,
+                      background: meeting.quorum_status === 'Met' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+                      color: meeting.quorum_status === 'Met' ? '#34D399' : '#FCA5A5',
+                      border: `1px solid ${meeting.quorum_status === 'Met' ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`,
                     }}>
-                      Quorum {meeting.quorumStatus}
+                      Quorum {meeting.quorum_status}
                     </span>
                   )}
                 </div>
@@ -191,7 +211,7 @@ export default function MeetingDetail() {
                 { label: 'Location', value: meeting.location || 'Virtual' },
                 { label: 'Status', value: meeting.status },
                 ...(isCommittee ? [
-                  { label: 'Quorum Status', value: meeting.quorumStatus || 'Pending' },
+                  { label: 'Quorum Status', value: meeting.quorum_status || 'Pending' },
                   { label: 'Circular Number', value: 'SC-10/2026' },
                 ] : []),
               ].map(field => (

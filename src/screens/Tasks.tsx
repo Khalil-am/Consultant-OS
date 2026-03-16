@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLayout } from '../hooks/useLayout';
 import {
   AlertTriangle, CheckSquare, Clock, TrendingUp, Plus, Filter, Search,
   ArrowRight, MoreHorizontal,
 } from 'lucide-react';
-import { tasks, risks } from '../data/mockData';
+import { getTasks, getRisks, updateTask } from '../lib/db';
+import type { TaskRow, RiskRow } from '../lib/db';
 
 const kanbanColumns = [
   { key: 'Backlog',     label: 'Backlog',      color: '#475569', trackColor: 'rgba(71,85,105,0.3)' },
@@ -46,7 +47,7 @@ const dependencies = [
   { id: 'DEP-005', fromWorkspace: 'ADNOC Supply Chain', description: 'ERP go-live contingent on Smart City IoT data schema finalization', toWorkspace: 'Smart City PMO', due: '01 May 2026', status: 'At Risk' },
 ];
 
-function buildHeatmap() {
+function buildHeatmap(risks: RiskRow[]) {
   const grid: Record<number, Record<number, string[]>> = {};
   for (let i = 1; i <= 5; i++) {
     grid[i] = {};
@@ -107,7 +108,27 @@ export default function Tasks() {
   const { width, isMobile } = useLayout();
   const [activeView, setActiveView] = useState<RAIDTab>('Tasks');
   const [taskSearch, setTaskSearch] = useState('');
-  const heatmap = buildHeatmap();
+  const [tasks, setTasks] = useState<TaskRow[]>([]);
+  const [risks, setRisks] = useState<RiskRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
+
+  useEffect(() => {
+    Promise.all([getTasks(), getRisks()])
+      .then(([t, r]) => { setTasks(t); setRisks(r); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  async function handleUpdateStatus(taskId: string, newStatus: string) {
+    setUpdatingTaskId(taskId);
+    try {
+      await updateTask(taskId, { status: newStatus as TaskRow['status'] });
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus as TaskRow['status'] } : t));
+    } catch { /* ignore */ }
+    finally { setUpdatingTaskId(null); }
+  }
+
+  const heatmap = buildHeatmap(risks);
 
   const tasksByStatus = (status: string) =>
     tasks.filter(t => t.status === status && (!taskSearch || t.title.toLowerCase().includes(taskSearch.toLowerCase())));
@@ -140,6 +161,11 @@ export default function Tasks() {
   const addLabel: Record<RAIDTab, string> = {
     Tasks: 'New Task', Risks: 'Log Risk', Assumptions: 'Add Assumption', Issues: 'Log Issue', Dependencies: 'Add Dependency',
   };
+
+  // suppress unused warning
+  void isMobile;
+  void updatingTaskId;
+  void handleUpdateStatus;
 
   return (
     <div className="screen-container animate-fade-in">
@@ -200,7 +226,12 @@ export default function Tasks() {
       {/* Tasks View – Kanban */}
       {activeView === 'Tasks' && (
         <div style={{ display: 'flex', gap: '0.75rem', overflowX: 'auto', paddingBottom: '0.5rem', alignItems: 'flex-start' }}>
-          {kanbanColumns.map(col => {
+          {loading && (
+            <div style={{ padding: '1rem', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+              Loading tasks…
+            </div>
+          )}
+          {!loading && kanbanColumns.map(col => {
             const colTasks = tasksByStatus(col.key);
             return (
               <div key={col.key} style={{ minWidth: '248px', width: '248px', flexShrink: 0 }}>
@@ -261,7 +292,7 @@ export default function Tasks() {
                             color: task.status === 'Overdue' ? '#FCA5A5' : 'var(--text-muted)',
                             display: 'flex', alignItems: 'center', gap: '3px',
                           }}>
-                            <Clock size={9} style={{ color: task.status === 'Overdue' ? '#EF4444' : 'var(--text-faint)' }} /> {task.dueDate}
+                            <Clock size={9} style={{ color: task.status === 'Overdue' ? '#EF4444' : 'var(--text-faint)' }} /> {task.due_date}
                           </span>
                           <div className="avatar" style={{ width: '20px', height: '20px', fontSize: '0.55rem', flexShrink: 0 }}>
                             {task.assignee}
@@ -269,10 +300,10 @@ export default function Tasks() {
                         </div>
 
                         {/* Linked item */}
-                        {(task.linkedDoc || task.linkedMeeting) && (
+                        {(task.linked_doc || task.linked_meeting) && (
                           <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-subtle)' }}>
                             <span style={{ fontSize: '0.6rem', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                              {task.linkedDoc ? `📄 ${task.linkedDoc.slice(0, 24)}…` : `🗓 ${task.linkedMeeting?.slice(0, 24)}…`}
+                              {task.linked_doc ? `📄 ${task.linked_doc.slice(0, 24)}…` : `🗓 ${task.linked_meeting?.slice(0, 24)}…`}
                             </span>
                           </div>
                         )}
