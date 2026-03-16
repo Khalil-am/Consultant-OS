@@ -73,7 +73,11 @@ export default function AutomationBuilder() {
   const [runError, setRunError] = useState('');
   const fileInputRef = useRef<HTMLTextAreaElement>(null);
 
-  const auto = automations.find(a => a.id === id) || automations[0];
+  const auto = automations.find(a => a.id === id) ?? automations[0];
+
+  if (!auto) {
+    return <div style={{ padding: '2rem', color: 'var(--text-muted)', fontSize: '0.875rem' }}>Automation not found.</div>;
+  }
 
   const handleRun = async () => {
     setRunning(true);

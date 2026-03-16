@@ -92,7 +92,7 @@ export default function DocumentDetail() {
       ]);
       if (!d) { setError('Document not found.'); return; }
       setDoc(d);
-      setTasks(allTasks.filter(t => t.linked_doc === id || t.linked_doc === d.id || t.linked_doc === d.name));
+      setTasks(allTasks.filter(t => t.linked_doc === id || t.linked_doc === d.id));
       // Seed AI chat with document context
       setMessages([{
         role: 'assistant',

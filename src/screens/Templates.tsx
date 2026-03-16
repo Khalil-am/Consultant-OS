@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useLayout } from '../hooks/useLayout';
 import {
   Search, Eye, Plus, Star, FileText, BarChart3, Users,
@@ -10,7 +10,6 @@ import { templates as initialTemplates, type Template } from '../data/mockData';
 import { chatWithDocument } from '../lib/openrouter';
 import { getWorkspaces } from '../lib/db';
 import type { WorkspaceRow } from '../lib/db';
-import { useEffect } from 'react';
 
 // ── Extended local type ───────────────────────────────────────
 interface TemplateItem extends Template {

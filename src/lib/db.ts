@@ -26,7 +26,7 @@ export async function getWorkspaces(): Promise<WorkspaceRow[]> {
 
 export async function getWorkspace(id: string): Promise<WorkspaceRow | null> {
   const { data, error } = await supabase.from('workspaces').select('*').eq('id', id).single();
-  if (error) throw error;
+  if (error && error.code !== 'PGRST116') throw error;
   return data as WorkspaceRow | null;
 }
 
@@ -132,7 +132,7 @@ export async function getMeetings(workspaceId?: string): Promise<MeetingRow[]> {
 
 export async function getMeeting(id: string): Promise<MeetingRow | null> {
   const { data, error } = await supabase.from('meetings').select('*').eq('id', id).single();
-  if (error) throw error;
+  if (error && error.code !== 'PGRST116') throw error;
   return data as MeetingRow | null;
 }
 
