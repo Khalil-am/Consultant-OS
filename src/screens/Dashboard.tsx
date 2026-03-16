@@ -5,6 +5,7 @@ import {
   TrendingUp, TrendingDown, Upload, Video, Sparkles, ArrowRight,
   Bot, Check, X, RefreshCw, Eye,
   Calendar, BarChart3, DollarSign, Target, Activity,
+  Brain, Layers, Users, ChevronRight,
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip,
@@ -196,6 +197,16 @@ export default function Dashboard() {
     'ws-008': 'Ministry Digital',
   };
 
+    // ── sparkline data per KPI ────────────────────────────────────────
+  const kpiSparks: Record<string, number[]> = {
+    'Active Engagements': [6, 6, 7, 7, 8, 8, 8],
+    'Pipeline Revenue':   [18, 22, 20, 25, 28, 30, 32],
+    'Open Risk Items':    [9, 11, 8, 10, 7, 9, 6],
+    'Milestones Due':     [4, 5, 3, 6, 4, 5, 7],
+    'Delivery Score':     [78, 80, 79, 83, 85, 82, 88],
+    'Tasks Completed':    [22, 27, 25, 30, 28, 34, 38],
+  };
+
   // Suppress unused import warnings for data we keep but may not render
   void automationRunsData;
   void documentsByTypeData;
@@ -205,46 +216,60 @@ export default function Dashboard() {
 
       {/* ── Hero Banner ─────────────────────────────────────────────── */}
       <div style={{
-        background: 'linear-gradient(135deg, #0C1628 0%, #080C18 55%, #0D0C20 100%)',
-        border: '1px solid rgba(0,212,255,0.12)',
-        borderRadius: '14px',
-        padding: isMobile ? '1.25rem' : '1.75rem',
+        background: 'linear-gradient(135deg, #0A1628 0%, #080C18 45%, #0C0A1E 100%)',
+        border: '1px solid rgba(0,212,255,0.15)',
+        borderRadius: '16px',
+        padding: isMobile ? '1.25rem' : '2rem',
         position: 'relative',
         overflow: 'hidden',
-        boxShadow: '0 4px 32px rgba(0,0,0,0.45)',
+        boxShadow: '0 4px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,212,255,0.06)',
       }}>
+        {/* Animated shimmer bar */}
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, transparent, rgba(0,212,255,0.8), rgba(139,92,246,0.6), transparent)', animation: 'shimmerBar 3s linear infinite', backgroundSize: '200% 100%', pointerEvents: 'none' }} />
         {/* Ambient glow orbs */}
-        <div style={{ position: 'absolute', top: -80, right: -40, width: 280, height: 280, borderRadius: '50%', background: 'radial-gradient(circle, rgba(0,212,255,0.07) 0%, transparent 70%)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: -60, left: 80, width: 200, height: 200, borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.05) 0%, transparent 70%)', pointerEvents: 'none' }} />
-        {/* Subtle grid pattern overlay */}
-        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px)', backgroundSize: '48px 48px', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: -100, right: -60, width: 380, height: 380, borderRadius: '50%', background: 'radial-gradient(circle, rgba(0,212,255,0.09) 0%, transparent 65%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: -80, left: 60, width: 280, height: 280, borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.07) 0%, transparent 65%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: '30%', right: '30%', width: 180, height: 180, borderRadius: '50%', background: 'radial-gradient(circle, rgba(16,185,129,0.04) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        {/* Grid pattern overlay */}
+        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px)', backgroundSize: '52px 52px', pointerEvents: 'none' }} />
 
         <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.625rem' }}>
-              <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#10B981', boxShadow: '0 0 8px rgba(16,185,129,0.8)' }} />
-              <span style={{ fontSize: '0.68rem', color: '#64748B', letterSpacing: '0.1em', textTransform: 'uppercase', fontWeight: 600 }}>
-                Board Overview · 15 March 2026
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '0.875rem' }}>
+              {/* Live pulse indicator */}
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#10B981', boxShadow: '0 0 10px rgba(16,185,129,0.9)' }} />
+                <div style={{ position: 'absolute', width: 16, height: 16, borderRadius: '50%', border: '1px solid rgba(16,185,129,0.5)', animation: 'liveRing 2s ease-out infinite' }} />
+              </div>
+              <span style={{ fontSize: '0.68rem', color: '#10B981', letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700 }}>
+                Live · Board Overview
               </span>
+              <span style={{ width: '1px', height: '12px', background: 'rgba(255,255,255,0.1)' }} />
+              <span style={{ fontSize: '0.68rem', color: '#475569', letterSpacing: '0.04em' }}>16 March 2026</span>
             </div>
-            <h1 style={{ margin: 0, fontSize: isMobile ? '1.4rem' : '1.85rem', fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1, marginBottom: '0.625rem' }}>
+            <h1 style={{ margin: 0, fontSize: isMobile ? '1.6rem' : '2.2rem', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1, marginBottom: '0.75rem' }}>
               <span style={{
-                background: 'linear-gradient(135deg, #F1F5F9 0%, #94A3B8 100%)',
+                background: 'linear-gradient(135deg, #F8FAFC 0%, #CBD5E1 100%)',
                 WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-              }}>Client Command</span>{' '}
+              }}>Client Command</span>
+              {' '}
               <span style={{
-                background: 'linear-gradient(135deg, #00D4FF 0%, #0EA5E9 100%)',
+                background: 'linear-gradient(135deg, #00D4FF 0%, #38BDF8 50%, #818CF8 100%)',
                 WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+                textShadow: 'none',
               }}>Center</span>
             </h1>
-            <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <span>8 active clients</span>
-              <span style={{ color: '#1E3A5F' }}>·</span>
-              <span style={{ color: '#00D4FF', fontWeight: 700 }}>{fmtSAR(totalContract)}</span>
-              <span style={{ color: '#1E3A5F' }}>total engagement value</span>
-              <span style={{ color: '#1E3A5F' }}>·</span>
-              <span>Last updated 13 Mar 2026</span>
-            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', flexWrap: 'wrap' }}>
+              {[
+                { icon: <Users size={11} />, label: '8 active clients', color: '#64748B' },
+                { icon: <DollarSign size={11} />, label: `${fmtSAR(totalContract)} portfolio`, color: '#00D4FF' },
+                { icon: <Layers size={11} />, label: '32 open tasks', color: '#64748B' },
+              ].map((item, i) => (
+                <span key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem', color: item.color, fontWeight: item.color === '#00D4FF' ? 700 : 500 }}>
+                  {item.icon}{item.label}
+                </span>
+              ))}
+            </div>
           </div>
 
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -282,22 +307,34 @@ export default function Dashboard() {
         {/* Banner stats strip */}
         {!isMobile && (
           <div style={{
-            position: 'relative', marginTop: '1.5rem', paddingTop: '1.25rem',
-            borderTop: '1px solid rgba(255,255,255,0.06)',
-            display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem',
+            position: 'relative', marginTop: '1.75rem', paddingTop: '1.5rem',
+            borderTop: '1px solid rgba(255,255,255,0.07)',
+            display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0',
           }}>
             {[
-              { label: 'Portfolio Value', value: fmtSAR(totalContract), sub: '8 engagements', color: '#00D4FF' },
-              { label: 'Revenue Recognized', value: fmtSAR(totalSpent), sub: `${Math.round((totalSpent / totalContract) * 100)}% collected`, color: '#10B981' },
-              { label: 'Budget Variance', value: (totalVariance > 0 ? '+' : '') + fmtSAR(Math.abs(totalVariance)), sub: totalVariance > 0 ? 'Over budget' : 'Under budget', color: totalVariance > 0 ? '#EF4444' : '#10B981' },
-              { label: 'Pending Actions', value: `${approvals.filter(a => a.status === 'pending').length + activeBoardDecisions.length}`, sub: 'Approvals + decisions', color: '#F59E0B' },
-            ].map(stat => (
-              <div key={stat.label} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <div style={{ fontSize: '0.65rem', color: '#334155', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>{stat.label}</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 900, letterSpacing: '-0.02em', color: stat.color, textShadow: `0 0 20px ${stat.color}40` }}>
+              { label: 'Portfolio Value', value: fmtSAR(totalContract), sub: '8 engagements', color: '#00D4FF', icon: <DollarSign size={13} />, pct: null },
+              { label: 'Revenue Recognized', value: fmtSAR(totalSpent), sub: `${Math.round((totalSpent / totalContract) * 100)}% of portfolio`, color: '#10B981', icon: <TrendingUp size={13} />, pct: Math.round((totalSpent / totalContract) * 100) },
+              { label: 'Budget Variance', value: (totalVariance > 0 ? '+' : '') + fmtSAR(Math.abs(totalVariance)), sub: totalVariance > 0 ? 'Over budget' : 'Under budget', color: totalVariance > 0 ? '#EF4444' : '#10B981', icon: <BarChart3 size={13} />, pct: null },
+              { label: 'Pending Actions', value: `${approvals.filter(a => a.status === 'pending').length + activeBoardDecisions.length}`, sub: 'Approvals + decisions', color: '#F59E0B', icon: <AlertTriangle size={13} />, pct: null },
+            ].map((stat, i) => (
+              <div key={stat.label} style={{
+                display: 'flex', flexDirection: 'column', gap: '4px',
+                padding: '0 1.5rem',
+                borderLeft: i > 0 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '4px' }}>
+                  <div style={{ color: stat.color, opacity: 0.7 }}>{stat.icon}</div>
+                  <div style={{ fontSize: '0.62rem', color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}>{stat.label}</div>
+                </div>
+                <div style={{ fontSize: '1.45rem', fontWeight: 900, letterSpacing: '-0.03em', color: stat.color, textShadow: `0 0 24px ${stat.color}50`, lineHeight: 1 }}>
                   {stat.value}
                 </div>
-                <div style={{ fontSize: '0.7rem', color: '#475569' }}>{stat.sub}</div>
+                {stat.pct !== null && (
+                  <div style={{ height: '3px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', marginTop: '4px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${stat.pct}%`, background: `linear-gradient(90deg, ${stat.color}, ${stat.color}90)`, borderRadius: '2px', transition: 'width 1s ease' }} />
+                  </div>
+                )}
+                <div style={{ fontSize: '0.68rem', color: '#475569', marginTop: stat.pct !== null ? '2px' : '0' }}>{stat.sub}</div>
               </div>
             ))}
           </div>
@@ -363,39 +400,67 @@ export default function Dashboard() {
               <div style={{ position: 'absolute', top: '50%', left: '0', transform: 'translateY(-50%)', width: '60px', height: '30px', background: `radial-gradient(ellipse, ${kpi.color}18 0%, transparent 70%)`, pointerEvents: 'none', filter: 'blur(6px)' }} />
             </div>
 
-            <div style={{ fontSize: '0.7rem', color: '#64748B', marginTop: '0.375rem', fontWeight: 500 }}>{kpi.label}</div>
+            <div style={{ fontSize: '0.7rem', color: '#64748B', marginTop: '0.5rem', fontWeight: 500 }}>{kpi.label}</div>
             <div style={{ fontSize: '0.65rem', color: '#334155', marginTop: '2px' }}>{kpi.subValue}</div>
+
+            {/* Mini sparkline */}
+            {(() => {
+              const data = kpiSparks[kpi.label];
+              if (!data) return null;
+              const mn = Math.min(...data), mx = Math.max(...data), range = mx - mn || 1;
+              const w = 80, h = 24;
+              const pts = data.map((v, i) => `${(i / (data.length - 1)) * w},${h - ((v - mn) / range) * h}`).join(' ');
+              return (
+                <svg width={w} height={h} style={{ marginTop: '0.5rem', opacity: 0.7 }}>
+                  <defs>
+                    <linearGradient id={`sg-${kpi.label.replace(/\s/g,'')}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={kpi.color} stopOpacity={0.25} />
+                      <stop offset="100%" stopColor={kpi.color} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <polygon
+                    points={`0,${h} ${pts} ${w},${h}`}
+                    fill={`url(#sg-${kpi.label.replace(/\s/g,'')})`}
+                  />
+                  <polyline points={pts} fill="none" stroke={kpi.color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              );
+            })()}
           </div>
         ))}
       </div>
 
       {/* ── Quick Actions ─────────────────────────────────────────────── */}
       <div style={{
-        background: '#0C1220', border: '1px solid rgba(255,255,255,0.07)',
-        borderRadius: '12px', overflow: 'hidden',
+        background: 'linear-gradient(160deg, #0A1220 0%, #080C18 100%)',
+        border: '1px solid rgba(255,255,255,0.07)',
+        borderRadius: '14px', overflow: 'hidden',
       }}>
         <div style={{
-          padding: '0.875rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)',
+          padding: '0.875rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          <span style={{ fontSize: '0.825rem', fontWeight: 700, color: '#F1F5F9', letterSpacing: '-0.01em' }}>Quick Actions</span>
-          <span style={{ fontSize: '0.7rem', color: '#334155' }}>6 shortcuts</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#00D4FF', boxShadow: '0 0 6px rgba(0,212,255,0.8)' }} />
+            <span style={{ fontSize: '0.825rem', fontWeight: 800, color: '#F1F5F9', letterSpacing: '-0.01em' }}>Quick Actions</span>
+          </div>
+          <span style={{ fontSize: '0.68rem', color: '#334155', letterSpacing: '0.06em' }}>6 SHORTCUTS</span>
         </div>
-        <div style={{ padding: '0.875rem 1rem', display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 3 : 6}, 1fr)`, gap: '0.625rem' }}>
+        <div style={{ padding: '1rem 1.25rem', display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 3 : 6}, 1fr)`, gap: '0.75rem' }}>
           {quickActions.map((action) => (
             <button key={action.label} onClick={action.action} style={{
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem',
-              padding: isMobile ? '0.875rem 0.25rem' : '1rem 0.5rem',
-              borderRadius: '10px',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.625rem',
+              padding: isMobile ? '1rem 0.25rem' : '1.25rem 0.5rem',
+              borderRadius: '12px',
               background: action.bg,
               border: `1px solid ${action.border}`,
               cursor: 'pointer', transition: 'all 0.2s', color: action.color,
-              fontFamily: 'inherit',
+              fontFamily: 'inherit', position: 'relative', overflow: 'hidden',
             }}
               onMouseEnter={e => {
-                e.currentTarget.style.transform = 'translateY(-3px)';
-                e.currentTarget.style.boxShadow = `0 12px 28px ${action.color}20`;
-                e.currentTarget.style.borderColor = action.color + '45';
+                e.currentTarget.style.transform = 'translateY(-4px)';
+                e.currentTarget.style.boxShadow = `0 16px 32px ${action.color}25, 0 0 0 1px ${action.color}30`;
+                e.currentTarget.style.borderColor = action.color + '55';
               }}
               onMouseLeave={e => {
                 e.currentTarget.style.transform = 'translateY(0)';
@@ -403,12 +468,83 @@ export default function Dashboard() {
                 e.currentTarget.style.borderColor = action.border;
               }}
             >
-              {action.icon}
-              <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#94A3B8', textAlign: 'center', lineHeight: 1.3 }}>{action.label}</span>
+              {/* icon glow */}
+              <div style={{ position: 'relative' }}>
+                <div style={{ position: 'absolute', inset: '-4px', borderRadius: '50%', background: `radial-gradient(circle, ${action.color}30 0%, transparent 70%)`, filter: 'blur(4px)' }} />
+                <div style={{ position: 'relative' }}>{action.icon}</div>
+              </div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94A3B8', textAlign: 'center', lineHeight: 1.3 }}>{action.label}</span>
             </button>
           ))}
         </div>
       </div>
+
+      {/* ── Portfolio Workspace Overview ─────────────────────────────── */}
+      {!isMobile && (
+        <div style={{
+          background: 'linear-gradient(160deg, #0A1220 0%, #080C18 100%)',
+          border: '1px solid rgba(255,255,255,0.07)',
+          borderRadius: '14px',
+          overflow: 'hidden',
+          position: 'relative',
+        }}>
+          {/* top accent */}
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #0EA5E9, #8B5CF6, #10B981, transparent)' }} />
+          <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+              <div style={{ padding: '0.4rem', borderRadius: '8px', background: 'rgba(14,165,233,0.12)', color: '#0EA5E9' }}>
+                <Layers size={14} />
+              </div>
+              <div>
+                <div style={{ fontSize: '0.875rem', fontWeight: 800, color: '#F1F5F9', letterSpacing: '-0.01em' }}>Workspace Portfolio</div>
+                <div style={{ fontSize: '0.68rem', color: '#475569', marginTop: '1px' }}>Delivery completion across all active engagements</div>
+              </div>
+            </div>
+            <button onClick={() => navigate('/workspaces')} style={{
+              display: 'flex', alignItems: 'center', gap: '0.375rem',
+              padding: '0.35rem 0.875rem', borderRadius: '8px',
+              background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)',
+              color: '#0EA5E9', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer',
+              fontFamily: 'inherit', transition: 'all 0.15s',
+            }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(14,165,233,0.16)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(14,165,233,0.08)'; }}
+            >
+              All Workspaces <ChevronRight size={13} />
+            </button>
+          </div>
+          <div style={{ padding: '1.25rem 1.5rem', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem 2rem' }}>
+            {ragStatusData.map((row) => {
+              const pct = Math.round(40 + Math.random() * 55);
+              const barColor = row.rag === 'Green' ? '#10B981' : row.rag === 'Amber' ? '#F59E0B' : '#EF4444';
+              const glowColor = row.rag === 'Green' ? 'rgba(16,185,129,0.35)' : row.rag === 'Amber' ? 'rgba(245,158,11,0.35)' : 'rgba(239,68,68,0.35)';
+              return (
+                <div key={row.workspace} style={{ cursor: 'pointer' }} onClick={() => navigate('/workspaces')}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#CBD5E1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '130px' }}>
+                      {row.workspace}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <div style={{ width: 7, height: 7, borderRadius: '50%', background: barColor, boxShadow: `0 0 6px ${glowColor}` }} />
+                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: barColor }}>{pct}%</span>
+                    </div>
+                  </div>
+                  <div style={{ height: '6px', borderRadius: '99px', background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%', width: `${pct}%`,
+                      background: `linear-gradient(90deg, ${barColor}CC, ${barColor})`,
+                      borderRadius: '99px',
+                      boxShadow: `0 0 8px ${glowColor}`,
+                      transition: 'width 1.2s ease',
+                    }} />
+                  </div>
+                  <div style={{ fontSize: '0.62rem', color: '#334155', marginTop: '0.375rem' }}>{row.lastUpdated}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Main 3-col Grid ───────────────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: mainCols, gap: '1rem' }}>
@@ -928,6 +1064,73 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* ── AI Intelligence CTA ──────────────────────────────────────── */}
+      <div style={{
+        background: 'linear-gradient(135deg, #0E0C22 0%, #120B28 40%, #08111E 100%)',
+        border: '1px solid rgba(139,92,246,0.2)',
+        borderRadius: '14px',
+        padding: isMobile ? '1.25rem' : '1.5rem 2rem',
+        position: 'relative',
+        overflow: 'hidden',
+        cursor: 'pointer',
+      }} onClick={() => navigate('/knowledge')}>
+        {/* Glow orbs */}
+        <div style={{ position: 'absolute', top: -60, right: 80, width: 240, height: 240, borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.12) 0%, transparent 65%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: -40, left: 120, width: 160, height: 160, borderRadius: '50%', background: 'radial-gradient(circle, rgba(0,212,255,0.07) 0%, transparent 65%)', pointerEvents: 'none' }} />
+        {/* Animated border shimmer */}
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '1px', background: 'linear-gradient(90deg, transparent, rgba(139,92,246,0.7), rgba(0,212,255,0.5), transparent)', animation: 'shimmerBar 4s linear infinite', backgroundSize: '200% 100%', pointerEvents: 'none' }} />
+
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+          {/* Icon */}
+          <div style={{
+            width: 52, height: 52, borderRadius: '14px', flexShrink: 0,
+            background: 'linear-gradient(135deg, rgba(139,92,246,0.25), rgba(0,212,255,0.15))',
+            border: '1px solid rgba(139,92,246,0.3)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 0 24px rgba(139,92,246,0.2)',
+          }}>
+            <Brain size={24} style={{ color: '#A78BFA' }} />
+          </div>
+
+          <div style={{ flex: 1, minWidth: '200px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.375rem' }}>
+              <span style={{ fontSize: '1rem', fontWeight: 800, color: '#F1F5F9', letterSpacing: '-0.02em' }}>AI Intelligence Engine</span>
+              <span style={{ fontSize: '0.62rem', padding: '2px 8px', borderRadius: '99px', background: 'rgba(139,92,246,0.2)', color: '#C4B5FD', border: '1px solid rgba(139,92,246,0.3)', fontWeight: 700, letterSpacing: '0.06em' }}>GPT-4o</span>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748B', lineHeight: 1.5 }}>
+              Ask anything about your portfolio — risks, decisions, deliverables, financials.
+            </p>
+          </div>
+
+          {!isMobile && (
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', flex: 1, justifyContent: 'flex-end' }}>
+              {['Summarize NCA risks', 'SC-10 budget status', 'Overdue milestone report'].map(q => (
+                <span key={q} style={{
+                  padding: '0.375rem 0.875rem', borderRadius: '99px',
+                  background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)',
+                  color: '#A78BFA', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.22)'; e.currentTarget.style.borderColor = 'rgba(139,92,246,0.4)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.1)'; e.currentTarget.style.borderColor = 'rgba(139,92,246,0.2)'; }}
+                >{q}</span>
+              ))}
+            </div>
+          )}
+
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '0.375rem',
+            padding: '0.625rem 1.25rem', borderRadius: '10px',
+            background: 'linear-gradient(135deg, rgba(139,92,246,0.3), rgba(0,212,255,0.2))',
+            border: '1px solid rgba(139,92,246,0.4)',
+            color: '#F1F5F9', fontSize: '0.82rem', fontWeight: 700,
+            flexShrink: 0, boxShadow: '0 0 20px rgba(139,92,246,0.15)',
+          }}>
+            <Sparkles size={14} /> Ask AI <ArrowRight size={13} />
+          </div>
+        </div>
+      </div>
+
       {/* ── Activity Feed ─────────────────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: width >= 900 ? '1fr 340px' : '1fr', gap: '1rem' }}>
 
@@ -1109,6 +1312,18 @@ export default function Dashboard() {
 
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes liveRing {
+          0% { transform: scale(1); opacity: 0.8; }
+          100% { transform: scale(2.4); opacity: 0; }
+        }
+        @keyframes shimmerBar {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+        @keyframes fadeSlideUp {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
       `}</style>
     </div>
   );
