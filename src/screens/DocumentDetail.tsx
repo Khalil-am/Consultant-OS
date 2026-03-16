@@ -1,57 +1,105 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, FileText, GitCompare, BarChart3, Sparkles, Check,
-  Download, Share, Clock, User, Calendar, Tag, Link, Send
+  ArrowLeft, FileText, Sparkles, Check,
+  Download, Clock, User, Calendar, Tag, Link, Send, Loader2,
+  Trash2, ExternalLink,
 } from 'lucide-react';
-import { documents } from '../data/mockData';
+import { getDocument, updateDocument, getTasks, updateTask } from '../lib/db';
+import type { DocumentRow, TaskRow } from '../lib/db';
 
-const tabs = ['Overview', 'Full Text', 'Summary', 'Extracted Fields', 'Requirements', 'Tasks', 'Versions', 'AI Chat'];
+const tabs = ['Overview', 'Summary', 'Tasks', 'Versions', 'AI Chat'];
 
-const extractedFields = [
-  { field: 'Project Name', value: 'NCA Digital Transformation Programme' },
-  { field: 'Client Organization', value: 'National Communications Authority' },
-  { field: 'Document Version', value: 'v2.3' },
-  { field: 'Prepared By', value: 'Ahmed Al-Mahmoud, Accel Consulting' },
-  { field: 'Review Date', value: '2026-03-20' },
-  { field: 'Approval Required By', value: 'NCA CTO, Programme Director' },
-  { field: 'Scope Boundary', value: 'Enterprise Systems Layer (excludes network infrastructure)' },
-  { field: 'Total Requirements', value: '312 (FR: 218, NFR: 94)' },
-  { field: 'Priority Breakdown', value: 'Must Have: 156, Should Have: 98, Nice to Have: 58' },
-  { field: 'Key Stakeholders', value: 'NCA CTO, IT Director, Change Management Lead, 12 dept heads' },
-];
+const STATUS_OPTIONS = ['Draft', 'Under Review', 'Approved', 'Final'] as const;
 
-const linkedRequirements = [
-  { id: 'FR-001', text: 'System shall support SSO via SAML 2.0 for all enterprise applications', priority: 'Must Have', status: 'Approved' },
-  { id: 'FR-002', text: 'API gateway shall handle minimum 5,000 concurrent requests with <200ms latency', priority: 'Must Have', status: 'Approved' },
-  { id: 'FR-015', text: 'Document management system shall support Arabic OCR with 98% accuracy', priority: 'Must Have', status: 'Review' },
-  { id: 'NFR-001', text: 'System availability shall be 99.9% uptime excluding planned maintenance', priority: 'Must Have', status: 'Approved' },
-  { id: 'NFR-008', text: 'All data shall be encrypted at rest using AES-256 and in transit using TLS 1.3', priority: 'Must Have', status: 'Approved' },
-];
+function statusBadge(s: string) {
+  const map: Record<string, { bg: string; color: string }> = {
+    Approved: { bg: 'rgba(16,185,129,0.12)', color: '#34D399' },
+    Final: { bg: 'rgba(0,212,255,0.1)', color: '#00D4FF' },
+    'Under Review': { bg: 'rgba(245,158,11,0.12)', color: '#FCD34D' },
+    Draft: { bg: 'rgba(148,163,184,0.07)', color: '#94A3B8' },
+  };
+  const c = map[s] ?? map.Draft;
+  return (
+    <span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: c.bg, color: c.color, border: `1px solid ${c.color}25` }}>
+      {s}
+    </span>
+  );
+}
 
-const versions = [
-  { version: 'v2.3', date: '2026-03-12', author: 'Ahmed Al-Mahmoud', note: 'Added Section 7 NFRs; updated stakeholder register', isCurrent: true },
-  { version: 'v2.2', date: '2026-03-05', author: 'Sara Al-Khalidi', note: 'Incorporated NCA review comments; revised integration scope' },
-  { version: 'v2.1', date: '2026-02-26', author: 'Ahmed Al-Mahmoud', note: 'Added use case diagrams; expanded glossary' },
-  { version: 'v2.0', date: '2026-02-15', author: 'Rania Taher', note: 'Major revision post workshop; restructured FR sections' },
-  { version: 'v1.0', date: '2026-01-28', author: 'Ahmed Al-Mahmoud', note: 'Initial draft submitted for client review' },
-];
+const TASK_STATUS_OPTIONS = ['Backlog', 'In Progress', 'In Review', 'Completed', 'Overdue'] as const;
 
-const chatMessages = [
-  { role: 'user', text: 'What are the top 3 critical requirements in this document?' },
-  { role: 'ai', text: 'Based on my analysis of the BRD, the three most critical requirements are:\n\n1. **SSO Integration (FR-001)** — Mandatory for user adoption. Must support SAML 2.0 across 14 enterprise systems, impacting all 2,800+ users.\n\n2. **API Gateway Performance (FR-002)** — Core to integration architecture. 5,000 concurrent requests with <200ms latency is aggressive and may require infrastructure review.\n\n3. **Arabic OCR Capability (FR-015)** — Critical for government compliance. Currently rated Medium risk due to accuracy requirements (98%) being above market standard for Arabic script.' },
-  { role: 'user', text: 'Are there any gaps or missing requirements?' },
-  { role: 'ai', text: 'I identified 4 potential gaps:\n\n1. **Disaster Recovery RTO/RPO** — NFR section mentions HA but doesn\'t specify RTO/RPO targets for each system tier.\n\n2. **Data Residency Requirements** — No explicit requirement for data sovereignty / UAE data residency compliance (mandatory for government).\n\n3. **Accessibility Standards** — WCAG 2.1 AA is referenced but no specific requirements for Arabic RTL interface accessibility.\n\n4. **Vendor Management API** — Section 4 references vendor portals but no API requirements are specified for vendor onboarding integration.\n\nWould you like me to draft these as requirement statements?' },
+const chatSeed = [
+  { role: 'user', text: 'What are the main topics covered in this document?' },
+  { role: 'ai', text: 'Based on the document metadata and summary, this document covers the core scope, requirements, and stakeholder expectations for the associated workspace initiative. Use the Upload feature to attach the actual file for deeper AI analysis.' },
 ];
 
 export default function DocumentDetail() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('Overview');
-  const [chatInput, setChatInput] = useState('');
-  const [messages, setMessages] = useState(chatMessages);
 
-  const doc = documents.find(d => d.id === id) || documents[0];
+  const [doc, setDoc] = useState<DocumentRow | null>(null);
+  const [tasks, setTasks] = useState<TaskRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const [activeTab, setActiveTab] = useState('Overview');
+  const [statusSaving, setStatusSaving] = useState(false);
+
+  // Tasks tab
+  const [taskStatusChanging, setTaskStatusChanging] = useState<string | null>(null);
+
+  // AI Chat
+  const [chatInput, setChatInput] = useState('');
+  const [messages, setMessages] = useState(chatSeed);
+
+  async function load() {
+    if (!id) return;
+    setLoading(true);
+    setError('');
+    try {
+      const [d, allTasks] = await Promise.all([
+        getDocument(id),
+        getTasks(),
+      ]);
+      setDoc(d);
+      // Tasks linked to this doc
+      setTasks(allTasks.filter(t => t.linked_doc === id || t.linked_doc === (d?.name ?? '')));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to load document');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, [id]);
+
+  async function handleStatusChange(status: string) {
+    if (!doc) return;
+    setStatusSaving(true);
+    try {
+      await updateDocument(doc.id, { status: status as DocumentRow['status'] });
+      setDoc(d => d ? { ...d, status: status as DocumentRow['status'] } : d);
+    } catch { /* ignore */ }
+    setStatusSaving(false);
+  }
+
+  async function handleTaskStatusChange(taskId: string, status: string) {
+    setTaskStatusChanging(taskId);
+    try {
+      await updateTask(taskId, { status: status as TaskRow['status'] });
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: status as TaskRow['status'] } : t));
+    } catch { /* ignore */ }
+    setTaskStatusChanging(null);
+  }
+
+  function handleDownload() {
+    if (doc?.file_url) {
+      window.open(doc.file_url, '_blank');
+    } else {
+      alert('No file is attached to this document. Upload a file in the Documents list.');
+    }
+  }
 
   const handleSendMessage = () => {
     if (!chatInput.trim()) return;
@@ -60,10 +108,29 @@ export default function DocumentDetail() {
     setTimeout(() => {
       setMessages(prev => [...prev, {
         role: 'ai',
-        text: `Based on the document analysis, I can see that "${chatInput}" relates to several sections in the BRD. Let me extract the relevant information for you...`,
+        text: `Based on the document "${doc?.name ?? ''}", your query relates to the core scope and requirements. Attach the actual document file for deeper contextual analysis.`,
       }]);
-    }, 800);
+    }, 700);
   };
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 64px)', color: '#475569', gap: '0.5rem' }}>
+        <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> Loading document…
+      </div>
+    );
+  }
+
+  if (error || !doc) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 64px)', color: '#475569', gap: '1rem' }}>
+        <div style={{ color: '#FCA5A5' }}>{error || 'Document not found.'}</div>
+        <button className="btn-ghost" onClick={() => navigate('/documents')}>
+          <ArrowLeft size={14} /> Back to Documents
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)', overflow: 'hidden' }}>
@@ -76,52 +143,59 @@ export default function DocumentDetail() {
           <ArrowLeft size={14} /> Documents
         </button>
 
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.875rem' }}>
-            <div style={{ padding: '0.625rem', borderRadius: '10px', background: `${doc.typeColor}18`, color: doc.typeColor, flexShrink: 0 }}>
+            <div style={{ padding: '0.625rem', borderRadius: '10px', background: `${doc.type_color}18`, color: doc.type_color, flexShrink: 0 }}>
               <FileText size={20} />
             </div>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '0.375rem' }}>
-                <span style={{
-                  fontSize: '0.7rem', padding: '2px 7px', borderRadius: '4px',
-                  background: `${doc.typeColor}15`, color: doc.typeColor, border: `1px solid ${doc.typeColor}25`,
-                }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '0.375rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.7rem', padding: '2px 7px', borderRadius: '4px', background: `${doc.type_color}15`, color: doc.type_color, border: `1px solid ${doc.type_color}25` }}>
                   {doc.type}
                 </span>
                 <span style={{ color: '#334155', fontSize: '0.75rem' }}>·</span>
                 <span style={{ fontSize: '0.75rem', color: '#475569' }}>{doc.workspace}</span>
+                {statusBadge(doc.status)}
               </div>
               <h1 style={{ fontSize: '1.125rem', fontWeight: 800, color: '#F1F5F9', margin: 0, marginBottom: '0.25rem' }}>{doc.name}</h1>
-              <div style={{ display: 'flex', gap: '1rem' }}>
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '0.72rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                   <User size={11} /> {doc.author}
                 </span>
                 <span style={{ fontSize: '0.72rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                   <Calendar size={11} /> {doc.date}
                 </span>
-                <span style={{ fontSize: '0.72rem', color: '#475569' }}>{doc.pages} pages · {doc.size}</span>
+                <span style={{ fontSize: '0.72rem', color: '#475569' }}>{doc.size}</span>
               </div>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button className="btn-ghost" style={{ fontSize: '0.78rem', height: '32px' }}>
-              <GitCompare size={13} /> Compare
-            </button>
-            <button className="btn-ghost" style={{ fontSize: '0.78rem', height: '32px' }}>
-              <BarChart3 size={13} /> Create Report
-            </button>
-            <button className="btn-ai" style={{ fontSize: '0.78rem', height: '32px' }}>
-              <Sparkles size={13} /> Ask AI
-            </button>
-            <button className="btn-primary" style={{ fontSize: '0.78rem', height: '32px' }}>
+
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {/* Status selector */}
+            <select
+              value={doc.status}
+              onChange={e => handleStatusChange(e.target.value)}
+              disabled={statusSaving}
+              className="btn-ghost"
+              style={{ fontSize: '0.78rem', height: '32px', cursor: 'pointer', color: '#94A3B8', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '0.5rem', padding: '0 0.625rem', fontFamily: 'inherit' }}
+            >
+              {STATUS_OPTIONS.map(s => <option key={s} value={s} style={{ background: '#1E2A45', color: '#F1F5F9' }}>{s}</option>)}
+            </select>
+            <button
+              className="btn-primary"
+              style={{ fontSize: '0.78rem', height: '32px' }}
+              onClick={() => handleStatusChange('Approved')}
+              disabled={statusSaving || doc.status === 'Approved'}
+            >
               <Check size={13} /> Mark Approved
             </button>
-            <button className="btn-ghost" style={{ fontSize: '0.78rem', height: '32px', padding: '0 0.625rem' }}>
+            <button
+              className="btn-ghost"
+              style={{ fontSize: '0.78rem', height: '32px', padding: '0 0.625rem', opacity: doc.file_url ? 1 : 0.5 }}
+              onClick={handleDownload}
+              title={doc.file_url ? 'Download attached file' : 'No file attached'}
+            >
               <Download size={13} />
-            </button>
-            <button className="btn-ghost" style={{ fontSize: '0.78rem', height: '32px', padding: '0 0.625rem' }}>
-              <Share size={13} />
             </button>
           </div>
         </div>
@@ -137,64 +211,61 @@ export default function DocumentDetail() {
             style={{ marginRight: '1.25rem', fontSize: '0.82rem' }}
           >
             {tab}
+            {tab === 'Tasks' && tasks.length > 0 && (
+              <span style={{ marginLeft: '0.375rem', fontSize: '0.65rem', padding: '1px 5px', borderRadius: '9999px', background: 'rgba(0,212,255,0.12)', color: '#00D4FF' }}>
+                {tasks.length}
+              </span>
+            )}
           </button>
         ))}
       </div>
 
       {/* Content */}
       <div style={{ flex: 1, overflow: 'auto', padding: '1.5rem' }}>
-        {/* Overview */}
+
+        {/* ── Overview ── */}
         {activeTab === 'Overview' && (
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.25rem' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div className="section-card">
                 <div className="section-card-header">
                   <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Document Summary</span>
-                  <span className="status-review" style={{ fontSize: '0.65rem' }}>{doc.status}</span>
+                  {statusBadge(doc.status)}
                 </div>
                 <div style={{ padding: '1.25rem' }}>
-                  <p style={{ fontSize: '0.875rem', color: '#94A3B8', lineHeight: 1.7, margin: 0 }}>{doc.summary}</p>
+                  <p style={{ fontSize: '0.875rem', color: '#94A3B8', lineHeight: 1.7, margin: 0 }}>
+                    {doc.summary || 'No summary provided for this document.'}
+                  </p>
                 </div>
               </div>
-              <div className="section-card">
-                <div className="section-card-header">
-                  <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Linked Requirements</span>
-                  <span style={{ fontSize: '0.75rem', color: '#475569' }}>312 total</span>
-                </div>
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>ID</th>
-                      <th>Requirement</th>
-                      <th>Priority</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {linkedRequirements.map(req => (
-                      <tr key={req.id}>
-                        <td style={{ color: '#0EA5E9', fontWeight: 500 }}>{req.id}</td>
-                        <td style={{ color: '#94A3B8', fontSize: '0.78rem', maxWidth: '300px' }}>
-                          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{req.text}</div>
-                        </td>
-                        <td>
-                          <span style={{ fontSize: '0.68rem', padding: '1px 5px', borderRadius: '3px', background: 'rgba(14,165,233,0.1)', color: '#38BDF8' }}>
-                            {req.priority}
-                          </span>
-                        </td>
-                        <td>
-                          <span className={req.status === 'Approved' ? 'status-approved' : 'status-review'} style={{ fontSize: '0.65rem' }}>
-                            {req.status}
-                          </span>
-                        </td>
-                      </tr>
+
+              {/* Linked tasks preview */}
+              {tasks.length > 0 && (
+                <div className="section-card">
+                  <div className="section-card-header">
+                    <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Linked Tasks</span>
+                    <button className="btn-ghost" style={{ fontSize: '0.72rem', height: '26px', padding: '0 0.625rem' }} onClick={() => setActiveTab('Tasks')}>
+                      View all ({tasks.length})
+                    </button>
+                  </div>
+                  <div>
+                    {tasks.slice(0, 3).map((task, i) => (
+                      <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1.25rem', borderBottom: i < Math.min(tasks.length, 3) - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F1F5F9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</div>
+                          <div style={{ fontSize: '0.7rem', color: '#475569' }}>{task.assignee} · Due {task.due_date}</div>
+                        </div>
+                        <span style={{ fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', background: task.priority === 'High' ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)', color: task.priority === 'High' ? '#FCA5A5' : '#FCD34D', flexShrink: 0 }}>
+                          {task.priority}
+                        </span>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
-              </div>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Right meta panel */}
+            {/* Right meta */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div className="section-card" style={{ padding: '1.125rem' }}>
                 <div style={{ marginBottom: '0.875rem' }}>
@@ -205,39 +276,48 @@ export default function DocumentDetail() {
                     { icon: <Calendar size={12} />, label: 'Created', value: doc.date },
                     { icon: <Link size={12} />, label: 'Workspace', value: doc.workspace },
                     { icon: <Clock size={12} />, label: 'Language', value: doc.language },
+                    { icon: <FileText size={12} />, label: 'File', value: doc.file_url ? 'Attached' : 'No file' },
                   ].map(item => (
                     <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.375rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', color: '#334155' }}>
                         {item.icon}
                         <span style={{ fontSize: '0.72rem' }}>{item.label}</span>
                       </div>
-                      <span style={{ fontSize: '0.72rem', color: '#94A3B8' }}>{item.value}</span>
+                      <span style={{ fontSize: '0.72rem', color: item.label === 'File' && doc.file_url ? '#34D399' : '#94A3B8' }}>{item.value}</span>
                     </div>
                   ))}
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.375rem' }}>
-                  {doc.tags.map(tag => (
-                    <span key={tag} style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: 'rgba(255,255,255,0.04)', color: '#94A3B8', border: '1px solid rgba(255,255,255,0.07)' }}>
-                      {tag}
-                    </span>
-                  ))}
-                </div>
+                {doc.tags?.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.375rem' }}>
+                    {doc.tags.map(tag => (
+                      <span key={tag} style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: 'rgba(255,255,255,0.04)', color: '#94A3B8', border: '1px solid rgba(255,255,255,0.07)' }}>
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="section-card" style={{ padding: '1.125rem' }}>
                 <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Quick Actions</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <button className="btn-ai" style={{ width: '100%', justifyContent: 'center', fontSize: '0.78rem' }}>
-                    <Sparkles size={13} /> Generate Deliverables
+                  <button
+                    className="btn-primary"
+                    style={{ width: '100%', justifyContent: 'center', fontSize: '0.78rem', opacity: doc.file_url ? 1 : 0.5 }}
+                    onClick={handleDownload}
+                  >
+                    <Download size={13} /> {doc.file_url ? 'Download File' : 'No File Attached'}
                   </button>
-                  <button className="btn-ghost" style={{ width: '100%', justifyContent: 'center', fontSize: '0.78rem' }}>
-                    <BarChart3 size={13} /> Create Status Report
+                  <button className="btn-ai" style={{ width: '100%', justifyContent: 'center', fontSize: '0.78rem' }} onClick={() => setActiveTab('AI Chat')}>
+                    <Sparkles size={13} /> Ask AI
                   </button>
-                  <button className="btn-ghost" style={{ width: '100%', justifyContent: 'center', fontSize: '0.78rem' }}>
-                    <GitCompare size={13} /> Compare Versions
-                  </button>
-                  <button className="btn-ghost" style={{ width: '100%', justifyContent: 'center', fontSize: '0.78rem' }}>
-                    <Download size={13} /> Export PDF
+                  <button
+                    className="btn-ghost"
+                    style={{ width: '100%', justifyContent: 'center', fontSize: '0.78rem' }}
+                    onClick={() => handleStatusChange('Approved')}
+                    disabled={doc.status === 'Approved' || statusSaving}
+                  >
+                    <Check size={13} /> Mark Approved
                   </button>
                 </div>
               </div>
@@ -245,90 +325,124 @@ export default function DocumentDetail() {
           </div>
         )}
 
-        {/* Extracted Fields */}
-        {activeTab === 'Extracted Fields' && (
-          <div className="section-card">
-            <div className="section-card-header">
-              <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>AI-Extracted Fields</span>
-              <span style={{ fontSize: '0.72rem', color: '#475569' }}>Extracted by GPT-4o</span>
+        {/* ── Summary ── */}
+        {activeTab === 'Summary' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div className="section-card">
+              <div className="section-card-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Sparkles size={14} style={{ color: '#8B5CF6' }} />
+                  <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Document Summary</span>
+                </div>
+                {statusBadge(doc.status)}
+              </div>
+              <div style={{ padding: '1.25rem' }}>
+                <p style={{ fontSize: '0.875rem', color: '#94A3B8', lineHeight: 1.7, margin: 0 }}>
+                  {doc.summary || 'No summary has been provided. Add a summary when uploading or editing the document.'}
+                </p>
+                {doc.tags?.length > 0 && (
+                  <div style={{ marginTop: '1rem', display: 'flex', flexWrap: 'wrap', gap: '0.375rem' }}>
+                    {doc.tags.map(tag => (
+                      <span key={tag} style={{ fontSize: '0.72rem', padding: '3px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: '#94A3B8', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th style={{ width: '30%' }}>Field</th>
-                  <th>Value</th>
-                  <th style={{ width: '10%' }}>Confidence</th>
-                </tr>
-              </thead>
-              <tbody>
-                {extractedFields.map((field, i) => (
-                  <tr key={i}>
-                    <td style={{ color: '#94A3B8', fontWeight: 500 }}>{field.field}</td>
-                    <td style={{ color: '#F1F5F9' }}>{field.value}</td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <div style={{ width: '40px', height: '4px', borderRadius: '2px', background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-                          <div style={{ height: '100%', width: `${85 + Math.random() * 15}%`, background: '#10B981', borderRadius: '2px' }} />
-                        </div>
-                        <span style={{ fontSize: '0.7rem', color: '#34D399' }}>High</span>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         )}
 
-        {/* Versions */}
+        {/* ── Tasks ── */}
+        {activeTab === 'Tasks' && (
+          <div className="section-card">
+            <div className="section-card-header">
+              <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Linked Tasks</span>
+              <span style={{ fontSize: '0.72rem', color: '#475569' }}>{tasks.length} task{tasks.length !== 1 ? 's' : ''}</span>
+            </div>
+            {tasks.length === 0 ? (
+              <div style={{ padding: '2.5rem', textAlign: 'center', color: '#334155', fontSize: '0.82rem' }}>
+                No tasks are linked to this document.<br />
+                <span style={{ fontSize: '0.75rem' }}>Link a task by setting its "Linked Doc" field in the workspace Tasks tab.</span>
+              </div>
+            ) : (
+              <div>
+                {tasks.map((task, i) => (
+                  <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.875rem 1.25rem', borderBottom: i < tasks.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 500, color: '#F1F5F9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</div>
+                      <div style={{ fontSize: '0.7rem', color: '#475569', marginTop: '0.125rem' }}>
+                        {task.assignee} · Due {task.due_date} · {task.workspace}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', background: task.priority === 'High' ? 'rgba(239,68,68,0.1)' : task.priority === 'Medium' ? 'rgba(245,158,11,0.1)' : 'rgba(148,163,184,0.07)', color: task.priority === 'High' ? '#FCA5A5' : task.priority === 'Medium' ? '#FCD34D' : '#94A3B8', flexShrink: 0 }}>
+                      {task.priority}
+                    </span>
+                    {taskStatusChanging === task.id ? (
+                      <Loader2 size={12} style={{ animation: 'spin 1s linear infinite', color: '#475569', flexShrink: 0 }} />
+                    ) : (
+                      <select
+                        value={task.status}
+                        onChange={e => handleTaskStatusChange(task.id, e.target.value)}
+                        style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', outline: 'none', fontSize: '0.68rem', color: task.status === 'Completed' ? '#34D399' : task.status === 'In Progress' ? '#38BDF8' : task.status === 'Overdue' ? '#FCA5A5' : '#94A3B8', cursor: 'pointer', fontFamily: 'inherit', padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}
+                      >
+                        {TASK_STATUS_OPTIONS.map(s => <option key={s} value={s} style={{ background: '#1E2A45', color: '#F1F5F9' }}>{s}</option>)}
+                      </select>
+                    )}
+                    <button
+                      onClick={() => navigate(`/workspaces/${task.workspace_id}`)}
+                      style={{ padding: '0.25rem', background: 'none', border: 'none', cursor: 'pointer', color: '#475569', borderRadius: '4px', flexShrink: 0 }}
+                      title="Open workspace"
+                    >
+                      <ExternalLink size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Versions ── */}
         {activeTab === 'Versions' && (
           <div className="section-card">
             <div className="section-card-header">
               <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Version History</span>
             </div>
-            <div style={{ padding: '1rem 1.5rem' }}>
-              {versions.map((v, i) => (
-                <div key={v.version} style={{ display: 'flex', gap: '1rem', paddingBottom: '1.5rem', position: 'relative' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
-                    <div style={{
-                      width: '12px', height: '12px', borderRadius: '9999px',
-                      background: v.isCurrent ? '#00D4FF' : '#334155',
-                      border: `2px solid ${v.isCurrent ? '#00D4FF' : '#334155'}`,
-                      flexShrink: 0, marginTop: '3px',
-                      boxShadow: v.isCurrent ? '0 0 8px rgba(0,212,255,0.5)' : 'none',
-                    }} />
-                    {i < versions.length - 1 && (
-                      <div style={{ width: '1px', flex: 1, background: 'rgba(255,255,255,0.06)', marginTop: '4px' }} />
-                    )}
+            <div style={{ padding: '1.25rem 1.5rem' }}>
+              {/* Current version as single entry */}
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <div style={{ width: '12px', height: '12px', borderRadius: '9999px', background: '#00D4FF', border: '2px solid #00D4FF', flexShrink: 0, marginTop: '3px', boxShadow: '0 0 8px rgba(0,212,255,0.5)' }} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.375rem', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#00D4FF' }}>Current</span>
+                    <span className="status-active" style={{ fontSize: '0.65rem' }}>Latest</span>
+                    <span style={{ fontSize: '0.72rem', color: '#334155' }}>{doc.date}</span>
+                    <span style={{ fontSize: '0.72rem', color: '#475569' }}>by {doc.author}</span>
                   </div>
-                  <div style={{ flex: 1, paddingBottom: '0.5rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.375rem' }}>
-                      <span style={{ fontSize: '0.875rem', fontWeight: 700, color: v.isCurrent ? '#00D4FF' : '#94A3B8' }}>
-                        {v.version}
-                      </span>
-                      {v.isCurrent && <span className="status-active" style={{ fontSize: '0.65rem' }}>Current</span>}
-                      <span style={{ fontSize: '0.72rem', color: '#334155' }}>{v.date}</span>
-                      <span style={{ fontSize: '0.72rem', color: '#475569' }}>by {v.author}</span>
-                    </div>
-                    <p style={{ fontSize: '0.8rem', color: '#475569', margin: 0 }}>{v.note}</p>
-                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                      <button className="btn-ghost" style={{ fontSize: '0.72rem', height: '26px', padding: '0 0.625rem' }}>
-                        <Download size={11} /> Download
-                      </button>
-                      {!v.isCurrent && (
-                        <button className="btn-ghost" style={{ fontSize: '0.72rem', height: '26px', padding: '0 0.625rem' }}>
-                          <GitCompare size={11} /> Compare with current
-                        </button>
-                      )}
-                    </div>
+                  <p style={{ fontSize: '0.8rem', color: '#475569', margin: 0 }}>{doc.name}</p>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                    <button
+                      className="btn-ghost"
+                      style={{ fontSize: '0.72rem', height: '26px', padding: '0 0.625rem', opacity: doc.file_url ? 1 : 0.4 }}
+                      onClick={handleDownload}
+                    >
+                      <Download size={11} /> Download
+                    </button>
                   </div>
                 </div>
-              ))}
+              </div>
+              <p style={{ fontSize: '0.75rem', color: '#334155', marginTop: '1.5rem', textAlign: 'center' }}>
+                Version history will appear here as new versions are uploaded.
+              </p>
             </div>
           </div>
         )}
 
-        {/* AI Chat */}
+        {/* ── AI Chat ── */}
         {activeTab === 'AI Chat' && (
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: 'calc(100vh - 280px)' }}>
             <div className="section-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -337,7 +451,7 @@ export default function DocumentDetail() {
                   <Sparkles size={15} style={{ color: '#8B5CF6' }} />
                   <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>AI Document Chat</span>
                 </div>
-                <span style={{ fontSize: '0.72rem', color: '#475569' }}>Powered by GPT-4o</span>
+                <span style={{ fontSize: '0.72rem', color: '#475569' }}>Document context</span>
               </div>
               <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 {messages.map((msg, i) => (
@@ -347,17 +461,7 @@ export default function DocumentDetail() {
                         <Sparkles size={13} style={{ color: 'white' }} />
                       </div>
                     )}
-                    <div style={{
-                      maxWidth: '75%',
-                      padding: '0.75rem 1rem',
-                      borderRadius: msg.role === 'user' ? '12px 12px 4px 12px' : '4px 12px 12px 12px',
-                      background: msg.role === 'user' ? 'rgba(14,165,233,0.15)' : 'rgba(255,255,255,0.04)',
-                      border: `1px solid ${msg.role === 'user' ? 'rgba(14,165,233,0.2)' : 'rgba(255,255,255,0.07)'}`,
-                      fontSize: '0.82rem',
-                      color: '#94A3B8',
-                      lineHeight: 1.6,
-                      whiteSpace: 'pre-wrap',
-                    }}>
+                    <div style={{ maxWidth: '75%', padding: '0.75rem 1rem', borderRadius: msg.role === 'user' ? '12px 12px 4px 12px' : '4px 12px 12px 12px', background: msg.role === 'user' ? 'rgba(14,165,233,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${msg.role === 'user' ? 'rgba(14,165,233,0.2)' : 'rgba(255,255,255,0.07)'}`, fontSize: '0.82rem', color: '#94A3B8', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
                       {msg.text}
                     </div>
                   </div>
@@ -366,7 +470,7 @@ export default function DocumentDetail() {
               <div style={{ padding: '1rem', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', gap: '0.75rem' }}>
                 <input
                   type="text"
-                  placeholder="Ask anything about this document..."
+                  placeholder="Ask anything about this document…"
                   value={chatInput}
                   onChange={e => setChatInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
@@ -377,117 +481,6 @@ export default function DocumentDetail() {
                   <Send size={14} />
                 </button>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Full Text tab */}
-        {activeTab === 'Full Text' && (
-          <div className="section-card">
-            <div className="section-card-header">
-              <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Document Content</span>
-            </div>
-            <div style={{ padding: '2rem', lineHeight: 1.8 }}>
-              {['1. Executive Summary', '2. Project Scope and Objectives', '3. Stakeholder Register', '4. Functional Requirements', '5. Non-Functional Requirements'].map(section => (
-                <div key={section} style={{ marginBottom: '2rem' }}>
-                  <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9', marginBottom: '0.75rem' }}>{section}</h2>
-                  <p style={{ fontSize: '0.875rem', color: '#94A3B8', margin: 0 }}>
-                    The {section.toLowerCase()} section of this Business Requirements Document outlines the key requirements, objectives, and stakeholder expectations for the {doc.workspace} initiative. This content has been processed and extracted from the original document.
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Summary Tab */}
-        {activeTab === 'Summary' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div className="section-card">
-              <div className="section-card-header">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Sparkles size={14} style={{ color: '#8B5CF6' }} />
-                  <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>AI-Generated Executive Summary</span>
-                </div>
-                <span style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '9999px', background: 'rgba(139,92,246,0.15)', color: '#C4B5FD', border: '1px solid rgba(139,92,246,0.25)' }}>Generated 12 Mar 2026</span>
-              </div>
-              <div style={{ padding: '1.25rem' }}>
-                {[
-                  { heading: 'Document Purpose', text: `This Business Requirements Document defines the functional and non-functional requirements for the ${doc.workspace} initiative. It serves as the formal agreement between the client organisation and the delivery team on the scope of the system to be built.` },
-                  { heading: 'Key Objectives', text: 'The programme aims to modernise core enterprise systems, introduce unified API management, implement an enterprise document management platform with Arabic OCR support, and establish an automated reporting layer for senior leadership visibility.' },
-                  { heading: 'Scope Summary', text: 'Scope covers 312 requirements across 8 functional modules. Integration with 14 existing enterprise systems is required. The system must support 5,000+ concurrent users with 99.9% SLA. Arabic-English bilingual support is mandatory throughout.' },
-                  { heading: 'Key Risks Identified', text: '3 critical risks identified at time of BRD completion: (1) ERP vendor timeline dependency, (2) Data migration complexity from legacy Oracle system, (3) Security compliance approval timeline. All have proposed mitigations documented in the Risk Register.' },
-                  { heading: 'Recommended Next Steps', text: 'Obtain formal sign-off from NCA CTO and Programme Director. Initiate FRD development in parallel. Schedule architecture review workshop with technical stakeholders within 14 days.' },
-                ].map((section, i) => (
-                  <div key={i} style={{ marginBottom: '1.25rem', paddingBottom: '1.25rem', borderBottom: i < 4 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
-                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#38BDF8', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{section.heading}</div>
-                    <p style={{ fontSize: '0.82rem', color: '#94A3B8', lineHeight: 1.7, margin: 0 }}>{section.text}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Requirements Tab */}
-        {activeTab === 'Requirements' && (
-          <div className="section-card">
-            <div className="section-card-header">
-              <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Linked Requirements</span>
-              <span style={{ fontSize: '0.7rem', color: '#475569' }}>5 of 312 shown</span>
-            </div>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
-                <thead>
-                  <tr>
-                    {['Req ID', 'Requirement Statement', 'Priority', 'Status'].map(h => (
-                      <th key={h} style={{ padding: '0.625rem 1rem', textAlign: 'left', fontSize: '0.68rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid rgba(255,255,255,0.06)', whiteSpace: 'nowrap' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {linkedRequirements.map((req, i) => (
-                    <tr key={req.id} style={{ cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                      <td style={{ padding: '0.75rem 1rem', fontSize: '0.78rem', fontWeight: 700, color: '#0EA5E9', borderBottom: '1px solid rgba(255,255,255,0.04)', whiteSpace: 'nowrap' }}>{req.id}</td>
-                      <td style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', color: '#F1F5F9', borderBottom: '1px solid rgba(255,255,255,0.04)', maxWidth: '380px' }}>{req.text}</td>
-                      <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)', whiteSpace: 'nowrap' }}>
-                        <span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: 'rgba(239,68,68,0.1)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.2)' }}>{req.priority}</span>
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)', whiteSpace: 'nowrap' }}>
-                        <span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: req.status === 'Approved' ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', color: req.status === 'Approved' ? '#34D399' : '#FCD34D', border: `1px solid ${req.status === 'Approved' ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.2)'}` }}>{req.status}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* Tasks Tab */}
-        {activeTab === 'Tasks' && (
-          <div className="section-card">
-            <div className="section-card-header">
-              <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Linked Tasks</span>
-              <button className="btn-primary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.72rem', height: '28px' }}>+ Link Task</button>
-            </div>
-            <div style={{ padding: '0.375rem 0' }}>
-              {[
-                { id: 'TSK-042', title: 'Obtain NCA CTO sign-off on BRD v2.3', owner: 'AM', due: '20 Mar 2026', priority: 'High', status: 'Open' },
-                { id: 'TSK-047', title: 'Schedule architecture review workshop', owner: 'SK', due: '22 Mar 2026', priority: 'Medium', status: 'Open' },
-                { id: 'TSK-031', title: 'Distribute BRD to steering committee', owner: 'AM', due: '19 Mar 2026', priority: 'High', status: 'Completed' },
-                { id: 'TSK-055', title: 'Update requirements traceability matrix', owner: 'RT', due: '28 Mar 2026', priority: 'Medium', status: 'In Progress' },
-              ].map((task, i) => (
-                <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem 1.25rem', borderBottom: i < 3 ? '1px solid rgba(255,255,255,0.04)' : 'none', cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                  <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#475569', minWidth: '60px' }}>{task.id}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F1F5F9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</div>
-                    <div style={{ fontSize: '0.7rem', color: '#475569' }}>{task.owner} · Due {task.due}</div>
-                  </div>
-                  <span style={{ fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', background: task.priority === 'High' ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)', color: task.priority === 'High' ? '#FCA5A5' : '#FCD34D', flexShrink: 0 }}>{task.priority}</span>
-                  <span style={{ fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', background: task.status === 'Completed' ? 'rgba(16,185,129,0.1)' : task.status === 'In Progress' ? 'rgba(14,165,233,0.1)' : 'rgba(148,163,184,0.07)', color: task.status === 'Completed' ? '#34D399' : task.status === 'In Progress' ? '#38BDF8' : '#94A3B8', flexShrink: 0 }}>{task.status}</span>
-                </div>
-              ))}
             </div>
           </div>
         )}
