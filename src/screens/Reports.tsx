@@ -3,13 +3,14 @@ import { useLayout } from '../hooks/useLayout';
 import {
   BarChart3, Download, Share, Eye, Plus, Calendar,
   TrendingUp, AlertTriangle, CheckCircle, Sparkles, Clock, FileText,
-  Search,
+  Search, X,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell
 } from 'recharts';
-import { getReports } from '../lib/db';
+import { getReports, getWorkspaces, getTasks, getRisks, getMilestones } from '../lib/db';
 import type { ReportRow } from '../lib/db';
+import { chatWithDocument } from '../lib/openrouter';
 
 const categoryTabs = ['All Reports', 'Weekly Status', 'Monthly', 'Steering Committee', 'Procurement', 'Board Summaries'];
 
@@ -119,10 +120,52 @@ export default function Reports() {
   const [hoveredReport, setHoveredReport] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [reports, setReports] = useState<ReportRow[]>([]);
+  const [reportPeriod, setReportPeriod] = useState('This Week (W10)');
+  const [generatingReport, setGeneratingReport] = useState(false);
+  const [generatedReport, setGeneratedReport] = useState('');
+  const [reportError, setReportError] = useState('');
 
   useEffect(() => {
     getReports().then(setReports).catch(() => {});
   }, []);
+
+  async function handleGenerateReport() {
+    setGeneratingReport(true);
+    setGeneratedReport('');
+    setReportError('');
+    try {
+      const [workspaces, tasks, risks, milestones] = await Promise.all([
+        getWorkspaces(), getTasks(), getRisks(), getMilestones(),
+      ]);
+      const wsFilter = selectedWorkspace === 'All Workspaces' ? workspaces : workspaces.filter(w => w.name === selectedWorkspace);
+      const contextParts = wsFilter.slice(0, 4).map(ws => {
+        const wsTasks = tasks.filter(t => t.workspace_id === ws.id);
+        const wsRisks = risks.filter(r => r.workspace_id === ws.id);
+        const wsMilestones = milestones.filter(m => m.workspace_id === ws.id);
+        return `**${ws.name}** (${ws.status}, ${ws.progress}% progress)
+Tasks: ${wsTasks.length} total, ${wsTasks.filter(t => t.status === 'Overdue').length} overdue
+Risks: ${wsRisks.filter(r => r.severity === 'Critical').length} critical, ${wsRisks.filter(r => r.status === 'Open').length} open
+Milestones: ${wsMilestones.filter(m => m.status === 'On Track').length} on track, ${wsMilestones.filter(m => m.status === 'At Risk').length} at risk`;
+      }).join('\n\n');
+
+      const systemPrompt = `You are a senior consultant generating a ${reportType} for a consulting firm.
+Generate a professional, structured report based on the live portfolio data below.
+Use markdown formatting: **bold** for headers, bullet points for lists.
+Be concise but comprehensive. Include: Executive Summary, Key Highlights, Concerns/Risks, Recommendations.`;
+
+      const userMsg = `Generate a ${reportType} for ${selectedWorkspace}, period: ${reportPeriod}.
+
+Portfolio Data:
+${contextParts || 'No workspace data available.'}`;
+
+      const result = await chatWithDocument([{ role: 'user', content: userMsg }], systemPrompt);
+      setGeneratedReport(result);
+    } catch (e: unknown) {
+      setReportError(e instanceof Error ? e.message : 'Report generation failed');
+    } finally {
+      setGeneratingReport(false);
+    }
+  }
 
   // suppress unused warning
   void isMobile;
@@ -482,6 +525,8 @@ export default function Reports() {
               <div style={{ marginBottom: '1.125rem' }}>
                 <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '0.375rem', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Period</label>
                 <select
+                  value={reportPeriod}
+                  onChange={e => setReportPeriod(e.target.value)}
                   style={selectStyle}
                   onFocus={e => (e.currentTarget.style.borderColor = 'rgba(139,92,246,0.5)')}
                   onBlur={e => (e.currentTarget.style.borderColor = 'var(--border-default)')}
@@ -492,9 +537,19 @@ export default function Reports() {
                   <option>Q1 2026</option>
                 </select>
               </div>
-              <button className="btn-ai" style={{ width: '100%', justifyContent: 'center' }}>
-                <Sparkles size={14} /> Generate Report
+              <button
+                className="btn-ai"
+                style={{ width: '100%', justifyContent: 'center' }}
+                onClick={handleGenerateReport}
+                disabled={generatingReport}
+              >
+                {generatingReport ? <><Clock size={14} style={{ animation: 'spin 1s linear infinite' }} /> Generating…</> : <><Sparkles size={14} /> Generate Report</>}
               </button>
+              {reportError && (
+                <div style={{ marginTop: '0.5rem', fontSize: '0.72rem', color: '#FCA5A5', background: 'rgba(239,68,68,0.06)', padding: '0.5rem', borderRadius: '6px', border: '1px solid rgba(239,68,68,0.15)' }}>
+                  {reportError}
+                </div>
+              )}
             </div>
           </div>
 
@@ -568,6 +623,33 @@ export default function Reports() {
           </div>
         </div>
       </div>
+
+      {/* Generated Report Modal */}
+      {generatedReport && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}
+          onClick={e => { if (e.target === e.currentTarget) setGeneratedReport(''); }}>
+          <div style={{ background: 'var(--bg-elevated)', border: '1px solid rgba(139,92,246,0.25)', borderRadius: '14px', width: '100%', maxWidth: '680px', maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}>
+            <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ padding: '5px', borderRadius: '7px', background: 'rgba(139,92,246,0.15)', color: '#A78BFA' }}><Sparkles size={14} /></div>
+                <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>{reportType} — {selectedWorkspace}</span>
+              </div>
+              <button onClick={() => setGeneratedReport('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px', borderRadius: '4px', display: 'flex' }}>
+                <X size={16} />
+              </button>
+            </div>
+            <div style={{ padding: '1.25rem', overflowY: 'auto', flex: 1, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.75, whiteSpace: 'pre-wrap' }}>
+              {generatedReport}
+            </div>
+            <div style={{ padding: '0.875rem 1.25rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+              <button className="btn-ghost" style={{ fontSize: '0.78rem' }} onClick={() => setGeneratedReport('')}>Close</button>
+              <button className="btn-primary" style={{ fontSize: '0.78rem' }} onClick={() => { navigator.clipboard.writeText(generatedReport); }}>
+                Copy to Clipboard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
