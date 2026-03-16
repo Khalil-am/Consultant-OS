@@ -479,8 +479,9 @@ export default function WorkspaceDetail() {
       </div>
 
       {/* Banner */}
-      <div style={{ padding: isMobile ? '1.25rem' : '1.75rem', borderRadius: '0.875rem', background: 'linear-gradient(135deg, #0D1527 0%, #111B35 60%, #0D1B3E 100%)', border: '1px solid rgba(255,255,255,0.08)', borderLeft: `4px solid ${ws.sector_color}`, position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: 0, right: 0, width: '300px', height: '100%', background: `radial-gradient(ellipse at right, ${ws.sector_color}10 0%, transparent 70%)` }} />
+      <div style={{ padding: isMobile ? '1.25rem' : '1.75rem', borderRadius: '0.875rem', background: 'linear-gradient(135deg, #0C1220 0%, #101828 60%, #0C1A30 100%)', border: '1px solid rgba(255,255,255,0.08)', borderLeft: `4px solid ${ws.sector_color}`, position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '280px', height: '280px', borderRadius: '50%', background: `radial-gradient(circle, ${ws.sector_color}18 0%, transparent 70%)`, pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: '-60px', right: '30%', width: '200px', height: '200px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(0,212,255,0.06) 0%, transparent 70%)', pointerEvents: 'none' }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
@@ -498,7 +499,7 @@ export default function WorkspaceDetail() {
                 </div>
               )}
             </div>
-            <h1 style={{ fontSize: isMobile ? '1.25rem' : '1.625rem', fontWeight: 900, color: '#F1F5F9', margin: 0, marginBottom: '0.375rem', letterSpacing: '-0.02em' }}>{ws.name}</h1>
+            <h1 style={{ fontSize: isMobile ? '1.25rem' : '1.625rem', fontWeight: 900, background: `linear-gradient(135deg, #F1F5F9 0%, ${ws.sector_color} 100%)`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', margin: 0, marginBottom: '0.375rem', letterSpacing: '-0.02em' }}>{ws.name}</h1>
             <p style={{ fontSize: '0.875rem', color: '#94A3B8', margin: 0, marginBottom: '0.75rem' }}>{ws.client}</p>
             <p style={{ fontSize: '0.8rem', color: '#475569', margin: 0, maxWidth: '600px', lineHeight: 1.5 }}>{ws.description}</p>
           </div>
@@ -526,6 +527,16 @@ export default function WorkspaceDetail() {
             <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#38BDF8' }}>{ws.language}</span>
           </div>
         </div>
+        {/* Progress bar */}
+        <div style={{ marginTop: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.375rem' }}>
+            <span style={{ fontSize: '0.7rem', color: '#475569' }}>Overall Progress</span>
+            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: ws.sector_color }}>{ws.progress}%</span>
+          </div>
+          <div style={{ height: '5px', borderRadius: '9999px', background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${ws.progress}%`, background: `linear-gradient(90deg, ${ws.sector_color}, ${ws.sector_color}99)`, borderRadius: '9999px', transition: 'width 0.8s ease', boxShadow: `0 0 8px ${ws.sector_color}50` }} />
+          </div>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -544,7 +555,8 @@ export default function WorkspaceDetail() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
           {/* Financial Summary */}
-          <div style={{ background: 'linear-gradient(135deg, #0D1527 0%, #111B35 100%)', border: '1px solid rgba(245,158,11,0.15)', borderRadius: '12px', padding: '1.25rem' }}>
+          <div style={{ background: 'linear-gradient(135deg, #0C1220 0%, #101828 100%)', border: '1px solid rgba(245,158,11,0.15)', borderRadius: '12px', padding: '1.25rem', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: '-30px', right: '-30px', width: '160px', height: '160px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(245,158,11,0.08) 0%, transparent 70%)', pointerEvents: 'none' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
               <DollarSign size={15} style={{ color: '#F59E0B' }} />
               <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#F1F5F9' }}>Financial Summary</span>
@@ -809,9 +821,9 @@ export default function WorkspaceDetail() {
                       <td>
                         <div style={{ display: 'flex' }}>
                           {mtg.participants.slice(0, 3).map((p, i) => (
-                            <div key={i} title={p} style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'linear-gradient(135deg, #0EA5E9, #8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.55rem', fontWeight: 700, color: 'white', border: '2px solid #0D1527', marginLeft: i > 0 ? '-5px' : 0 }}>{p.slice(0, 2)}</div>
+                            <div key={i} title={p} style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'linear-gradient(135deg, #0EA5E9, #8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.55rem', fontWeight: 700, color: 'white', border: '2px solid #0C1220', marginLeft: i > 0 ? '-5px' : 0 }}>{p.slice(0, 2)}</div>
                           ))}
-                          {mtg.participants.length > 3 && <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.55rem', color: '#94A3B8', border: '2px solid #0D1527', marginLeft: '-5px' }}>+{mtg.participants.length - 3}</div>}
+                          {mtg.participants.length > 3 && <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.55rem', color: '#94A3B8', border: '2px solid #0C1220', marginLeft: '-5px' }}>+{mtg.participants.length - 3}</div>}
                         </div>
                       </td>
                       <td>
