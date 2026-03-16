@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Save, Play, ChevronDown, ChevronRight, Check,
@@ -6,6 +6,7 @@ import {
   Filter, Cpu, Upload, AlertCircle
 } from 'lucide-react';
 import { automations } from '../data/mockData';
+import { chatWithDocument } from '../lib/openrouter';
 
 interface FlowNode {
   id: string;
@@ -68,12 +69,30 @@ export default function AutomationBuilder() {
   const [activeTab, setActiveTab] = useState('Prompt');
   const [selectedNode, setSelectedNode] = useState<string>('n4');
   const [running, setRunning] = useState(false);
+  const [runOutput, setRunOutput] = useState('');
+  const [runError, setRunError] = useState('');
+  const fileInputRef = useRef<HTMLTextAreaElement>(null);
 
   const auto = automations.find(a => a.id === id) || automations[0];
 
-  const handleRun = () => {
+  const handleRun = async () => {
     setRunning(true);
-    setTimeout(() => setRunning(false), 3000);
+    setRunOutput('');
+    setRunError('');
+    setActiveTab('Logs');
+    try {
+      const inputText = fileInputRef.current?.value?.trim() || `Sample requirements document for ${auto.name}`;
+      const filledPrompt = promptTemplate.replace('{{input_document}}', inputText);
+      const result = await chatWithDocument(
+        [{ role: 'user', content: filledPrompt }],
+        `You are a senior consulting AI assistant specializing in ${auto.category}.`
+      );
+      setRunOutput(result);
+    } catch (e) {
+      setRunError(e instanceof Error ? e.message : 'Run failed');
+    } finally {
+      setRunning(false);
+    }
   };
 
   const getNodeBg = (node: FlowNode) => {
@@ -295,6 +314,20 @@ export default function AutomationBuilder() {
                 }}>
                   {promptTemplate}
                 </div>
+                {/* Input document for Run Now */}
+                <div style={{ marginTop: '0.875rem' }}>
+                  <div style={{ fontSize: '0.7rem', color: '#475569', marginBottom: '0.375rem' }}>Input (paste document text or requirements to test)</div>
+                  <textarea
+                    ref={fileInputRef}
+                    placeholder="Paste requirements text here to test the automation with real AI output…"
+                    style={{
+                      width: '100%', minHeight: '80px', padding: '0.625rem 0.75rem',
+                      background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: '0.5rem', color: '#94A3B8', fontSize: '0.72rem',
+                      fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
                 <div style={{ marginTop: '0.875rem', display: 'flex', gap: '0.5rem' }}>
                   <select style={{
                     flex: 1, padding: '0.375rem 0.625rem', borderRadius: '6px', fontSize: '0.78rem',
@@ -430,6 +463,19 @@ export default function AutomationBuilder() {
             {/* Logs */}
             {activeTab === 'Logs' && (
               <div>
+                {/* Live run output */}
+                {(running || runOutput || runError) && (
+                  <div style={{ marginBottom: '1rem', padding: '0.875rem', borderRadius: '0.5rem', background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)' }}>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#A78BFA', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                      {running ? <AlertCircle size={11} /> : <Check size={11} />}
+                      {running ? 'Running…' : runError ? 'Run Failed' : 'Run Complete'}
+                    </div>
+                    {runError && <div style={{ fontSize: '0.75rem', color: '#FCA5A5' }}>{runError}</div>}
+                    {runOutput && (
+                      <pre style={{ margin: 0, fontSize: '0.72rem', color: '#CBD5E1', lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: '300px', overflowY: 'auto', fontFamily: 'inherit' }}>{runOutput}</pre>
+                    )}
+                  </div>
+                )}
                 <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#94A3B8', marginBottom: '0.875rem' }}>Recent Runs</div>
                 {recentLogs.map((log, i) => (
                   <div key={i} style={{

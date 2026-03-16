@@ -5,8 +5,9 @@ import {
   Plus, Video, Users, Clock, CheckCircle, FileText,
   ChevronRight, Calendar, MapPin, Activity, TrendingUp, Search,
 } from 'lucide-react';
-import { getMeetings, updateMeeting } from '../lib/db';
-import type { MeetingRow } from '../lib/db';
+import { getMeetings, updateMeeting, upsertMeeting, getWorkspaces } from '../lib/db';
+import type { MeetingRow, WorkspaceRow } from '../lib/db';
+import { X } from 'lucide-react';
 
 const filterTabs = ['All', 'Upcoming', 'In Progress', 'Completed', 'Committee'];
 
@@ -76,11 +77,47 @@ export default function Meetings() {
   const [search, setSearch] = useState('');
   const [meetings, setMeetings] = useState<MeetingRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showNewModal, setShowNewModal] = useState(false);
+  const [workspaces, setWorkspaces] = useState<WorkspaceRow[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    title: '', date: '', time: '09:00', duration: '1h', type: 'Review' as MeetingRow['type'],
+    workspace: '', workspace_id: '', location: '', participants: '',
+  });
 
   useEffect(() => {
-    getMeetings().then(data => { setMeetings(data); setLoading(false); })
-      .catch(() => setLoading(false));
+    getMeetings().then(data => { setMeetings(data); setLoading(false); }).catch(() => setLoading(false));
+    getWorkspaces().then(setWorkspaces).catch(() => {});
   }, []);
+
+  async function handleCreateMeeting() {
+    if (!form.title || !form.date || !form.workspace_id) return;
+    setSaving(true);
+    try {
+      const newMeeting = await upsertMeeting({
+        id: crypto.randomUUID(),
+        title: form.title,
+        date: form.date,
+        time: form.time,
+        duration: form.duration,
+        type: form.type,
+        status: 'Upcoming',
+        workspace: form.workspace,
+        workspace_id: form.workspace_id,
+        participants: form.participants.split(',').map(p => p.trim()).filter(Boolean),
+        location: form.location || null,
+        minutes_generated: false,
+        actions_extracted: 0,
+        decisions_logged: 0,
+        agenda: null,
+        quorum_status: null,
+      });
+      setMeetings(prev => [newMeeting, ...prev]);
+      setShowNewModal(false);
+      setForm({ title: '', date: '', time: '09:00', duration: '1h', type: 'Review', workspace: '', workspace_id: '', location: '', participants: '' });
+    } catch { /* ignore */ }
+    finally { setSaving(false); }
+  }
 
   const statsCards = [
     { label: 'Total Meetings', value: String(meetings.length), color: '#8B5CF6', trend: '+' + meetings.filter(m => m.status === 'Upcoming').length + ' upcoming' },
@@ -166,7 +203,7 @@ export default function Meetings() {
                 </button>
               ))}
             </div>
-            <button className="btn-primary" style={{ height: '36px', flexShrink: 0 }}>
+            <button className="btn-primary" style={{ height: '36px', flexShrink: 0 }} onClick={() => setShowNewModal(true)}>
               <Plus size={14} /> New Meeting
             </button>
           </div>
@@ -460,6 +497,101 @@ export default function Meetings() {
           </div>
         </div>
       </div>
+
+      {/* New Meeting Modal */}
+      {showNewModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
+        }} onClick={() => setShowNewModal(false)}>
+          <div style={{
+            background: 'var(--bg-elevated)', border: '1px solid var(--border-default)',
+            borderRadius: 'var(--radius-lg)', padding: '1.75rem', width: '100%', maxWidth: '500px',
+            boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
+          }} onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>New Meeting</h2>
+                <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Schedule a new governance meeting</p>
+              </div>
+              <button onClick={() => setShowNewModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px', borderRadius: '6px' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Form */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {/* Title */}
+              <div>
+                <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>Meeting Title *</label>
+                <input className="input-field" placeholder="e.g. NCA Steering Committee #15" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} style={{ width: '100%' }} />
+              </div>
+
+              {/* Date + Time */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>Date *</label>
+                  <input className="input-field" type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} style={{ width: '100%' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>Time</label>
+                  <input className="input-field" type="time" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} style={{ width: '100%' }} />
+                </div>
+              </div>
+
+              {/* Duration + Type */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>Duration</label>
+                  <select className="input-field" value={form.duration} onChange={e => setForm(f => ({ ...f, duration: e.target.value }))} style={{ width: '100%' }}>
+                    {['30min', '1h', '1.5h', '2h', '3h'].map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>Type</label>
+                  <select className="input-field" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as MeetingRow['type'] }))} style={{ width: '100%' }}>
+                    {['Review', 'Steering', 'Committee', 'Workshop', 'Kickoff', 'Standup'].map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Workspace */}
+              <div>
+                <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>Workspace *</label>
+                <select className="input-field" value={form.workspace_id} onChange={e => {
+                  const ws = workspaces.find(w => w.id === e.target.value);
+                  setForm(f => ({ ...f, workspace_id: e.target.value, workspace: ws?.name || '' }));
+                }} style={{ width: '100%' }}>
+                  <option value="">Select workspace…</option>
+                  {workspaces.map(ws => <option key={ws.id} value={ws.id}>{ws.name}</option>)}
+                </select>
+              </div>
+
+              {/* Location */}
+              <div>
+                <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>Location</label>
+                <input className="input-field" placeholder="e.g. Boardroom A / Microsoft Teams" value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} style={{ width: '100%' }} />
+              </div>
+
+              {/* Participants */}
+              <div>
+                <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>Participants (initials, comma-separated)</label>
+                <input className="input-field" placeholder="e.g. AM, JL, RT, DN" value={form.participants} onChange={e => setForm(f => ({ ...f, participants: e.target.value }))} style={{ width: '100%' }} />
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.75rem' }}>
+              <button className="btn-secondary" onClick={() => setShowNewModal(false)}>Cancel</button>
+              <button className="btn-primary" onClick={handleCreateMeeting} disabled={saving || !form.title || !form.date || !form.workspace_id}>
+                {saving ? 'Saving…' : 'Create Meeting'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

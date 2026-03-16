@@ -4,8 +4,9 @@ import {
   AlertTriangle, CheckSquare, Clock, TrendingUp, Plus, Filter, Search,
   ArrowRight, MoreHorizontal,
 } from 'lucide-react';
-import { getTasks, getRisks, updateTask } from '../lib/db';
-import type { TaskRow, RiskRow } from '../lib/db';
+import { getTasks, getRisks, updateTask, upsertTask, getWorkspaces } from '../lib/db';
+import type { TaskRow, RiskRow, WorkspaceRow } from '../lib/db';
+import { X } from 'lucide-react';
 
 const kanbanColumns = [
   { key: 'Backlog',     label: 'Backlog',      color: '#475569', trackColor: 'rgba(71,85,105,0.3)' },
@@ -112,10 +113,17 @@ export default function Tasks() {
   const [risks, setRisks] = useState<RiskRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
+  const [showNewTask, setShowNewTask] = useState(false);
+  const [workspaces, setWorkspaces] = useState<WorkspaceRow[]>([]);
+  const [savingTask, setSavingTask] = useState(false);
+  const [taskForm, setTaskForm] = useState({
+    title: '', workspace: '', workspace_id: '', priority: 'Medium' as TaskRow['priority'],
+    status: 'Backlog' as TaskRow['status'], due_date: '', assignee: '', description: '',
+  });
 
   useEffect(() => {
-    Promise.all([getTasks(), getRisks()])
-      .then(([t, r]) => { setTasks(t); setRisks(r); setLoading(false); })
+    Promise.all([getTasks(), getRisks(), getWorkspaces()])
+      .then(([t, r, ws]) => { setTasks(t); setRisks(r); setWorkspaces(ws); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 
@@ -126,6 +134,30 @@ export default function Tasks() {
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus as TaskRow['status'] } : t));
     } catch { /* ignore */ }
     finally { setUpdatingTaskId(null); }
+  }
+
+  async function handleCreateTask() {
+    if (!taskForm.title || !taskForm.workspace_id || !taskForm.due_date) return;
+    setSavingTask(true);
+    try {
+      const newTask = await upsertTask({
+        id: crypto.randomUUID(),
+        title: taskForm.title,
+        workspace: taskForm.workspace,
+        workspace_id: taskForm.workspace_id,
+        priority: taskForm.priority,
+        status: taskForm.status,
+        due_date: taskForm.due_date,
+        assignee: taskForm.assignee,
+        description: taskForm.description,
+        linked_doc: null,
+        linked_meeting: null,
+      });
+      setTasks(prev => [newTask, ...prev]);
+      setShowNewTask(false);
+      setTaskForm({ title: '', workspace: '', workspace_id: '', priority: 'Medium', status: 'Backlog', due_date: '', assignee: '', description: '' });
+    } catch { /* ignore */ }
+    finally { setSavingTask(false); }
   }
 
   const heatmap = buildHeatmap(risks);
@@ -217,7 +249,7 @@ export default function Tasks() {
           <button className="btn-ghost" style={{ height: '34px', fontSize: '0.78rem' }}>
             <Filter size={12} /> Filter
           </button>
-          <button className="btn-primary" style={{ height: '34px', fontSize: '0.78rem' }}>
+          <button className="btn-primary" style={{ height: '34px', fontSize: '0.78rem' }} onClick={() => activeView === 'Tasks' && setShowNewTask(true)}>
             <Plus size={12} /> {addLabel[activeView]}
           </button>
         </div>
@@ -675,6 +707,87 @@ export default function Tasks() {
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* New Task Modal */}
+      {showNewTask && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
+        }} onClick={() => setShowNewTask(false)}>
+          <div style={{
+            background: 'var(--bg-elevated)', border: '1px solid var(--border-default)',
+            borderRadius: 'var(--radius-lg)', padding: '1.75rem', width: '100%', maxWidth: '500px',
+            boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>New Task</h2>
+                <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Add a task to the RAID log</p>
+              </div>
+              <button onClick={() => setShowNewTask(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px', borderRadius: '6px' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>Task Title *</label>
+                <input className="input-field" placeholder="Describe the task..." value={taskForm.title} onChange={e => setTaskForm(f => ({ ...f, title: e.target.value }))} style={{ width: '100%' }} />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>Workspace *</label>
+                <select className="input-field" value={taskForm.workspace_id} onChange={e => {
+                  const ws = workspaces.find(w => w.id === e.target.value);
+                  setTaskForm(f => ({ ...f, workspace_id: e.target.value, workspace: ws?.name || '' }));
+                }} style={{ width: '100%' }}>
+                  <option value="">Select workspace…</option>
+                  {workspaces.map(ws => <option key={ws.id} value={ws.id}>{ws.name}</option>)}
+                </select>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>Priority</label>
+                  <select className="input-field" value={taskForm.priority} onChange={e => setTaskForm(f => ({ ...f, priority: e.target.value as TaskRow['priority'] }))} style={{ width: '100%' }}>
+                    {['High', 'Medium', 'Low'].map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>Status</label>
+                  <select className="input-field" value={taskForm.status} onChange={e => setTaskForm(f => ({ ...f, status: e.target.value as TaskRow['status'] }))} style={{ width: '100%' }}>
+                    {['Backlog', 'In Progress', 'In Review', 'Completed', 'Overdue'].map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>Due Date *</label>
+                  <input className="input-field" type="date" value={taskForm.due_date} onChange={e => setTaskForm(f => ({ ...f, due_date: e.target.value }))} style={{ width: '100%' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>Assignee</label>
+                  <input className="input-field" placeholder="Initials, e.g. AM" value={taskForm.assignee} onChange={e => setTaskForm(f => ({ ...f, assignee: e.target.value }))} style={{ width: '100%' }} />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>Description</label>
+                <textarea className="input-field" placeholder="Optional details..." value={taskForm.description} onChange={e => setTaskForm(f => ({ ...f, description: e.target.value }))} style={{ width: '100%', minHeight: '80px', resize: 'vertical' }} />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.75rem' }}>
+              <button className="btn-secondary" onClick={() => setShowNewTask(false)}>Cancel</button>
+              <button className="btn-primary" onClick={handleCreateTask} disabled={savingTask || !taskForm.title || !taskForm.workspace_id || !taskForm.due_date}>
+                {savingTask ? 'Saving…' : 'Create Task'}
+              </button>
+            </div>
           </div>
         </div>
       )}

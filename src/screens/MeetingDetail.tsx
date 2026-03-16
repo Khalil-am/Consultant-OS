@@ -5,8 +5,9 @@ import {
   ArrowLeft, Video, Users, Clock, MapPin, Calendar,
   Sparkles, CheckSquare, FileText, Plus, Check, AlertCircle
 } from 'lucide-react';
-import { getMeeting } from '../lib/db';
+import { getMeeting, updateMeeting } from '../lib/db';
 import type { MeetingRow } from '../lib/db';
+import { chatWithDocument } from '../lib/openrouter';
 
 const tabs = ['Meeting Info', 'Agenda', 'Notes', 'Decisions', 'Action Items', 'Attachments', 'Generated Outputs'];
 
@@ -42,6 +43,9 @@ export default function MeetingDetail() {
   const [activeTab, setActiveTab] = useState('Meeting Info');
   const [meeting, setMeeting] = useState<MeetingRow | null>(null);
   const [loadingMeeting, setLoadingMeeting] = useState(true);
+  const [generatingMinutes, setGeneratingMinutes] = useState(false);
+  const [generatedMinutes, setGeneratedMinutes] = useState('');
+  const [minutesError, setMinutesError] = useState('');
 
   useEffect(() => {
     if (id) {
@@ -59,6 +63,30 @@ export default function MeetingDetail() {
   }
 
   const isCommittee = meeting.type === 'Committee' || meeting.type === 'Steering';
+
+  async function handleGenerateMinutes() {
+    if (!meeting) return;
+    setGeneratingMinutes(true);
+    setGeneratedMinutes('');
+    setMinutesError('');
+    setActiveTab('Generated Outputs');
+    try {
+      const agendaText = sampleAgenda.map(a => `${a.time} (${a.duration}) – ${a.item} [${a.facilitator}]`).join('\n');
+      const decisionText = decisionRows.map(d => `${d.id}: ${d.decision} — ${d.status}`).join('\n');
+      const actionText = actionItems.map(a => `${a.id}: ${a.title} (Owner: ${a.owner}, Due: ${a.dueDate})`).join('\n');
+      const systemPrompt = `You are a professional meeting secretary. Generate formal, structured meeting minutes in markdown format. Be concise and professional.`;
+      const userMsg = `Generate meeting minutes for:\n\nMeeting: ${meeting.title}\nDate: ${meeting.date} at ${meeting.time}\nDuration: ${meeting.duration}\nWorkspace: ${meeting.workspace}\nType: ${meeting.type}\nParticipants: ${meeting.participants.join(', ')}\nLocation: ${meeting.location || 'Not specified'}\nQuorum Status: ${meeting.quorum_status || 'N/A'}\n\nAGENDA:\n${agendaText}\n\nDECISIONS MADE:\n${decisionText}\n\nACTION ITEMS:\n${actionText}\n\nGenerate formal meeting minutes with sections: Opening, Attendees, Agenda Items (with key points), Decisions, Action Items, and Close.`;
+      const result = await chatWithDocument([{ role: 'user', content: userMsg }], systemPrompt);
+      setGeneratedMinutes(result);
+      // Mark minutes as generated in DB
+      await updateMeeting(meeting.id, { minutes_generated: true });
+      setMeeting(prev => prev ? { ...prev, minutes_generated: true } : prev);
+    } catch (e) {
+      setMinutesError(e instanceof Error ? e.message : 'Failed to generate minutes');
+    } finally {
+      setGeneratingMinutes(false);
+    }
+  }
 
   // suppress unused warning
   void width;
@@ -150,8 +178,8 @@ export default function MeetingDetail() {
                   </button>
                 </>
               )}
-              <button className="btn-ai" style={{ fontSize: '0.78rem', height: '32px' }}>
-                <Sparkles size={13} /> Generate Minutes
+              <button className="btn-ai" style={{ fontSize: '0.78rem', height: '32px' }} onClick={handleGenerateMinutes} disabled={generatingMinutes}>
+                <Sparkles size={13} /> {generatingMinutes ? 'Generating…' : 'Generate Minutes'}
               </button>
               <button className="btn-primary" style={{ fontSize: '0.78rem', height: '32px' }}>
                 <CheckSquare size={13} /> Extract Actions
@@ -457,14 +485,38 @@ export default function MeetingDetail() {
       {/* Generated Outputs Tab */}
       {activeTab === 'Generated Outputs' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {/* AI Minutes result */}
+          {(generatingMinutes || generatedMinutes || minutesError) && (
+            <div className="section-card" style={{ border: '1px solid rgba(139,92,246,0.25)' }}>
+              <div className="section-card-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Sparkles size={14} style={{ color: '#8B5CF6' }} />
+                  <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>AI Meeting Minutes</span>
+                </div>
+                {generatedMinutes && (
+                  <button className="btn-ghost" style={{ height: '28px', fontSize: '0.72rem' }} onClick={() => navigator.clipboard.writeText(generatedMinutes)}>
+                    Copy
+                  </button>
+                )}
+              </div>
+              <div style={{ padding: '1rem 1.25rem' }}>
+                {generatingMinutes && <div style={{ color: '#A78BFA', fontSize: '0.82rem' }}>Generating minutes with AI…</div>}
+                {minutesError && <div style={{ color: '#FCA5A5', fontSize: '0.82rem' }}>{minutesError}</div>}
+                {generatedMinutes && (
+                  <pre style={{ margin: 0, fontSize: '0.8rem', lineHeight: 1.65, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{generatedMinutes}</pre>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="section-card">
             <div className="section-card-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Sparkles size={14} style={{ color: '#8B5CF6' }} />
                 <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>AI-Generated Outputs</span>
               </div>
-              <button className="btn-ai" style={{ padding: '0.25rem 0.875rem', fontSize: '0.72rem', height: '28px', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                <Sparkles size={11} /> Regenerate
+              <button className="btn-ai" style={{ padding: '0.25rem 0.875rem', fontSize: '0.72rem', height: '28px', display: 'flex', alignItems: 'center', gap: '0.375rem' }} onClick={handleGenerateMinutes} disabled={generatingMinutes}>
+                <Sparkles size={11} /> {generatingMinutes ? 'Generating…' : 'Regenerate'}
               </button>
             </div>
             <div style={{ padding: '0.5rem 0' }}>

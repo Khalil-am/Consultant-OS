@@ -967,7 +967,7 @@ export default function Dashboard() {
                 <ActivityIcon type={activity.type} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#E2E8F0', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {activity.title}
+                    {activity.action} {activity.target}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '0.68rem', color: '#64748B' }}>{activity.workspace}</span>
@@ -984,7 +984,7 @@ export default function Dashboard() {
                     )}
                   </div>
                 </div>
-                <span style={{ fontSize: '0.65rem', color: '#334155', flexShrink: 0, marginTop: '2px' }}>{activity.timestamp}</span>
+                <span style={{ fontSize: '0.65rem', color: '#334155', flexShrink: 0, marginTop: '2px' }}>{activity.time}</span>
               </div>
             ))}
           </div>

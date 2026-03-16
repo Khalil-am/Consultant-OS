@@ -11,6 +11,7 @@ import {
 } from '../lib/db';
 import type { DocumentRow, WorkspaceRow } from '../lib/db';
 import { supabase } from '../lib/supabase';
+import { chatWithDocument } from '../lib/openrouter';
 
 async function downloadFile(doc: DocumentRow) {
   if (!doc.file_url) {
@@ -89,6 +90,9 @@ export default function Documents() {
 
   // Inline status change
   const [statusChanging, setStatusChanging] = useState<string | null>(null);
+
+  // AI Summarize
+  const [summarizing, setSummarizing] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -212,6 +216,22 @@ export default function Documents() {
     downloadFile(doc);
   }
 
+  async function handleSummarize() {
+    if (!selected) return;
+    setSummarizing(true);
+    try {
+      const systemPrompt = `You are a professional document analyst. Generate a concise 3-5 sentence executive summary for the given document. Focus on purpose, scope, key findings or requirements, and intended audience.`;
+      const userMsg = `Generate a summary for this document:\n\nName: ${selected.name}\nType: ${selected.type}\nWorkspace: ${selected.workspace}\nAuthor: ${selected.author}\nStatus: ${selected.status}\nDate: ${selected.date}\nExisting Summary: ${selected.summary || 'None'}\nTags: ${selected.tags?.join(', ') || 'None'}`;
+      const result = await chatWithDocument([{ role: 'user', content: userMsg }], systemPrompt);
+      await updateDocument(selected.id, { summary: result });
+      setDocs(prev => prev.map(d => d.id === selected.id ? { ...d, summary: result } : d));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Summarize failed');
+    } finally {
+      setSummarizing(false);
+    }
+  }
+
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 60px)', overflow: 'hidden' }}>
       {/* Left sidebar */}
@@ -259,8 +279,8 @@ export default function Documents() {
           <button className="btn-primary" style={{ height: '34px', fontSize: '0.8rem' }} onClick={() => setShowUpload(true)}>
             <Upload size={13} /> Upload
           </button>
-          <button className="btn-ai" style={{ height: '34px', fontSize: '0.8rem' }}>
-            <Sparkles size={13} /> Summarize
+          <button className="btn-ai" style={{ height: '34px', fontSize: '0.8rem' }} onClick={handleSummarize} disabled={!selected || summarizing}>
+            <Sparkles size={13} /> {summarizing ? 'Summarizing…' : selected ? 'Summarize Selected' : 'Summarize'}
           </button>
 
           <div style={{ flex: 1 }} />
