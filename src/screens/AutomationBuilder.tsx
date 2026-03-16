@@ -91,12 +91,12 @@ export default function AutomationBuilder() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 60px)', overflow: 'hidden' }}>
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0.875rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)',
-        background: '#0D1527', flexShrink: 0,
+        padding: '0.875rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)',
+        background: '#0C1220', flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <button
@@ -130,8 +130,8 @@ export default function AutomationBuilder() {
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {/* Left Panel – Config */}
         <div style={{
-          width: '280px', minWidth: '280px', borderRight: '1px solid rgba(255,255,255,0.06)',
-          display: 'flex', flexDirection: 'column', overflowY: 'auto', background: '#0D1527',
+          width: '280px', minWidth: '280px', borderRight: '1px solid rgba(255,255,255,0.05)',
+          display: 'flex', flexDirection: 'column', overflowY: 'auto', background: '#0C1220',
         }}>
           <div style={{ padding: '1rem' }}>
             <div style={{ marginBottom: '1.25rem' }}>
@@ -176,7 +176,7 @@ export default function AutomationBuilder() {
                 }}>
                   <div style={{
                     width: '14px', height: '14px', borderRadius: '3px',
-                    background: i < 3 ? 'rgba(0,212,255,0.2)' : 'rgba(255,255,255,0.06)',
+                    background: i < 3 ? 'rgba(0,212,255,0.2)' : 'rgba(255,255,255,0.05)',
                     border: `1px solid ${i < 3 ? 'rgba(0,212,255,0.4)' : 'rgba(255,255,255,0.1)'}`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
@@ -190,7 +190,7 @@ export default function AutomationBuilder() {
         </div>
 
         {/* Center Canvas */}
-        <div style={{ flex: 1, overflow: 'auto', background: '#0A0F1E', padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div style={{ flex: 1, overflow: 'auto', background: '#080C18', padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           {/* Flow nodes */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0, minWidth: '280px' }}>
             {flowNodes.map((node, i) => (
@@ -259,11 +259,11 @@ export default function AutomationBuilder() {
 
         {/* Right Panel */}
         <div style={{
-          width: '320px', minWidth: '320px', borderLeft: '1px solid rgba(255,255,255,0.06)',
-          display: 'flex', flexDirection: 'column', overflowY: 'auto', background: '#0D1527',
+          width: '320px', minWidth: '320px', borderLeft: '1px solid rgba(255,255,255,0.05)',
+          display: 'flex', flexDirection: 'column', overflowY: 'auto', background: '#0C1220',
         }}>
           {/* Tab Bar */}
-          <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0 0.75rem' }}>
+          <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '0 0.75rem' }}>
             {rightPanelTabs.map(tab => (
               <button
                 key={tab}
@@ -436,7 +436,7 @@ export default function AutomationBuilder() {
                     padding: '0.75rem',
                     borderRadius: '0.5rem',
                     background: 'rgba(255,255,255,0.03)',
-                    border: '1px solid rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.05)',
                     marginBottom: '0.5rem',
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.375rem' }}>

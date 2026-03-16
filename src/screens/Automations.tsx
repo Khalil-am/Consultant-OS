@@ -48,18 +48,18 @@ export default function Automations() {
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 768 ? 4 : 2}, 1fr)`, gap: '0.875rem' }}>
         {[
-          { label: 'Total Automations', value: '14', icon: <Zap size={16} />, color: '#00D4FF' },
-          { label: 'Runs This Month', value: '1,284', icon: <Play size={16} />, color: '#10B981' },
-          { label: 'Success Rate', value: '96.8%', icon: <CheckCircle size={16} />, color: '#34D399' },
-          { label: 'Hours Saved', value: '384 hrs', icon: <TrendingUp size={16} />, color: '#8B5CF6' },
+          { label: 'Total Automations', value: '14',      icon: <Zap size={15} />,         color: '#00D4FF' },
+          { label: 'Runs This Month',   value: '1,284',   icon: <Play size={15} />,        color: '#10B981' },
+          { label: 'Success Rate',      value: '96.8%',   icon: <CheckCircle size={15} />, color: '#34D399' },
+          { label: 'Hours Saved',       value: '384 hrs', icon: <TrendingUp size={15} />,  color: '#8B5CF6' },
         ].map(stat => (
-          <div key={stat.label} className="metric-card" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={{ padding: '0.625rem', borderRadius: '8px', background: `${stat.color}15`, color: stat.color }}>
+          <div key={stat.label} className="metric-card" style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
+            <div style={{ width: 40, height: 40, borderRadius: '10px', background: `${stat.color}12`, border: `1px solid ${stat.color}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: stat.color, flexShrink: 0 }}>
               {stat.icon}
             </div>
             <div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#F1F5F9' }}>{stat.value}</div>
-              <div style={{ fontSize: '0.72rem', color: '#475569' }}>{stat.label}</div>
+              <div style={{ fontSize: '1.375rem', fontWeight: 900, color: '#F1F5F9', lineHeight: 1, letterSpacing: '-0.02em' }}>{stat.value}</div>
+              <div style={{ fontSize: '0.7rem', color: '#64748B', marginTop: '3px' }}>{stat.label}</div>
             </div>
           </div>
         ))}
@@ -68,7 +68,7 @@ export default function Automations() {
       {/* Toolbar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
         {/* Category Tabs */}
-        <div style={{ display: 'flex', gap: '0.25rem', overflowX: 'auto', background: 'rgba(255,255,255,0.03)', padding: '0.25rem', borderRadius: '0.625rem', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ display: 'flex', gap: '0.25rem', overflowX: 'auto', background: 'rgba(255,255,255,0.03)', padding: '0.25rem', borderRadius: '0.625rem', border: '1px solid rgba(255,255,255,0.05)' }}>
           {categories.map(cat => (
             <button
               key={cat}
@@ -109,7 +109,7 @@ export default function Automations() {
               (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 24px rgba(0,0,0,0.25)';
             }}
             onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)';
+              (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.05)';
               (e.currentTarget as HTMLElement).style.transform = 'translateY(0)';
               (e.currentTarget as HTMLElement).style.boxShadow = 'none';
             }}
@@ -156,7 +156,7 @@ export default function Automations() {
 
               {/* Input/Output Chips */}
               <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.25rem 0.5rem', borderRadius: '4px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.25rem 0.5rem', borderRadius: '4px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.05)' }}>
                   <span style={{ fontSize: '0.6rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>IN</span>
                   <span style={{ fontSize: '0.72rem', color: '#94A3B8' }}>{auto.inputType}</span>
                 </div>
@@ -177,7 +177,7 @@ export default function Automations() {
                   <span style={{ fontSize: '0.72rem', color: '#475569' }}>{auto.lastRun}</span>
                 </div>
                 <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                  <div style={{ width: '24px', height: '4px', borderRadius: '2px', background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                  <div style={{ width: '24px', height: '4px', borderRadius: '2px', background: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
                     <div style={{ width: `${auto.successRate}%`, height: '100%', background: '#10B981', borderRadius: '2px' }} />
                   </div>
                   <span style={{ fontSize: '0.7rem', color: '#34D399' }}>{auto.successRate}%</span>
