@@ -1,0 +1,108 @@
+{
+  "name": "SUB_Callback_Status",
+  "nodes": [
+    {
+      "id": "sub-cb-n1",
+      "name": "SUB Callback Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {}
+    },
+    {
+      "id": "sub-cb-n2",
+      "name": "Build Status Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst runId = item.runId || item.execution?.runId || 'unknown';\nconst status = item.status || 'failed';\nconst errorMessage = item.errorMessage || item.message || item.error?.message || 'Unknown error';\nconst stageName = item.stageName || 'unknown';\n\nconsole.log(`[SUB_Callback_Status] runId=${runId} status=${status} stage=${stageName}`);\n\nreturn [{\n  json: {\n    runId,\n    status,\n    stageName,\n    errorMessage,\n    callbackPayload: {\n      runId,\n      status,\n      stageName,\n      errorMessage,\n      timestamp: new Date().toISOString()\n    }\n  }\n}];"
+      }
+    },
+    {
+      "id": "sub-cb-n3",
+      "name": "Update Run Status",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [680, 300],
+      "parameters": {
+        "operation": "update",
+        "tableId": "automation_runs",
+        "filterType": "string",
+        "filterString": "id=eq.{{ $json.runId }}",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "status", "fieldValue": "={{ $json.status }}" },
+            { "fieldId": "error_message", "fieldValue": "={{ $json.errorMessage }}" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "sub-cb-n4",
+      "name": "POST to Consultant OS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ process.env.CONSULTANT_OS_URL || 'http://localhost:3001' }}/api/automation/brd/callback",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-N8N-Secret", "value": "={{ process.env.N8N_CALLBACK_SECRET || 'dev-secret' }}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "body": "={{ JSON.stringify($('Build Status Payload').first().json.callbackPayload) }}",
+        "options": {
+          "timeout": 10000,
+          "retry": { "enabled": true, "maxTries": 2 }
+        }
+      }
+    },
+    {
+      "id": "sub-cb-n5",
+      "name": "Log Status Event",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1120, 300],
+      "parameters": {
+        "operation": "create",
+        "tableId": "automation_run_events",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "run_id", "fieldValue": "={{ $('Build Status Payload').first().json.runId }}" },
+            { "fieldId": "event_type", "fieldValue": "status_callback" },
+            { "fieldId": "stage_name", "fieldValue": "={{ $('Build Status Payload').first().json.stageName }}" },
+            { "fieldId": "payload_json", "fieldValue": "={{ JSON.stringify($('Build Status Payload').first().json.callbackPayload) }}" }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "SUB Callback Trigger": {
+      "main": [[{ "node": "Build Status Payload", "type": "main", "index": 0 }]]
+    },
+    "Build Status Payload": {
+      "main": [[{ "node": "Update Run Status", "type": "main", "index": 0 }]]
+    },
+    "Update Run Status": {
+      "main": [[{ "node": "POST to Consultant OS", "type": "main", "index": 0 }]]
+    },
+    "POST to Consultant OS": {
+      "main": [[{ "node": "Log Status Event", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": { "executionOrder": "v1" },
+  "meta": {
+    "description": "Reusable sub-workflow. Called by error workflows and status transitions. Updates automation_runs status in Supabase and POSTs callback to Consultant OS. Accepts { runId, status, stageName, errorMessage }.",
+    "tags": ["sub-workflow", "callback", "error-handler", "reusable"]
+  }
+}

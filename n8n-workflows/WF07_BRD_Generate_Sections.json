@@ -1,0 +1,187 @@
+{
+  "name": "WF07_BRD_Generate_Sections",
+  "nodes": [
+    {
+      "id": "wf07-n1",
+      "name": "WF07 Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {}
+    },
+    {
+      "id": "wf07-n2",
+      "name": "Update Status Generating",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [460, 300],
+      "parameters": {
+        "operation": "update",
+        "tableId": "automation_runs",
+        "filterType": "string",
+        "filterString": "id=eq.{{ $json.runId }}",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "status", "fieldValue": "generating_sections" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wf07-n3",
+      "name": "Build Section List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "parameters": {
+        "jsCode": "const runId = $input.first().json.runId;\nconst blueprint = $input.first().json.blueprint || {};\nconst brdModel = $input.first().json.brdModel || {};\nconst gapAnalysis = $input.first().json.gapAnalysis || {};\n\nconst canonicalSections = blueprint.canonicalSections || [\n  'Executive Summary',\n  'Background & Business Context',\n  'Business Need & Problem Statement',\n  'Objectives & Success Criteria',\n  'Scope',\n  'Stakeholder Register',\n  'Functional Requirements',\n  'Non-Functional Requirements',\n  'Process Flows & Use Cases',\n  'Integration Requirements',\n  'Reporting & Data Requirements',\n  'Assumptions & Constraints',\n  'Risks & Mitigation',\n  'Dependencies',\n  'Acceptance Criteria',\n  'Appendices & Open Questions'\n];\n\nconsole.log(`[WF07][${runId}] Generating ${canonicalSections.length} sections...`);\n\n// Return one item per section for parallel/sequential processing\nreturn canonicalSections.map((sectionName, index) => ({\n  json: {\n    runId,\n    sectionIndex: index,\n    sectionName,\n    totalSections: canonicalSections.length,\n    brdModel,\n    blueprint,\n    gapAnalysis,\n    source: $input.first().json.source,\n    options: $input.first().json.options,\n    isWeakSection: (gapAnalysis.weakSections || []).includes(sectionName),\n    isMissingSection: (gapAnalysis.missingSections || []).includes(sectionName)\n  }\n}));"
+      }
+    },
+    {
+      "id": "wf07-n4",
+      "name": "Prepare Section Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300],
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst { runId, sectionName, brdModel, blueprint, gapAnalysis, source, isWeakSection, isMissingSection } = item;\n\n// Extract relevant source chunks for this section\nconst relevantSections = (source.sections || []).filter(s => \n  s.title?.toLowerCase().includes(sectionName.toLowerCase().split(' ')[0]) ||\n  sectionName.toLowerCase().includes((s.title||'').toLowerCase().split(' ')[0])\n);\nconst relevantText = relevantSections.map(s => s.content).join('\\n\\n').substring(0, 2000) \n  || source.plainText?.substring(0, 1500) || '';\n\nconst styleRules = blueprint.styleRules || {};\nconst gapNote = isWeakSection \n  ? `NOTE: This section was identified as WEAK in the gap analysis — expand with more detail.`\n  : isMissingSection \n  ? `NOTE: This section was MISSING from the source — construct it from available context, clearly marking assumptions.`\n  : '';\n\nconst prompt = `You are a senior consulting business analyst writing a BRD section.\n\nSection to write: ${sectionName}\n${gapNote}\n\nStyle rules:\n- Tone: ${styleRules.tone || 'formal_consulting'}\n- Verbosity: ${styleRules.verbosity || 'medium'}\n- Use tables: ${styleRules.tableUsage ? 'yes where appropriate' : 'no'}\n- Use bullets: ${styleRules.bulletsPreferred ? 'yes' : 'sparingly'}\n\nRelevant source content for this section:\n${relevantText || '[No direct source content for this section - use BRD model data below]'}\n\nFull BRD Model (use as source of facts):\nProject: ${brdModel.projectName || 'Unknown'}\nBusiness Problem: ${brdModel.businessProblem || ''}\nObjectives: ${JSON.stringify(brdModel.objectives || [])}\nStakeholders: ${JSON.stringify((brdModel.stakeholders || []).slice(0, 5))}\nFRs (first 5): ${JSON.stringify((brdModel.functionalRequirements || []).slice(0, 5))}\nNFRs (first 5): ${JSON.stringify((brdModel.nonFunctionalRequirements || []).slice(0, 5))}\nRisks: ${JSON.stringify((brdModel.risks || []).slice(0, 5))}\nAssumptions: ${JSON.stringify((brdModel.assumptions || []).slice(0, 5))}\n\nGap analysis recommendations relevant to this section:\n${(gapAnalysis.recommendations || []).filter(r => r.toLowerCase().includes(sectionName.toLowerCase().split(' ')[0])).join('\\n') || 'None specific'}\n\nWrite the \"${sectionName}\" section now.\nRules:\n- Only use facts from the source. Mark inferred content as [Assumed] or [To Be Confirmed].\n- Write in professional consulting prose.\n- Return ONLY valid JSON in this format:\n{\n  \"sectionName\": \"${sectionName}\",\n  \"content\": \"full markdown content of the section\",\n  \"assumptionsUsed\": [\"list of assumptions made\"],\n  \"openQuestions\": [\"any open questions for this section\"],\n  \"confidence\": 0.0\n}`;\n\nreturn [{ json: { ...item, sectionPrompt: prompt } }];"
+      }
+    },
+    {
+      "id": "wf07-n5",
+      "name": "Claude Generate Section",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.2,
+      "position": [1120, 300],
+      "parameters": {
+        "model": "claude-sonnet-4-6",
+        "messages": {
+          "messageValues": [
+            {
+              "type": "SystemMessagePromptTemplate",
+              "message": "You are a senior consulting business analyst writing enterprise BRD sections. Write professionally, avoid hallucination, mark assumptions clearly. Return only valid JSON."
+            },
+            {
+              "type": "HumanMessagePromptTemplate",
+              "message": "={{ $json.sectionPrompt }}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.3,
+          "maxTokens": 2500
+        }
+      }
+    },
+    {
+      "id": "wf07-n6",
+      "name": "Parse Section Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 300],
+      "parameters": {
+        "jsCode": "const item = $('Prepare Section Prompt').first().json;\nconst rawResponse = $input.first().json.text || $input.first().json.content || '';\n\nlet sectionResult;\ntry {\n  const clean = rawResponse.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  sectionResult = JSON.parse(clean);\n} catch(e) {\n  console.warn(`[WF07][${item.runId}][${item.sectionName}] Parse failed, using raw text`);\n  sectionResult = {\n    sectionName: item.sectionName,\n    content: rawResponse,\n    assumptionsUsed: [],\n    openQuestions: [],\n    confidence: 0.5\n  };\n}\n\nreturn [{\n  json: {\n    runId: item.runId,\n    sectionIndex: item.sectionIndex,\n    sectionName: sectionResult.sectionName || item.sectionName,\n    content: sectionResult.content || '',\n    assumptionsUsed: sectionResult.assumptionsUsed || [],\n    openQuestions: sectionResult.openQuestions || [],\n    confidence: sectionResult.confidence || 0.8\n  }\n}];"
+      }
+    },
+    {
+      "id": "wf07-n7",
+      "name": "Store Draft Section",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1560, 300],
+      "parameters": {
+        "operation": "upsert",
+        "tableId": "automation_run_sections",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "run_id", "fieldValue": "={{ $json.runId }}" },
+            { "fieldId": "section_name", "fieldValue": "={{ $json.sectionName }}" },
+            { "fieldId": "status", "fieldValue": "draft" },
+            { "fieldId": "content", "fieldValue": "={{ $json.content }}" },
+            { "fieldId": "confidence", "fieldValue": "={{ $json.confidence }}" },
+            { "fieldId": "validation_notes", "fieldValue": "={{ JSON.stringify({ assumptionsUsed: $json.assumptionsUsed, openQuestions: $json.openQuestions }) }}" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wf07-n8",
+      "name": "Collect All Sections",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [1780, 300],
+      "parameters": {
+        "mode": "passThrough",
+        "output": "input1"
+      }
+    },
+    {
+      "id": "wf07-n9",
+      "name": "Check All Complete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 300],
+      "parameters": {
+        "jsCode": "// Pass through to WF08 with the run context\nconst firstItem = $input.first().json;\nreturn [{\n  json: {\n    runId: firstItem.runId,\n    sectionsGenerated: $input.all().length,\n    message: `All ${$input.all().length} sections generated`\n  }\n}];"
+      }
+    },
+    {
+      "id": "wf07-n10",
+      "name": "Dispatch WF08",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [2220, 300],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "WF08_BRD_Assemble_Validate",
+          "mode": "name"
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      }
+    }
+  ],
+  "connections": {
+    "WF07 Trigger": {
+      "main": [[{ "node": "Update Status Generating", "type": "main", "index": 0 }]]
+    },
+    "Update Status Generating": {
+      "main": [[{ "node": "Build Section List", "type": "main", "index": 0 }]]
+    },
+    "Build Section List": {
+      "main": [[{ "node": "Prepare Section Prompt", "type": "main", "index": 0 }]]
+    },
+    "Prepare Section Prompt": {
+      "main": [[{ "node": "Claude Generate Section", "type": "main", "index": 0 }]]
+    },
+    "Claude Generate Section": {
+      "main": [[{ "node": "Parse Section Output", "type": "main", "index": 0 }]]
+    },
+    "Parse Section Output": {
+      "main": [[{ "node": "Store Draft Section", "type": "main", "index": 0 }]]
+    },
+    "Store Draft Section": {
+      "main": [[{ "node": "Collect All Sections", "type": "main", "index": 0 }]]
+    },
+    "Collect All Sections": {
+      "main": [[{ "node": "Check All Complete", "type": "main", "index": 0 }]]
+    },
+    "Check All Complete": {
+      "main": [[{ "node": "Dispatch WF08", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "SUB_Callback_Status"
+  },
+  "meta": {
+    "description": "Loops through all canonical BRD sections and generates each independently using Claude. Each section gets its own prompt with relevant source chunks, blueprint style, and gap recommendations. Stores each section to automation_run_sections.",
+    "tags": ["brd", "generation", "claude", "sections", "phase-2"]
+  }
+}

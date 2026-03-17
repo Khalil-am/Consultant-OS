@@ -1,0 +1,190 @@
+{
+  "name": "WF01_BRD_Intake_Run_Init",
+  "nodes": [
+    {
+      "id": "wf01-n1",
+      "name": "BRD Run Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "brd-run-intake",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "automation/brd/run",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      }
+    },
+    {
+      "id": "wf01-n2",
+      "name": "Validate Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\n\nconst required = ['runId','workspaceId','userId','automationType','promptTemplateId','inputFile'];\nconst missing = required.filter(f => !body[f]);\n\nif (missing.length > 0) {\n  throw new Error(`Missing required fields: ${missing.join(', ')}`);\n}\n\nif (!body.inputFile.url || !body.inputFile.name) {\n  throw new Error('inputFile must have url and name');\n}\n\nif (!body.sampleFiles || body.sampleFiles.length === 0) {\n  console.warn(`[WF01][${body.runId}] No sample files provided - proceeding without sample blueprint`);\n}\n\nreturn [{\n  json: {\n    runId: body.runId,\n    workspaceId: body.workspaceId,\n    userId: body.userId,\n    automationType: body.automationType,\n    promptTemplateId: body.promptTemplateId,\n    inputFile: body.inputFile,\n    sampleFiles: body.sampleFiles || [],\n    options: body.options || {\n      language: 'en',\n      outputFormat: 'docx',\n      comparisonMode: true,\n      strictTemplateMatch: false\n    },\n    validatedAt: new Date().toISOString()\n  }\n}];"
+      }
+    },
+    {
+      "id": "wf01-n3",
+      "name": "Create Run in Supabase",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [680, 300],
+      "parameters": {
+        "operation": "create",
+        "tableId": "automation_runs",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "id", "fieldValue": "={{ $json.runId }}" },
+            { "fieldId": "workspace_id", "fieldValue": "={{ $json.workspaceId }}" },
+            { "fieldId": "user_id", "fieldValue": "={{ $json.userId }}" },
+            { "fieldId": "automation_type", "fieldValue": "={{ $json.automationType }}" },
+            { "fieldId": "prompt_template_id", "fieldValue": "={{ $json.promptTemplateId }}" },
+            { "fieldId": "status", "fieldValue": "queued" },
+            { "fieldId": "options_json", "fieldValue": "={{ JSON.stringify($json.options) }}" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wf01-n4",
+      "name": "Register Input Files",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [900, 300],
+      "parameters": {
+        "operation": "create",
+        "tableId": "automation_run_files",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "run_id", "fieldValue": "={{ $('Validate Payload').first().json.runId }}" },
+            { "fieldId": "file_role", "fieldValue": "input" },
+            { "fieldId": "file_name", "fieldValue": "={{ $('Validate Payload').first().json.inputFile.name }}" },
+            { "fieldId": "mime_type", "fieldValue": "={{ $('Validate Payload').first().json.inputFile.mimeType }}" },
+            { "fieldId": "storage_url", "fieldValue": "={{ $('Validate Payload').first().json.inputFile.url }}" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wf01-n5",
+      "name": "Log Queued Event",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1120, 300],
+      "parameters": {
+        "operation": "create",
+        "tableId": "automation_run_events",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "run_id", "fieldValue": "={{ $('Validate Payload').first().json.runId }}" },
+            { "fieldId": "event_type", "fieldValue": "status_change" },
+            { "fieldId": "stage_name", "fieldValue": "intake" },
+            { "fieldId": "payload_json", "fieldValue": "={{ JSON.stringify({ status: 'queued', workflow: 'WF01_BRD_Intake_Run_Init' }) }}" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wf01-n6",
+      "name": "Build Manifest",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [1340, 300],
+      "parameters": {
+        "mode": "manual",
+        "fields": {
+          "values": [
+            { "name": "runId", "value": "={{ $('Validate Payload').first().json.runId }}" },
+            { "name": "workspaceId", "value": "={{ $('Validate Payload').first().json.workspaceId }}" },
+            { "name": "userId", "value": "={{ $('Validate Payload').first().json.userId }}" },
+            { "name": "promptTemplateId", "value": "={{ $('Validate Payload').first().json.promptTemplateId }}" },
+            { "name": "inputFile", "value": "={{ $('Validate Payload').first().json.inputFile }}" },
+            { "name": "sampleFiles", "value": "={{ $('Validate Payload').first().json.sampleFiles }}" },
+            { "name": "options", "value": "={{ $('Validate Payload').first().json.options }}" },
+            { "name": "nextWorkflow", "value": "WF02_BRD_Parse_Normalize" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wf01-n7",
+      "name": "Dispatch WF02",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1560, 300],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "WF02_BRD_Parse_Normalize",
+          "mode": "name"
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      }
+    },
+    {
+      "id": "wf01-n8",
+      "name": "Respond to Client",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1780, 300],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ runId: $('Validate Payload').first().json.runId, status: 'queued', nextWorkflow: 'WF02_BRD_Parse_Normalize', message: 'BRD run initialized successfully' }) }}"
+      }
+    },
+    {
+      "id": "wf01-err",
+      "name": "Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [460, 500],
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 400,
+        "responseBody": "={{ JSON.stringify({ error: $input.first().json.message || 'Validation failed' }) }}"
+      }
+    }
+  ],
+  "connections": {
+    "BRD Run Webhook": {
+      "main": [[{ "node": "Validate Payload", "type": "main", "index": 0 }]]
+    },
+    "Validate Payload": {
+      "main": [[{ "node": "Create Run in Supabase", "type": "main", "index": 0 }]]
+    },
+    "Create Run in Supabase": {
+      "main": [[{ "node": "Register Input Files", "type": "main", "index": 0 }]]
+    },
+    "Register Input Files": {
+      "main": [[{ "node": "Log Queued Event", "type": "main", "index": 0 }]]
+    },
+    "Log Queued Event": {
+      "main": [[{ "node": "Build Manifest", "type": "main", "index": 0 }]]
+    },
+    "Build Manifest": {
+      "main": [[{ "node": "Dispatch WF02", "type": "main", "index": 0 }]]
+    },
+    "Dispatch WF02": {
+      "main": [[{ "node": "Respond to Client", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "SUB_Callback_Status"
+  },
+  "meta": {
+    "description": "Receives BRD upload event from Consultant OS, validates payload, creates run record in Supabase, and dispatches WF02.",
+    "tags": ["brd", "intake", "phase-1"]
+  }
+}

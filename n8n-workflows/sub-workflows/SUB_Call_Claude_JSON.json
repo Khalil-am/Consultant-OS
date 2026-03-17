@@ -1,0 +1,76 @@
+{
+  "name": "SUB_Call_Claude_JSON",
+  "nodes": [
+    {
+      "id": "sub-claude-n1",
+      "name": "SUB Claude Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {}
+    },
+    {
+      "id": "sub-claude-n2",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nif (!item.prompt) throw new Error('[SUB_Call_Claude_JSON] Missing required field: prompt');\nif (!item.runId) throw new Error('[SUB_Call_Claude_JSON] Missing required field: runId');\n\nreturn [{\n  json: {\n    runId: item.runId,\n    prompt: item.prompt,\n    systemPrompt: item.systemPrompt || 'You are a senior consulting business analyst. Return only valid JSON.',\n    model: item.model || 'claude-sonnet-4-6',\n    temperature: item.temperature ?? 0.2,\n    maxTokens: item.maxTokens || 2000,\n    stageName: item.stageName || 'llm_call'\n  }\n}];"
+      }
+    },
+    {
+      "id": "sub-claude-n3",
+      "name": "Call Claude",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.2,
+      "position": [680, 300],
+      "parameters": {
+        "model": "={{ $json.model }}",
+        "messages": {
+          "messageValues": [
+            {
+              "type": "SystemMessagePromptTemplate",
+              "message": "={{ $json.systemPrompt }}"
+            },
+            {
+              "type": "HumanMessagePromptTemplate",
+              "message": "={{ $json.prompt }}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": "={{ $json.temperature }}",
+          "maxTokens": "={{ $json.maxTokens }}"
+        }
+      }
+    },
+    {
+      "id": "sub-claude-n4",
+      "name": "Parse & Return JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300],
+      "parameters": {
+        "jsCode": "const runId = $('Validate Input').first().json.runId;\nconst stageName = $('Validate Input').first().json.stageName;\nconst rawText = $input.first().json.text || $input.first().json.content || '';\n\nlet parsed = null;\nlet parseError = null;\n\ntry {\n  const clean = rawText.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  parsed = JSON.parse(clean);\n} catch(e) {\n  parseError = e.message;\n  console.warn(`[SUB_Call_Claude_JSON][${runId}][${stageName}] JSON parse failed: ${e.message}`);\n}\n\nreturn [{\n  json: {\n    runId,\n    stageName,\n    parsed,\n    rawText,\n    parseError,\n    success: parsed !== null\n  }\n}];"
+      }
+    }
+  ],
+  "connections": {
+    "SUB Claude Trigger": {
+      "main": [[{ "node": "Validate Input", "type": "main", "index": 0 }]]
+    },
+    "Validate Input": {
+      "main": [[{ "node": "Call Claude", "type": "main", "index": 0 }]]
+    },
+    "Call Claude": {
+      "main": [[{ "node": "Parse & Return JSON", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": { "executionOrder": "v1" },
+  "meta": {
+    "description": "Reusable sub-workflow. Accepts { runId, prompt, systemPrompt?, model?, temperature?, maxTokens?, stageName? }. Calls Claude and returns { parsed, rawText, parseError, success }.",
+    "tags": ["sub-workflow", "claude", "llm", "reusable"]
+  }
+}

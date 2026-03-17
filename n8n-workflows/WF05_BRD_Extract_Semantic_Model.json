@@ -1,0 +1,145 @@
+{
+  "name": "WF05_BRD_Extract_Semantic_Model",
+  "nodes": [
+    {
+      "id": "wf05-n1",
+      "name": "WF05 Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {}
+    },
+    {
+      "id": "wf05-n2",
+      "name": "Update Status Extracting",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [460, 300],
+      "parameters": {
+        "operation": "update",
+        "tableId": "automation_runs",
+        "filterType": "string",
+        "filterString": "id=eq.{{ $json.runId }}",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "status", "fieldValue": "extracting_requirements" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wf05-n3",
+      "name": "Prepare Extraction Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "parameters": {
+        "jsCode": "const runId = $input.first().json.runId;\nconst source = $input.first().json.source || {};\nconst blueprint = $input.first().json.blueprint || {};\n\n// Truncate source text to ~6000 chars for extraction (use first + last portions)\nconst fullText = source.plainText || '';\nconst maxChars = 6000;\nlet sourceExcerpt;\nif (fullText.length <= maxChars) {\n  sourceExcerpt = fullText;\n} else {\n  sourceExcerpt = fullText.substring(0, 4000) + '\\n\\n[...middle truncated...]\\n\\n' + fullText.substring(fullText.length - 2000);\n}\n\nconsole.log(`[WF05][${runId}] Preparing extraction prompt. Source length: ${fullText.length} chars, excerpt: ${sourceExcerpt.length} chars`);\n\nconst sectionListFromBlueprint = (blueprint.canonicalSections || []).join(', ');\n\nreturn [{\n  json: {\n    runId,\n    source: $input.first().json.source,\n    samples: $input.first().json.samples,\n    options: $input.first().json.options,\n    quality: $input.first().json.quality,\n    blueprint,\n    extractionPrompt: `You are a senior consulting business analyst and enterprise documentation specialist.\n\nYour task is to extract a structured semantic model from the provided source BRD document.\nReturn ONLY valid JSON. No prose, no markdown fences.\n\nExtract ALL of the following in structured JSON:\n1. projectName — string\n2. businessContext — string (2-3 sentences)\n3. businessProblem — string (clear problem statement)\n4. objectives — array of strings\n5. stakeholders — array of { name, role, interest }\n6. scopeIn — array of strings (what is included)\n7. scopeOut — array of strings (what is excluded)\n8. functionalRequirements — array of { id, title, description, priority (Must/Should/Nice) }\n9. nonFunctionalRequirements — array of { id, category, description, priority }\n10. reportingRequirements — array of strings\n11. integrationRequirements — array of { system, type, description }\n12. dataRequirements — array of strings\n13. constraints — array of strings\n14. assumptions — array of strings\n15. dependencies — array of strings\n16. risks — array of { title, probability (H/M/L), impact (H/M/L), mitigation }\n17. approvals — array of { role, responsibility }\n18. openQuestions — array of strings\n\nRules:\n- Do NOT invent facts. If a field has no data, use an empty array or null.\n- Preserve exact terminology from the source.\n- Consolidate duplicates.\n- If an item is implied but not explicit, include it and prefix with \"[Assumed]\"\n\nSOURCE BRD DOCUMENT:\n${sourceExcerpt}\n\nExpected section structure from sample blueprint:\n${sectionListFromBlueprint || 'Standard BRD sections'}\n\nReturn valid JSON only:`\n  }\n}];"
+      }
+    },
+    {
+      "id": "wf05-n4",
+      "name": "Claude Semantic Extraction",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.2,
+      "position": [900, 300],
+      "parameters": {
+        "model": "claude-opus-4-6",
+        "messages": {
+          "messageValues": [
+            {
+              "type": "SystemMessagePromptTemplate",
+              "message": "You are a senior consulting business analyst and enterprise documentation specialist. Your task is to generate high-quality Business Requirements Documents from uploaded source BRDs. Always preserve factual alignment with the source material. Never hallucinate project facts. Return structured outputs exactly in the requested JSON schema."
+            },
+            {
+              "type": "HumanMessagePromptTemplate",
+              "message": "={{ $json.extractionPrompt }}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.1,
+          "maxTokens": 4000
+        }
+      }
+    },
+    {
+      "id": "wf05-n5",
+      "name": "Parse Semantic Model JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 300],
+      "parameters": {
+        "jsCode": "const runId = $('Prepare Extraction Prompt').first().json.runId;\nconst rawResponse = $input.first().json.text || $input.first().json.content || '';\n\nconsole.log(`[WF05][${runId}] Parsing semantic model response (${rawResponse.length} chars)...`);\n\nlet brdModel;\ntry {\n  const clean = rawResponse.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  brdModel = JSON.parse(clean);\n} catch (e) {\n  console.error(`[WF05][${runId}] JSON parse failed: ${e.message}`);\n  // Return partial model with error flag\n  brdModel = {\n    _parseError: true,\n    _rawResponse: rawResponse.substring(0, 500),\n    projectName: 'Unknown',\n    businessContext: '',\n    businessProblem: '',\n    objectives: [],\n    stakeholders: [],\n    scopeIn: [],\n    scopeOut: [],\n    functionalRequirements: [],\n    nonFunctionalRequirements: [],\n    reportingRequirements: [],\n    integrationRequirements: [],\n    dataRequirements: [],\n    constraints: [],\n    assumptions: [],\n    dependencies: [],\n    risks: [],\n    approvals: [],\n    openQuestions: [`[AUTO] Extraction failed: ${e.message} - Manual review required`]\n  };\n}\n\nconsole.log(`[WF05][${runId}] Model extracted. FRs: ${(brdModel.functionalRequirements||[]).length}, NFRs: ${(brdModel.nonFunctionalRequirements||[]).length}, Risks: ${(brdModel.risks||[]).length}`);\n\nreturn [{\n  json: {\n    runId,\n    source: $('Prepare Extraction Prompt').first().json.source,\n    samples: $('Prepare Extraction Prompt').first().json.samples,\n    options: $('Prepare Extraction Prompt').first().json.options,\n    quality: $('Prepare Extraction Prompt').first().json.quality,\n    blueprint: $('Prepare Extraction Prompt').first().json.blueprint,\n    brdModel\n  }\n}];"
+      }
+    },
+    {
+      "id": "wf05-n6",
+      "name": "Store BRD Model",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1340, 300],
+      "parameters": {
+        "operation": "create",
+        "tableId": "automation_run_events",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "run_id", "fieldValue": "={{ $json.runId }}" },
+            { "fieldId": "event_type", "fieldValue": "brd_model_extracted" },
+            { "fieldId": "stage_name", "fieldValue": "semantic_extraction" },
+            { "fieldId": "payload_json", "fieldValue": "={{ JSON.stringify({ brdModel: $json.brdModel, frCount: ($json.brdModel.functionalRequirements||[]).length, nfrCount: ($json.brdModel.nonFunctionalRequirements||[]).length }) }}" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wf05-n7",
+      "name": "Dispatch WF06",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1560, 300],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "WF06_BRD_Gap_Analysis",
+          "mode": "name"
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      }
+    }
+  ],
+  "connections": {
+    "WF05 Trigger": {
+      "main": [[{ "node": "Update Status Extracting", "type": "main", "index": 0 }]]
+    },
+    "Update Status Extracting": {
+      "main": [[{ "node": "Prepare Extraction Prompt", "type": "main", "index": 0 }]]
+    },
+    "Prepare Extraction Prompt": {
+      "main": [[{ "node": "Claude Semantic Extraction", "type": "main", "index": 0 }]]
+    },
+    "Claude Semantic Extraction": {
+      "main": [[{ "node": "Parse Semantic Model JSON", "type": "main", "index": 0 }]]
+    },
+    "Parse Semantic Model JSON": {
+      "main": [[{ "node": "Store BRD Model", "type": "main", "index": 0 }]]
+    },
+    "Store BRD Model": {
+      "main": [[{ "node": "Dispatch WF06", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "SUB_Callback_Status"
+  },
+  "meta": {
+    "description": "Uses Claude to extract a structured semantic BRD model (FRs, NFRs, stakeholders, risks, etc.) from the normalized source text. Returns JSON-only output for downstream generation.",
+    "tags": ["brd", "extraction", "claude", "phase-2"]
+  }
+}

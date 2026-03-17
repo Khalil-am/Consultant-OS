@@ -1,0 +1,79 @@
+{
+  "name": "SUB_Validate_JSON_Schema",
+  "nodes": [
+    {
+      "id": "sub-val-n1",
+      "name": "SUB Validate Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {}
+    },
+    {
+      "id": "sub-val-n2",
+      "name": "Validate Schema",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst { runId, data, schema, stageName } = item;\n\nif (!data) return [{ json: { runId, valid: false, errors: ['No data provided'], stageName } }];\nif (!schema) return [{ json: { runId, valid: true, errors: [], stageName, data } }];\n\nconst errors = [];\n\n// Simple required field validation\nconst checkRequired = (obj, fields, prefix = '') => {\n  fields.forEach(field => {\n    if (obj[field] === undefined || obj[field] === null) {\n      errors.push(`Missing required field: ${prefix}${field}`);\n    }\n  });\n};\n\n// Check top-level required fields\nif (schema.required) {\n  checkRequired(data, schema.required);\n}\n\n// Check array fields are actually arrays\nif (schema.arrays) {\n  schema.arrays.forEach(field => {\n    if (data[field] !== undefined && !Array.isArray(data[field])) {\n      errors.push(`Field '${field}' must be an array`);\n    }\n  });\n}\n\n// Check string fields\nif (schema.strings) {\n  schema.strings.forEach(field => {\n    if (data[field] !== undefined && typeof data[field] !== 'string') {\n      errors.push(`Field '${field}' must be a string`);\n    }\n  });\n}\n\nconsole.log(`[SUB_Validate_JSON_Schema][${runId}][${stageName}] Validation: ${errors.length === 0 ? 'PASS' : 'FAIL'} (${errors.length} errors)`);\n\nreturn [{\n  json: {\n    runId,\n    stageName,\n    valid: errors.length === 0,\n    errors,\n    data: errors.length === 0 ? data : null\n  }\n}];"
+      }
+    },
+    {
+      "id": "sub-val-n3",
+      "name": "Validation Gate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "sub-val-n4",
+      "name": "Pass Valid Data",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [900, 200],
+      "parameters": {}
+    },
+    {
+      "id": "sub-val-n5",
+      "name": "Throw Validation Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 420],
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nthrow new Error(`Schema validation failed at stage '${item.stageName}': ${item.errors.join('; ')}`);"
+      }
+    }
+  ],
+  "connections": {
+    "SUB Validate Trigger": {
+      "main": [[{ "node": "Validate Schema", "type": "main", "index": 0 }]]
+    },
+    "Validate Schema": {
+      "main": [[{ "node": "Validation Gate", "type": "main", "index": 0 }]]
+    },
+    "Validation Gate": {
+      "main": [
+        [{ "node": "Pass Valid Data", "type": "main", "index": 0 }],
+        [{ "node": "Throw Validation Error", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": true,
+  "settings": { "executionOrder": "v1" },
+  "meta": {
+    "description": "Reusable sub-workflow. Validates a JSON object against a simple schema definition { required, arrays, strings }. Returns valid data or throws on failure.",
+    "tags": ["sub-workflow", "validation", "schema", "reusable"]
+  }
+}

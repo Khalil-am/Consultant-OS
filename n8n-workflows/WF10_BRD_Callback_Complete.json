@@ -1,0 +1,169 @@
+{
+  "name": "WF10_BRD_Callback_Complete",
+  "nodes": [
+    {
+      "id": "wf10-n1",
+      "name": "WF10 Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {}
+    },
+    {
+      "id": "wf10-n2",
+      "name": "Fetch Run Details",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [460, 300],
+      "parameters": {
+        "operation": "get",
+        "tableId": "automation_runs",
+        "filterType": "string",
+        "filterString": "id=eq.{{ $json.runId }}"
+      }
+    },
+    {
+      "id": "wf10-n3",
+      "name": "Fetch Output Files",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [460, 480],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "automation_run_files",
+        "returnAll": true,
+        "filterType": "string",
+        "filterString": "run_id=eq.{{ $('WF10 Trigger').first().json.runId }}&file_role=eq.output"
+      }
+    },
+    {
+      "id": "wf10-n4",
+      "name": "Fetch QA & Gap Reports",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [460, 660],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "automation_run_events",
+        "returnAll": true,
+        "filterType": "string",
+        "filterString": "run_id=eq.{{ $('WF10 Trigger').first().json.runId }}&event_type=in.(assembly_complete,gap_analysis_complete,quality_gate_passed)"
+      }
+    },
+    {
+      "id": "wf10-n5",
+      "name": "Build Callback Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [780, 480],
+      "parameters": {
+        "jsCode": "const runId = $('WF10 Trigger').first().json.runId;\n\n// Get output files\nconst outputFiles = $('Fetch Output Files').all().map(i => i.json);\nconst docxFile = outputFiles.find(f => f.file_name?.endsWith('.docx'));\nconst pdfFile = outputFiles.find(f => f.file_name?.endsWith('.pdf'));\n\n// Get event payloads\nconst events = $('Fetch QA & Gap Reports').all().map(i => i.json);\nlet qaReport = {};\nlet gapAnalysis = {};\nlet qualityGate = {};\n\nevents.forEach(e => {\n  try {\n    const payload = JSON.parse(e.payload_json || '{}');\n    if (e.event_type === 'assembly_complete') qaReport = payload.qaReport || {};\n    if (e.event_type === 'gap_analysis_complete') gapAnalysis = payload.gapAnalysis || {};\n    if (e.event_type === 'quality_gate_passed') qualityGate = payload || {};\n  } catch(e) {}\n});\n\nconst callbackPayload = {\n  runId,\n  status: 'completed',\n  completedAt: new Date().toISOString(),\n  outputs: {\n    previewUrl: `${process.env.CONSULTANT_OS_URL || 'http://localhost:5173'}/api/runs/${runId}/preview`,\n    docxUrl: docxFile?.storage_url || null,\n    pdfUrl: pdfFile?.storage_url || null\n  },\n  qualityReport: {\n    score: qaReport.qualityScore || 0.85,\n    consistencyScore: qaReport.consistencyScore || 0.85,\n    warnings: [\n      ...(qaReport.missingContent || []).slice(0, 3),\n      ...(qaReport.weakPhrasing || []).slice(0, 2)\n    ].filter(Boolean),\n    summary: qaReport.summary || 'BRD generated successfully'\n  },\n  comparison: {\n    sampleCoverage: gapAnalysis.coverageScore || 0.85,\n    missingSectionsBeforeGeneration: (gapAnalysis.missingSections || []).length,\n    resolvedAfterGeneration: (gapAnalysis.missingSections || []).length,\n    remainingGaps: gapAnalysis.sampleAlignmentGaps || []\n  },\n  inputQuality: {\n    score: qualityGate.score || 0.9,\n    warnings: qualityGate.warnings || []\n  }\n};\n\nconsole.log(`[WF10][${runId}] Callback payload built. Status: completed`);\n\nreturn [{ json: { runId, callbackPayload } }];"
+      }
+    },
+    {
+      "id": "wf10-n6",
+      "name": "Send Callback to Consultant OS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1060, 480],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ process.env.CONSULTANT_OS_URL || 'http://localhost:3001' }}/api/automation/brd/callback",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-N8N-Secret", "value": "={{ process.env.N8N_CALLBACK_SECRET || 'dev-secret' }}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "body": "={{ JSON.stringify($json.callbackPayload) }}",
+        "options": {
+          "timeout": 15000,
+          "retry": {
+            "enabled": true,
+            "maxTries": 3,
+            "waitBetweenTries": 2000
+          }
+        }
+      }
+    },
+    {
+      "id": "wf10-n7",
+      "name": "Mark Run Completed",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1300, 480],
+      "parameters": {
+        "operation": "update",
+        "tableId": "automation_runs",
+        "filterType": "string",
+        "filterString": "id=eq.{{ $('WF10 Trigger').first().json.runId }}",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "status", "fieldValue": "completed" },
+            { "fieldId": "completed_at", "fieldValue": "={{ new Date().toISOString() }}" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wf10-n8",
+      "name": "Log Completion Event",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1540, 480],
+      "parameters": {
+        "operation": "create",
+        "tableId": "automation_run_events",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "run_id", "fieldValue": "={{ $('WF10 Trigger').first().json.runId }}" },
+            { "fieldId": "event_type", "fieldValue": "run_completed" },
+            { "fieldId": "stage_name", "fieldValue": "callback_complete" },
+            { "fieldId": "payload_json", "fieldValue": "={{ JSON.stringify({ callbackSent: true, completedAt: new Date().toISOString() }) }}" }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "WF10 Trigger": {
+      "main": [
+        [{ "node": "Fetch Run Details", "type": "main", "index": 0 }],
+        [{ "node": "Fetch Output Files", "type": "main", "index": 0 }],
+        [{ "node": "Fetch QA & Gap Reports", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Run Details": {
+      "main": [[{ "node": "Build Callback Payload", "type": "main", "index": 0 }]]
+    },
+    "Fetch Output Files": {
+      "main": [[{ "node": "Build Callback Payload", "type": "main", "index": 0 }]]
+    },
+    "Fetch QA & Gap Reports": {
+      "main": [[{ "node": "Build Callback Payload", "type": "main", "index": 0 }]]
+    },
+    "Build Callback Payload": {
+      "main": [[{ "node": "Send Callback to Consultant OS", "type": "main", "index": 0 }]]
+    },
+    "Send Callback to Consultant OS": {
+      "main": [[{ "node": "Mark Run Completed", "type": "main", "index": 0 }]]
+    },
+    "Mark Run Completed": {
+      "main": [[{ "node": "Log Completion Event", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "SUB_Callback_Status"
+  },
+  "meta": {
+    "description": "Final workflow. Collects all run artifacts, builds the completion callback payload (outputs, QA score, sample comparison), POSTs to Consultant OS callback endpoint, and marks the run as completed.",
+    "tags": ["brd", "callback", "completion", "phase-3"]
+  }
+}

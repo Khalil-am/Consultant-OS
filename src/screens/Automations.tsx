@@ -102,7 +102,7 @@ export default function Automations() {
             key={auto.id}
             className="section-card"
             style={{ cursor: 'pointer', overflow: 'hidden' }}
-            onClick={() => navigate(`/automations/${auto.id}`)}
+            onClick={() => auto.id === 'auto-001' ? navigate('/automations/brd/run') : navigate(`/automations/${auto.id}`)}
             onMouseEnter={e => {
               (e.currentTarget as HTMLElement).style.borderColor = `${auto.categoryColor}30`;
               (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)';
@@ -189,7 +189,11 @@ export default function Automations() {
                 <button
                   className="btn-primary"
                   style={{ flex: 1, height: '32px', fontSize: '0.78rem', justifyContent: 'center' }}
-                  onClick={(e) => { e.stopPropagation(); navigate(`/automations/${auto.id}`); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (auto.id === 'auto-001') navigate('/automations/brd/run');
+                    else navigate(`/automations/${auto.id}`);
+                  }}
                 >
                   <Play size={12} /> Run Now
                 </button>

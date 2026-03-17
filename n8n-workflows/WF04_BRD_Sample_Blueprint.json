@@ -1,0 +1,196 @@
+{
+  "name": "WF04_BRD_Sample_Blueprint",
+  "nodes": [
+    {
+      "id": "wf04-n1",
+      "name": "WF04 Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {}
+    },
+    {
+      "id": "wf04-n2",
+      "name": "Update Status Analyzing Sample",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [460, 300],
+      "parameters": {
+        "operation": "update",
+        "tableId": "automation_runs",
+        "filterType": "string",
+        "filterString": "id=eq.{{ $json.runId }}",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "status", "fieldValue": "analyzing_sample" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wf04-n3",
+      "name": "Check Sample Availability",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "id": "has-samples",
+              "leftValue": "={{ $json.samples?.length || 0 }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "wf04-n4",
+      "name": "Prepare Blueprint Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 200],
+      "parameters": {
+        "jsCode": "const runId = $input.first().json.runId;\nconst samples = $input.first().json.samples || [];\n\n// Combine sample texts (truncate each to 4000 chars to stay within context limits)\nconst combinedSampleText = samples\n  .map((s, i) => `--- SAMPLE DOCUMENT ${i + 1}: ${s.sampleId} ---\\n${(s.plainText || '').substring(0, 4000)}`)\n  .join('\\n\\n');\n\nconsole.log(`[WF04][${runId}] Preparing blueprint prompt. Samples: ${samples.length}, Total chars: ${combinedSampleText.length}`);\n\nreturn [{\n  json: {\n    runId,\n    source: $input.first().json.source,\n    samples: $input.first().json.samples,\n    options: $input.first().json.options,\n    quality: $input.first().json.quality,\n    blueprintPrompt: `You are a senior enterprise document analyst.\n\nAnalyze the following sample Business Requirements Document(s) and return a structured blueprint in JSON format.\n\nExtract:\n1. canonicalSections — the ordered list of section names as they appear\n2. tone — the writing tone (formal_consulting, technical, executive, etc.)\n3. verbosity — section length style (brief, medium, detailed)\n4. tableUsage — true/false\n5. bulletsPreferred — true/false\n6. subsectionPatterns — any notable subsection patterns per main section\n7. terminologyStyle — domain-specific vocabulary observed\n8. documentType — BRD, FRD, SRS, etc.\n\nIMPORTANT: Return only valid JSON. Do not include markdown fences or prose.\n\nSAMPLE DOCUMENTS:\n${combinedSampleText}\n\nReturn format:\n{\n  \"documentType\": \"string\",\n  \"canonicalSections\": [\"string\"],\n  \"styleRules\": {\n    \"tone\": \"string\",\n    \"verbosity\": \"string\",\n    \"tableUsage\": boolean,\n    \"bulletsPreferred\": boolean\n  },\n  \"subsectionPatterns\": { \"SectionName\": [\"subsection1\", \"subsection2\"] },\n  \"terminologyStyle\": [\"string\"]\n}`\n  }\n}];"
+      }
+    },
+    {
+      "id": "wf04-n5",
+      "name": "Claude Blueprint Analysis",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.2,
+      "position": [1120, 200],
+      "parameters": {
+        "model": "claude-opus-4-6",
+        "messages": {
+          "messageValues": [
+            {
+              "type": "HumanMessagePromptTemplate",
+              "message": "={{ $json.blueprintPrompt }}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.2,
+          "maxTokens": 2000
+        }
+      }
+    },
+    {
+      "id": "wf04-n6",
+      "name": "Parse Blueprint JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 200],
+      "parameters": {
+        "jsCode": "const runId = $('Prepare Blueprint Prompt').first().json.runId;\nconst rawResponse = $input.first().json.text || $input.first().json.content || '';\n\nconsole.log(`[WF04][${runId}] Parsing blueprint response...`);\n\nlet blueprint;\ntry {\n  // Strip markdown fences if present\n  const clean = rawResponse.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  blueprint = JSON.parse(clean);\n} catch (e) {\n  console.warn(`[WF04][${runId}] Blueprint JSON parse failed, using default blueprint`);\n  blueprint = {\n    documentType: 'BRD',\n    canonicalSections: [\n      'Executive Summary', 'Business Need', 'Scope', 'Stakeholders',\n      'Functional Requirements', 'Non-Functional Requirements',\n      'Integrations', 'Assumptions', 'Risks', 'Dependencies',\n      'Acceptance Criteria', 'Appendices'\n    ],\n    styleRules: {\n      tone: 'formal_consulting',\n      verbosity: 'medium',\n      tableUsage: true,\n      bulletsPreferred: true\n    },\n    subsectionPatterns: {},\n    terminologyStyle: []\n  };\n}\n\nreturn [{\n  json: {\n    runId,\n    source: $('Prepare Blueprint Prompt').first().json.source,\n    samples: $('Prepare Blueprint Prompt').first().json.samples,\n    options: $('Prepare Blueprint Prompt').first().json.options,\n    quality: $('Prepare Blueprint Prompt').first().json.quality,\n    blueprint\n  }\n}];"
+      }
+    },
+    {
+      "id": "wf04-n7",
+      "name": "Default Blueprint (No Samples)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [900, 420],
+      "parameters": {
+        "mode": "manual",
+        "fields": {
+          "values": [
+            { "name": "runId", "value": "={{ $json.runId }}" },
+            { "name": "source", "value": "={{ $json.source }}" },
+            { "name": "samples", "value": "={{ $json.samples }}" },
+            { "name": "options", "value": "={{ $json.options }}" },
+            { "name": "quality", "value": "={{ $json.quality }}" },
+            {
+              "name": "blueprint",
+              "value": "={{ { documentType: 'BRD', canonicalSections: ['Executive Summary','Business Need','Scope','Stakeholders','Functional Requirements','Non-Functional Requirements','Integrations','Assumptions','Risks','Dependencies','Acceptance Criteria'], styleRules: { tone: 'formal_consulting', verbosity: 'medium', tableUsage: true, bulletsPreferred: true }, subsectionPatterns: {}, terminologyStyle: [] } }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wf04-n8",
+      "name": "Store Blueprint Event",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1560, 300],
+      "parameters": {
+        "operation": "create",
+        "tableId": "automation_run_events",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "run_id", "fieldValue": "={{ $json.runId }}" },
+            { "fieldId": "event_type", "fieldValue": "blueprint_generated" },
+            { "fieldId": "stage_name", "fieldValue": "sample_blueprint" },
+            { "fieldId": "payload_json", "fieldValue": "={{ JSON.stringify({ blueprint: $json.blueprint }) }}" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wf04-n9",
+      "name": "Dispatch WF05",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1780, 300],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "WF05_BRD_Extract_Semantic_Model",
+          "mode": "name"
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      }
+    }
+  ],
+  "connections": {
+    "WF04 Trigger": {
+      "main": [[{ "node": "Update Status Analyzing Sample", "type": "main", "index": 0 }]]
+    },
+    "Update Status Analyzing Sample": {
+      "main": [[{ "node": "Check Sample Availability", "type": "main", "index": 0 }]]
+    },
+    "Check Sample Availability": {
+      "main": [
+        [{ "node": "Prepare Blueprint Prompt", "type": "main", "index": 0 }],
+        [{ "node": "Default Blueprint (No Samples)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Prepare Blueprint Prompt": {
+      "main": [[{ "node": "Claude Blueprint Analysis", "type": "main", "index": 0 }]]
+    },
+    "Claude Blueprint Analysis": {
+      "main": [[{ "node": "Parse Blueprint JSON", "type": "main", "index": 0 }]]
+    },
+    "Parse Blueprint JSON": {
+      "main": [[{ "node": "Store Blueprint Event", "type": "main", "index": 0 }]]
+    },
+    "Default Blueprint (No Samples)": {
+      "main": [[{ "node": "Store Blueprint Event", "type": "main", "index": 0 }]]
+    },
+    "Store Blueprint Event": {
+      "main": [[{ "node": "Dispatch WF05", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "SUB_Callback_Status"
+  },
+  "meta": {
+    "description": "Uses Claude to analyze sample documents and extract a canonical section blueprint (structure, tone, style, section order). Falls back to default BRD blueprint if no samples.",
+    "tags": ["brd", "sample-blueprint", "claude", "phase-2"]
+  }
+}

@@ -1,0 +1,139 @@
+{
+  "name": "SUB_Parse_Document_By_Type",
+  "nodes": [
+    {
+      "id": "sub-parse-n1",
+      "name": "SUB Parse Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {}
+    },
+    {
+      "id": "sub-parse-n2",
+      "name": "Route by File Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [460, 300],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {},
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.fileType }}",
+                    "rightValue": "pdf",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "pdf"
+            },
+            {
+              "conditions": {
+                "options": {},
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.fileType }}",
+                    "rightValue": "docx",
+                    "operator": { "type": "string", "operation": "contains" }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "docx"
+            },
+            {
+              "conditions": {
+                "options": {},
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.fileType }}",
+                    "rightValue": "txt",
+                    "operator": { "type": "string", "operation": "contains" }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "text"
+            }
+          ]
+        },
+        "fallbackOutput": "extra"
+      }
+    },
+    {
+      "id": "sub-parse-n3",
+      "name": "Parse PDF",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 160],
+      "parameters": {
+        "jsCode": "// In production: use a PDF parsing service (AWS Textract, Azure Form Recognizer, or pdf2text)\n// This stub simulates the output contract\nconst item = $input.first().json;\nconsole.log(`[SUB_PARSE] PDF parsing: ${item.fileName}`);\n\n// Production implementation would:\n// 1. Download PDF from item.fileUrl\n// 2. Call OCR/extraction service\n// 3. Return structured text + sections\n\nreturn [{\n  json: {\n    fileId: item.sampleId || item.fileId,\n    fileName: item.fileName,\n    fileType: 'pdf',\n    plainText: `[PDF content extracted from ${item.fileName}]\\n\\nIn production, this contains the full extracted text from the PDF document.`,\n    sections: [\n      { id: 'sec_01', title: 'Introduction', level: 1, content: 'Extracted from PDF...' }\n    ],\n    metadata: {\n      pageCount: 1,\n      wordCount: 150,\n      hasTables: false,\n      extractionMethod: 'pdf_parser'\n    }\n  }\n}];"
+      }
+    },
+    {
+      "id": "sub-parse-n4",
+      "name": "Parse DOCX",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 320],
+      "parameters": {
+        "jsCode": "// In production: use mammoth.js or python-docx to extract DOCX\nconst item = $input.first().json;\nconsole.log(`[SUB_PARSE] DOCX parsing: ${item.fileName}`);\n\nreturn [{\n  json: {\n    fileId: item.sampleId || item.fileId,\n    fileName: item.fileName,\n    fileType: 'docx',\n    plainText: `[DOCX content extracted from ${item.fileName}]\\n\\nIn production, this contains the full extracted text from the Word document with heading structure preserved.`,\n    sections: [\n      { id: 'sec_01', title: 'Executive Summary', level: 1, content: 'Extracted from DOCX...' },\n      { id: 'sec_02', title: 'Business Requirements', level: 1, content: 'Extracted from DOCX...' }\n    ],\n    metadata: {\n      pageCount: 1,\n      wordCount: 200,\n      hasTables: true,\n      extractionMethod: 'docx_parser'\n    }\n  }\n}];"
+      }
+    },
+    {
+      "id": "sub-parse-n5",
+      "name": "Parse TXT/Markdown",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 480],
+      "parameters": {
+        "jsCode": "// Plain text / markdown - direct processing\nconst item = $input.first().json;\nconsole.log(`[SUB_PARSE] Text/Markdown parsing: ${item.fileName}`);\n\n// For text/markdown, content is already accessible\n// In production, download the file and parse heading structure\nconst text = item.textContent || `Content of ${item.fileName}`;\n\n// Extract sections from markdown headings\nconst sectionMatches = [];\nconst headingRegex = /^(#{1,3})\\s+(.+)$/gm;\nlet match;\nlet secId = 0;\nwhile ((match = headingRegex.exec(text)) !== null) {\n  sectionMatches.push({\n    id: `sec_${String(++secId).padStart(2,'0')}`,\n    title: match[2].trim(),\n    level: match[1].length,\n    content: ''\n  });\n}\n\nreturn [{\n  json: {\n    fileId: item.sampleId || item.fileId,\n    fileName: item.fileName,\n    fileType: item.fileType,\n    plainText: text,\n    sections: sectionMatches,\n    metadata: {\n      pageCount: Math.ceil(text.length / 3000),\n      wordCount: text.split(/\\s+/).filter(Boolean).length,\n      hasTables: text.includes('|'),\n      extractionMethod: 'text_parser'\n    }\n  }\n}];"
+      }
+    },
+    {
+      "id": "sub-parse-n6",
+      "name": "Normalize Output",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [960, 300],
+      "parameters": {
+        "mode": "passThrough",
+        "output": "input1"
+      }
+    }
+  ],
+  "connections": {
+    "SUB Parse Trigger": {
+      "main": [[{ "node": "Route by File Type", "type": "main", "index": 0 }]]
+    },
+    "Route by File Type": {
+      "pdf": [[{ "node": "Parse PDF", "type": "main", "index": 0 }]],
+      "docx": [[{ "node": "Parse DOCX", "type": "main", "index": 0 }]],
+      "text": [[{ "node": "Parse TXT/Markdown", "type": "main", "index": 0 }]],
+      "extra": [[{ "node": "Parse TXT/Markdown", "type": "main", "index": 0 }]]
+    },
+    "Parse PDF": {
+      "main": [[{ "node": "Normalize Output", "type": "main", "index": 0 }]]
+    },
+    "Parse DOCX": {
+      "main": [[{ "node": "Normalize Output", "type": "main", "index": 0 }]]
+    },
+    "Parse TXT/Markdown": {
+      "main": [[{ "node": "Normalize Output", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "Reusable sub-workflow. Routes document by file type (pdf/docx/txt/md) to the appropriate parser and returns a normalized output contract: { plainText, sections[], metadata }.",
+    "tags": ["sub-workflow", "parse", "reusable"]
+  }
+}

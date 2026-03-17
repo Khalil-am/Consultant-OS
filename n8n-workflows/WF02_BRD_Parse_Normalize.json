@@ -1,0 +1,192 @@
+{
+  "name": "WF02_BRD_Parse_Normalize",
+  "nodes": [
+    {
+      "id": "wf02-n1",
+      "name": "WF02 Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {}
+    },
+    {
+      "id": "wf02-n2",
+      "name": "Update Status Parsing",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [460, 300],
+      "parameters": {
+        "operation": "update",
+        "tableId": "automation_runs",
+        "filterType": "string",
+        "filterString": "id=eq.{{ $json.runId }}",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "status", "fieldValue": "parsing" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wf02-n3",
+      "name": "Download Source BRD",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [680, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('WF02 Trigger').first().json.inputFile.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "wf02-n4",
+      "name": "Detect File Type & Extract Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300],
+      "parameters": {
+        "jsCode": "// File type detection and text extraction routing\nconst runId = $('WF02 Trigger').first().json.runId;\nconst fileName = $('WF02 Trigger').first().json.inputFile.name || '';\nconst ext = fileName.split('.').pop()?.toLowerCase();\n\nconsole.log(`[WF02][${runId}] Processing file: ${fileName} (type: ${ext})`);\n\n// Supported types: pdf, docx, txt, md\nconst supportedTypes = ['pdf', 'docx', 'doc', 'txt', 'md', 'markdown'];\nif (!supportedTypes.includes(ext)) {\n  throw new Error(`Unsupported file type: .${ext}. Supported: ${supportedTypes.join(', ')}`);\n}\n\n// In production this calls SUB_Parse_Document_By_Type\n// For now, pass through with file type metadata\nreturn [{\n  json: {\n    runId,\n    fileName,\n    fileType: ext,\n    mimeType: $('WF02 Trigger').first().json.inputFile.mimeType,\n    fileUrl: $('WF02 Trigger').first().json.inputFile.url,\n    sampleFiles: $('WF02 Trigger').first().json.sampleFiles || [],\n    options: $('WF02 Trigger').first().json.options || {}\n  }\n}];"
+      }
+    },
+    {
+      "id": "wf02-n5",
+      "name": "Call Parse Sub-Workflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1120, 300],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "SUB_Parse_Document_By_Type",
+          "mode": "name"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "wf02-n6",
+      "name": "Parse Samples Loop",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 300],
+      "parameters": {
+        "jsCode": "// Build list of sample parse tasks\nconst samples = $('Detect File Type & Extract Text').first().json.sampleFiles || [];\nconst runId = $('Detect File Type & Extract Text').first().json.runId;\n\nif (samples.length === 0) {\n  console.log(`[WF02][${runId}] No samples to parse`);\n  return [{ json: { runId, parsedSamples: [] } }];\n}\n\n// Return items for each sample to be parsed\nreturn samples.map(s => ({\n  json: {\n    runId,\n    sampleId: s.fileId,\n    fileName: s.name,\n    fileUrl: s.url,\n    fileType: s.name.split('.').pop()?.toLowerCase() || 'pdf'\n  }\n}));"
+      }
+    },
+    {
+      "id": "wf02-n7",
+      "name": "Parse Each Sample",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1560, 300],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "SUB_Parse_Document_By_Type",
+          "mode": "name"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "wf02-n8",
+      "name": "Build Normalized Artifact",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1780, 300],
+      "parameters": {
+        "jsCode": "const runId = $('Detect File Type & Extract Text').first().json.runId;\nconst sourceResult = $('Call Parse Sub-Workflow').first().json;\nconst sampleResults = $items('Parse Each Sample').map(i => i.json);\n\nconst artifact = {\n  runId,\n  source: {\n    plainText: sourceResult.plainText || '',\n    sections: sourceResult.sections || [],\n    metadata: sourceResult.metadata || { pageCount: 0, wordCount: 0, hasTables: false }\n  },\n  samples: sampleResults.map(s => ({\n    sampleId: s.sampleId || s.fileId,\n    plainText: s.plainText || '',\n    sections: s.sections || []\n  })),\n  parsedAt: new Date().toISOString()\n};\n\nconsole.log(`[WF02][${runId}] Normalized artifact built. Source words: ${artifact.source.metadata.wordCount}, Samples: ${artifact.samples.length}`);\n\nreturn [{ json: artifact }];"
+      }
+    },
+    {
+      "id": "wf02-n9",
+      "name": "Store Normalized JSON",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [2000, 300],
+      "parameters": {
+        "operation": "create",
+        "tableId": "automation_run_events",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "run_id", "fieldValue": "={{ $json.runId }}" },
+            { "fieldId": "event_type", "fieldValue": "artifact_stored" },
+            { "fieldId": "stage_name", "fieldValue": "parse_normalize" },
+            { "fieldId": "payload_json", "fieldValue": "={{ JSON.stringify({ artifact: $json }) }}" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wf02-n10",
+      "name": "Dispatch WF03",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [2220, 300],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "WF03_BRD_Quality_Gate",
+          "mode": "name"
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      }
+    }
+  ],
+  "connections": {
+    "WF02 Trigger": {
+      "main": [[{ "node": "Update Status Parsing", "type": "main", "index": 0 }]]
+    },
+    "Update Status Parsing": {
+      "main": [[{ "node": "Download Source BRD", "type": "main", "index": 0 }]]
+    },
+    "Download Source BRD": {
+      "main": [[{ "node": "Detect File Type & Extract Text", "type": "main", "index": 0 }]]
+    },
+    "Detect File Type & Extract Text": {
+      "main": [[{ "node": "Call Parse Sub-Workflow", "type": "main", "index": 0 }]]
+    },
+    "Call Parse Sub-Workflow": {
+      "main": [[{ "node": "Parse Samples Loop", "type": "main", "index": 0 }]]
+    },
+    "Parse Samples Loop": {
+      "main": [[{ "node": "Parse Each Sample", "type": "main", "index": 0 }]]
+    },
+    "Parse Each Sample": {
+      "main": [[{ "node": "Build Normalized Artifact", "type": "main", "index": 0 }]]
+    },
+    "Build Normalized Artifact": {
+      "main": [[{ "node": "Store Normalized JSON", "type": "main", "index": 0 }]]
+    },
+    "Store Normalized JSON": {
+      "main": [[{ "node": "Dispatch WF03", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "SUB_Callback_Status"
+  },
+  "meta": {
+    "description": "Downloads BRD and sample files, detects file types, extracts and normalizes text into structured sections. Calls SUB_Parse_Document_By_Type for each file.",
+    "tags": ["brd", "parse", "phase-1"]
+  }
+}

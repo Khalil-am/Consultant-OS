@@ -1,0 +1,177 @@
+{
+  "name": "WF03_BRD_Quality_Gate",
+  "nodes": [
+    {
+      "id": "wf03-n1",
+      "name": "WF03 Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {}
+    },
+    {
+      "id": "wf03-n2",
+      "name": "Update Status Quality Check",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [460, 300],
+      "parameters": {
+        "operation": "update",
+        "tableId": "automation_runs",
+        "filterType": "string",
+        "filterString": "id=eq.{{ $json.runId }}",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "status", "fieldValue": "quality_check" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wf03-n3",
+      "name": "Run Quality Checks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "parameters": {
+        "jsCode": "const runId = $input.first().json.runId;\nconst source = $input.first().json.source || {};\nconst plainText = source.plainText || '';\nconst sections = source.sections || [];\nconst metadata = source.metadata || {};\n\nconsole.log(`[WF03][${runId}] Running quality checks...`);\n\nconst warnings = [];\nconst errors = [];\nlet score = 1.0;\n\n// 1. Minimum word count (at least 300 words for a real BRD)\nconst wordCount = metadata.wordCount || plainText.split(/\\s+/).filter(Boolean).length;\nif (wordCount < 300) {\n  errors.push(`Document too short: ${wordCount} words (minimum 300 required)`);\n  score -= 0.5;\n} else if (wordCount < 800) {\n  warnings.push(`Low word count: ${wordCount} words. Consider a more detailed source document.`);\n  score -= 0.1;\n}\n\n// 2. Section density\nif (sections.length === 0) {\n  warnings.push('No structured sections detected. Analysis will rely on full text only.');\n  score -= 0.1;\n} else if (sections.length < 3) {\n  warnings.push(`Only ${sections.length} section(s) detected. Document may lack structure.`);\n  score -= 0.05;\n}\n\n// 3. Heading presence check\nconst hasHeadings = sections.some(s => s.level === 1) || /^#+\\s/m.test(plainText);\nif (!hasHeadings) {\n  warnings.push('No top-level headings detected. Structure will be inferred from content.');\n  score -= 0.05;\n}\n\n// 4. OCR noise detection (high ratio of special chars = noisy OCR)\nconst specialCharRatio = (plainText.match(/[^a-zA-Z0-9\\s.,;:!?'\"()\\-]/g) || []).length / Math.max(plainText.length, 1);\nif (specialCharRatio > 0.08) {\n  warnings.push(`High OCR noise detected (${(specialCharRatio * 100).toFixed(1)}% non-standard characters). Quality may be affected.`);\n  score -= 0.1;\n}\n\n// 5. Empty/corrupted check\nif (plainText.trim().length < 50) {\n  errors.push('Document appears empty or corrupted. No readable content found.');\n  score = 0;\n}\n\n// 6. Sample availability\nconst hasSamples = $input.first().json.samples && $input.first().json.samples.length > 0;\nif (!hasSamples) {\n  warnings.push('No sample documents provided. Output will not be blueprint-aligned.');\n  score -= 0.05;\n}\n\n// Determine status\nconst finalScore = Math.max(0, Math.min(1, score));\nlet status;\nif (errors.length > 0) {\n  status = 'fail';\n} else if (warnings.length > 0) {\n  status = 'pass_with_warning';\n} else {\n  status = 'pass';\n}\n\nconsole.log(`[WF03][${runId}] Quality result: ${status} (score: ${finalScore.toFixed(2)})`);\n\nreturn [{\n  json: {\n    runId,\n    source: $input.first().json.source,\n    samples: $input.first().json.samples,\n    options: $input.first().json.options,\n    quality: {\n      status,\n      score: parseFloat(finalScore.toFixed(2)),\n      warnings,\n      errors\n    }\n  }\n}];"
+      }
+    },
+    {
+      "id": "wf03-n4",
+      "name": "Quality Decision",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [900, 300],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true
+          },
+          "conditions": [
+            {
+              "id": "quality-pass",
+              "leftValue": "={{ $json.quality.status }}",
+              "rightValue": "fail",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "wf03-n5",
+      "name": "Log Quality Event",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1120, 200],
+      "parameters": {
+        "operation": "create",
+        "tableId": "automation_run_events",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "run_id", "fieldValue": "={{ $json.runId }}" },
+            { "fieldId": "event_type", "fieldValue": "quality_gate_passed" },
+            { "fieldId": "stage_name", "fieldValue": "quality_gate" },
+            { "fieldId": "payload_json", "fieldValue": "={{ JSON.stringify($json.quality) }}" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wf03-n6",
+      "name": "Dispatch WF04",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1340, 200],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "WF04_BRD_Sample_Blueprint",
+          "mode": "name"
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      }
+    },
+    {
+      "id": "wf03-n7",
+      "name": "Mark Needs Review",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1120, 420],
+      "parameters": {
+        "operation": "update",
+        "tableId": "automation_runs",
+        "filterType": "string",
+        "filterString": "id=eq.{{ $json.runId }}",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "status", "fieldValue": "needs_review" },
+            { "fieldId": "error_message", "fieldValue": "={{ $json.quality.errors.join('; ') }}" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wf03-n8",
+      "name": "Callback Quality Fail",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1340, 420],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "SUB_Callback_Status",
+          "mode": "name"
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      }
+    }
+  ],
+  "connections": {
+    "WF03 Trigger": {
+      "main": [[{ "node": "Update Status Quality Check", "type": "main", "index": 0 }]]
+    },
+    "Update Status Quality Check": {
+      "main": [[{ "node": "Run Quality Checks", "type": "main", "index": 0 }]]
+    },
+    "Run Quality Checks": {
+      "main": [[{ "node": "Quality Decision", "type": "main", "index": 0 }]]
+    },
+    "Quality Decision": {
+      "main": [
+        [{ "node": "Log Quality Event", "type": "main", "index": 0 }],
+        [{ "node": "Mark Needs Review", "type": "main", "index": 0 }]
+      ]
+    },
+    "Log Quality Event": {
+      "main": [[{ "node": "Dispatch WF04", "type": "main", "index": 0 }]]
+    },
+    "Mark Needs Review": {
+      "main": [[{ "node": "Callback Quality Fail", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "SUB_Callback_Status"
+  },
+  "meta": {
+    "description": "Runs quality gate checks on parsed BRD: word count, section density, OCR noise, empty content. Routes to WF04 on pass or marks run as needs_review on fail.",
+    "tags": ["brd", "quality-gate", "phase-1"]
+  }
+}

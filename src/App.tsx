@@ -16,6 +16,7 @@ import Reports from './screens/Reports';
 import Knowledge from './screens/Knowledge';
 import Templates from './screens/Templates';
 import Admin from './screens/Admin';
+import BrdRunPage from './screens/BrdRunPage';
 
 function AppShell() {
   const { sidebarOpen, setSidebarOpen, isTablet } = useLayout();
@@ -53,6 +54,7 @@ function AppShell() {
             <Route path="/knowledge" element={<Knowledge />} />
             <Route path="/templates" element={<Templates />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/automations/brd/run" element={<BrdRunPage />} />
           </Routes>
         </main>
       </div>

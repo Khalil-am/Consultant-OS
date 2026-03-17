@@ -1,0 +1,123 @@
+{
+  "name": "WF06_BRD_Gap_Analysis",
+  "nodes": [
+    {
+      "id": "wf06-n1",
+      "name": "WF06 Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {}
+    },
+    {
+      "id": "wf06-n2",
+      "name": "Prepare Gap Analysis Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "parameters": {
+        "jsCode": "const runId = $input.first().json.runId;\nconst brdModel = $input.first().json.brdModel || {};\nconst blueprint = $input.first().json.blueprint || {};\n\nconsole.log(`[WF06][${runId}] Preparing gap analysis...`);\n\nconst canonicalSections = blueprint.canonicalSections || [\n  'Executive Summary', 'Business Need', 'Scope', 'Stakeholders',\n  'Functional Requirements', 'Non-Functional Requirements',\n  'Integrations', 'Assumptions', 'Risks', 'Dependencies', 'Acceptance Criteria'\n];\n\n// Build a concise summary of what we found in the BRD model\nconst modelSummary = {\n  hasProjectName: !!brdModel.projectName,\n  hasBusinessProblem: !!brdModel.businessProblem,\n  objectivesCount: (brdModel.objectives||[]).length,\n  stakeholdersCount: (brdModel.stakeholders||[]).length,\n  scopeInCount: (brdModel.scopeIn||[]).length,\n  scopeOutCount: (brdModel.scopeOut||[]).length,\n  frCount: (brdModel.functionalRequirements||[]).length,\n  nfrCount: (brdModel.nonFunctionalRequirements||[]).length,\n  risksCount: (brdModel.risks||[]).length,\n  assumptionsCount: (brdModel.assumptions||[]).length,\n  dependenciesCount: (brdModel.dependencies||[]).length,\n  openQuestionsCount: (brdModel.openQuestions||[]).length,\n  integrationsCount: (brdModel.integrationRequirements||[]).length\n};\n\nreturn [{\n  json: {\n    runId,\n    brdModel,\n    blueprint,\n    source: $input.first().json.source,\n    samples: $input.first().json.samples,\n    options: $input.first().json.options,\n    quality: $input.first().json.quality,\n    gapPrompt: `You are a senior business analyst reviewing a Business Requirements Document for completeness.\n\nBRD Model Summary (what was extracted from the source):\n${JSON.stringify(modelSummary, null, 2)}\n\nFull BRD Model:\n${JSON.stringify(brdModel, null, 2).substring(0, 3000)}\n\nExpected Canonical Sections from Sample Blueprint:\n${canonicalSections.join(', ')}\n\nBlueprint Style Rules:\n${JSON.stringify(blueprint.styleRules || {}, null, 2)}\n\nTask: Perform a comprehensive gap analysis and return ONLY valid JSON:\n\n1. missingSections — sections in the blueprint not found or nearly empty in the BRD model\n2. weakSections — sections present but needing significant expansion\n3. missingRequirements — types of requirements that appear absent (e.g., \"security NFRs\", \"performance SLAs\")\n4. recommendations — specific actionable recommendations to improve the BRD\n5. sampleAlignmentGaps — things the sample expects that the source doesn't provide\n6. coverageScore — 0.0-1.0 score of how complete the source BRD is vs the blueprint\n\nReturn valid JSON only:\n{\n  \"missingSections\": [\"string\"],\n  \"weakSections\": [\"string\"],\n  \"missingRequirements\": [\"string\"],\n  \"recommendations\": [\"string\"],\n  \"sampleAlignmentGaps\": [\"string\"],\n  \"coverageScore\": 0.0\n}`\n  }\n}];"
+      }
+    },
+    {
+      "id": "wf06-n3",
+      "name": "Claude Gap Analysis",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.2,
+      "position": [680, 300],
+      "parameters": {
+        "model": "claude-sonnet-4-6",
+        "messages": {
+          "messageValues": [
+            {
+              "type": "SystemMessagePromptTemplate",
+              "message": "You are a senior consulting business analyst. Analyze BRD completeness against a sample blueprint. Return structured JSON only."
+            },
+            {
+              "type": "HumanMessagePromptTemplate",
+              "message": "={{ $json.gapPrompt }}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.2,
+          "maxTokens": 1500
+        }
+      }
+    },
+    {
+      "id": "wf06-n4",
+      "name": "Parse Gap Analysis JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300],
+      "parameters": {
+        "jsCode": "const runId = $('Prepare Gap Analysis Prompt').first().json.runId;\nconst rawResponse = $input.first().json.text || $input.first().json.content || '';\n\nconsole.log(`[WF06][${runId}] Parsing gap analysis...`);\n\nlet gapAnalysis;\ntry {\n  const clean = rawResponse.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  gapAnalysis = JSON.parse(clean);\n} catch(e) {\n  console.warn(`[WF06][${runId}] Gap analysis parse failed, using defaults`);\n  gapAnalysis = {\n    missingSections: [],\n    weakSections: [],\n    missingRequirements: [],\n    recommendations: ['Manual review recommended - gap analysis parsing failed'],\n    sampleAlignmentGaps: [],\n    coverageScore: 0.5\n  };\n}\n\nconsole.log(`[WF06][${runId}] Gap analysis complete. Missing: ${(gapAnalysis.missingSections||[]).length}, Weak: ${(gapAnalysis.weakSections||[]).length}, Score: ${gapAnalysis.coverageScore}`);\n\nreturn [{\n  json: {\n    runId,\n    brdModel: $('Prepare Gap Analysis Prompt').first().json.brdModel,\n    blueprint: $('Prepare Gap Analysis Prompt').first().json.blueprint,\n    source: $('Prepare Gap Analysis Prompt').first().json.source,\n    samples: $('Prepare Gap Analysis Prompt').first().json.samples,\n    options: $('Prepare Gap Analysis Prompt').first().json.options,\n    quality: $('Prepare Gap Analysis Prompt').first().json.quality,\n    gapAnalysis\n  }\n}];"
+      }
+    },
+    {
+      "id": "wf06-n5",
+      "name": "Store Gap Analysis",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1120, 300],
+      "parameters": {
+        "operation": "create",
+        "tableId": "automation_run_events",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "run_id", "fieldValue": "={{ $json.runId }}" },
+            { "fieldId": "event_type", "fieldValue": "gap_analysis_complete" },
+            { "fieldId": "stage_name", "fieldValue": "gap_analysis" },
+            { "fieldId": "payload_json", "fieldValue": "={{ JSON.stringify({ gapAnalysis: $json.gapAnalysis }) }}" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wf06-n6",
+      "name": "Dispatch WF07",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1340, 300],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "WF07_BRD_Generate_Sections",
+          "mode": "name"
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      }
+    }
+  ],
+  "connections": {
+    "WF06 Trigger": {
+      "main": [[{ "node": "Prepare Gap Analysis Prompt", "type": "main", "index": 0 }]]
+    },
+    "Prepare Gap Analysis Prompt": {
+      "main": [[{ "node": "Claude Gap Analysis", "type": "main", "index": 0 }]]
+    },
+    "Claude Gap Analysis": {
+      "main": [[{ "node": "Parse Gap Analysis JSON", "type": "main", "index": 0 }]]
+    },
+    "Parse Gap Analysis JSON": {
+      "main": [[{ "node": "Store Gap Analysis", "type": "main", "index": 0 }]]
+    },
+    "Store Gap Analysis": {
+      "main": [[{ "node": "Dispatch WF07", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "SUB_Callback_Status"
+  },
+  "meta": {
+    "description": "Compares extracted BRD model against the sample blueprint to identify missing sections, weak sections, and alignment gaps. Produces a coverage score and recommendations.",
+    "tags": ["brd", "gap-analysis", "claude", "phase-2"]
+  }
+}

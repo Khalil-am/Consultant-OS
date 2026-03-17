@@ -1,0 +1,78 @@
+{
+  "name": "SUB_Render_DOCX",
+  "nodes": [
+    {
+      "id": "sub-docx-n1",
+      "name": "SUB DOCX Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {}
+    },
+    {
+      "id": "sub-docx-n2",
+      "name": "Prepare DOCX Structure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst runId = item.runId;\nconst sections = item.sections || [];\n\nconsole.log(`[SUB_Render_DOCX][${runId}] Preparing DOCX for ${sections.length} sections...`);\n\n// In production: use docxtemplater, pandoc, or a DOCX generation API\n// This sub-workflow represents the integration point for your DOCX renderer\n\n// Option A: Call a self-hosted pandoc service\n// Option B: Call AWS Lambda with docxtemplater\n// Option C: Use n8n's HTTP node to call a DOCX API (e.g., DocRaptor, CloudConvert)\n\n// The assembled markdown is passed through for the HTTP call\nreturn [{\n  json: {\n    runId,\n    markdownContent: item.assembledDraft || item.markdownContent || '',\n    sectionCount: sections.length,\n    renderService: process.env.DOCX_RENDER_URL || 'http://localhost:3002/render/docx',\n    templateName: item.templateName || 'consultant_os_brd_template',\n    metadata: {\n      title: 'Business Requirements Document',\n      author: 'Consultant OS',\n      runId\n    }\n  }\n}];"
+      }
+    },
+    {
+      "id": "sub-docx-n3",
+      "name": "Call DOCX Render Service",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [680, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.renderService }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Render-Key", "value": "={{ process.env.RENDER_SERVICE_KEY || 'dev' }}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "body": "={{ JSON.stringify({ markdown: $json.markdownContent, template: $json.templateName, metadata: $json.metadata }) }}",
+        "options": {
+          "timeout": 60000,
+          "retry": { "enabled": true, "maxTries": 2, "waitBetweenTries": 3000 },
+          "response": {
+            "response": { "responseFormat": "json" }
+          }
+        }
+      }
+    },
+    {
+      "id": "sub-docx-n4",
+      "name": "Return DOCX URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300],
+      "parameters": {
+        "jsCode": "const runId = $('Prepare DOCX Structure').first().json.runId;\nconst response = $input.first().json || {};\n\n// Render service should return a signed URL for the generated DOCX\nconst docxUrl = response.url || response.docxUrl || response.fileUrl ||\n  `${process.env.STORAGE_BASE_URL || 'https://storage.consultant-os.com'}/runs/${runId}/exports/brd_document.docx`;\n\nconsole.log(`[SUB_Render_DOCX][${runId}] DOCX ready: ${docxUrl}`);\n\nreturn [{ json: { runId, docxUrl, renderSuccess: !!response.url } }];"
+      }
+    }
+  ],
+  "connections": {
+    "SUB DOCX Trigger": {
+      "main": [[{ "node": "Prepare DOCX Structure", "type": "main", "index": 0 }]]
+    },
+    "Prepare DOCX Structure": {
+      "main": [[{ "node": "Call DOCX Render Service", "type": "main", "index": 0 }]]
+    },
+    "Call DOCX Render Service": {
+      "main": [[{ "node": "Return DOCX URL", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": { "executionOrder": "v1" },
+  "meta": {
+    "description": "Reusable sub-workflow. Accepts assembled markdown and calls a DOCX render service (pandoc/docxtemplater/CloudConvert). Returns { docxUrl }. Configure DOCX_RENDER_URL env var to point to your render service.",
+    "tags": ["sub-workflow", "docx", "export", "reusable"]
+  }
+}
