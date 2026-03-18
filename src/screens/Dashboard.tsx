@@ -585,7 +585,7 @@ export default function Dashboard() {
                   <div key={bd.id} style={{
                     padding: '0.75rem 1.25rem',
                     borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem',
                   }}>
                     <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#E2E8F0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, paddingRight: '0.75rem' }}>
                       {bd.title}
@@ -596,6 +596,20 @@ export default function Dashboard() {
                     }}>
                       {statusLabel}
                     </span>
+                    <button
+                      onClick={() => markDecisionComplete(bd.id)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '3px',
+                        padding: '3px 8px', borderRadius: '5px', border: '1px solid rgba(16,185,129,0.2)',
+                        background: 'rgba(16,185,129,0.1)', color: '#34D399',
+                        fontSize: '0.62rem', fontWeight: 700, cursor: 'pointer',
+                        fontFamily: 'inherit', flexShrink: 0, transition: 'all 0.15s',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.22)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.1)'; }}
+                    >
+                      <Check size={10} /> Done
+                    </button>
                   </div>
                 );
               })}

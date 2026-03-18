@@ -280,10 +280,13 @@ export default function AskAI() {
   const [showModelDropdown, setShowModelDropdown] = useState(false);
   const [ragContext, setRagContext] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [shareLabel, setShareLabel] = useState('Share');
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const modelDropdownRef = useRef<HTMLDivElement>(null);
+  const historyDropdownRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll on new messages
   useEffect(() => {
@@ -295,6 +298,9 @@ export default function AskAI() {
     const handler = (e: MouseEvent) => {
       if (modelDropdownRef.current && !modelDropdownRef.current.contains(e.target as Node)) {
         setShowModelDropdown(false);
+      }
+      if (historyDropdownRef.current && !historyDropdownRef.current.contains(e.target as Node)) {
+        setShowHistory(false);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -375,6 +381,23 @@ export default function AskAI() {
     }
   };
 
+  const handleShare = useCallback(async () => {
+    if (messages.length === 0) return;
+    const lines = [`Thread: ${selectedPersona.name}`, ''];
+    for (const msg of messages) {
+      const label = msg.role === 'user' ? 'User' : 'AI';
+      lines.push(`[${label}]: ${msg.content}`, '');
+    }
+    try {
+      await navigator.clipboard.writeText(lines.join('\n'));
+      setShareLabel('Copied!');
+      setTimeout(() => setShareLabel('Share'), 2000);
+    } catch {
+      setShareLabel('Failed');
+      setTimeout(() => setShareLabel('Share'), 2000);
+    }
+  }, [messages, selectedPersona]);
+
   const handleNewThread = () => {
     setMessages([]);
     setSelectedThread(null);
@@ -418,19 +441,59 @@ export default function AskAI() {
         </div>
         {!isMobile && (
           <div style={{ display: 'flex', gap: 8 }}>
-            <button style={{
-              display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8,
-              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
-              color: '#94A3B8', fontSize: '0.8rem', cursor: 'pointer',
-            }}>
-              <History size={14} /> History
-            </button>
-            <button style={{
-              display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8,
-              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
-              color: '#94A3B8', fontSize: '0.8rem', cursor: 'pointer',
-            }}>
-              <Share2 size={14} /> Share
+            {/* History dropdown */}
+            <div ref={historyDropdownRef} style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowHistory(v => !v)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8,
+                  background: showHistory ? 'rgba(16,185,129,0.10)' : 'rgba(255,255,255,0.05)',
+                  border: showHistory ? '1px solid rgba(16,185,129,0.25)' : '1px solid rgba(255,255,255,0.08)',
+                  color: showHistory ? '#10B981' : '#94A3B8', fontSize: '0.8rem', cursor: 'pointer',
+                }}
+              >
+                <History size={14} /> History
+              </button>
+              {showHistory && (
+                <div style={{
+                  position: 'absolute', top: '100%', right: 0, marginTop: 6,
+                  background: '#0F1629', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12,
+                  padding: 8, minWidth: 240, boxShadow: '0 12px 40px rgba(0,0,0,0.5)', zIndex: 50,
+                }}>
+                  <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '4px 8px 8px' }}>
+                    Recent Threads
+                  </div>
+                  {THREADS.map(t => (
+                    <button
+                      key={t.id}
+                      onClick={() => { setSelectedThread(t.id); setShowHistory(false); }}
+                      style={{
+                        display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
+                        background: selectedThread === t.id ? 'rgba(16,185,129,0.10)' : 'transparent',
+                        border: selectedThread === t.id ? '1px solid rgba(16,185,129,0.2)' : '1px solid transparent',
+                        transition: 'all 0.15s',
+                      }}
+                      onMouseEnter={e => { if (selectedThread !== t.id) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                      onMouseLeave={e => { if (selectedThread !== t.id) e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      <div style={{ fontSize: '0.8rem', fontWeight: 500, color: selectedThread === t.id ? '#F1F5F9' : '#CBD5E1', lineHeight: 1.3 }}>{t.title}</div>
+                      <div style={{ fontSize: '0.65rem', color: '#475569', marginTop: 2 }}>{t.time}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {/* Share button */}
+            <button
+              onClick={handleShare}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8,
+                background: shareLabel === 'Copied!' ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.05)',
+                border: shareLabel === 'Copied!' ? '1px solid rgba(16,185,129,0.25)' : '1px solid rgba(255,255,255,0.08)',
+                color: shareLabel === 'Copied!' ? '#10B981' : '#94A3B8', fontSize: '0.8rem', cursor: 'pointer',
+              }}
+            >
+              <Share2 size={14} /> {shareLabel}
             </button>
           </div>
         )}

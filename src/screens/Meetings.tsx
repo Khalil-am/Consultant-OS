@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { getMeetings, updateMeeting, upsertMeeting, deleteMeeting, getWorkspaces } from '../lib/db';
 import type { MeetingRow, WorkspaceRow } from '../lib/db';
+import { chatWithDocument } from '../lib/openrouter';
 
 const filterTabs = ['All', 'Upcoming', 'Completed', 'Needs Action'];
 
@@ -98,6 +99,7 @@ export default function Meetings() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [markingComplete, setMarkingComplete] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState<string | null>(null); // tracks which AI action is running
   const [form, setForm] = useState({
     title: '', date: '', time: '09:00', duration: '1h', type: 'Review' as MeetingRow['type'],
     workspace: '', workspace_id: '', location: '', participants: '',
@@ -194,6 +196,61 @@ export default function Meetings() {
       setMeetings(prev => prev.map(m => m.id === id ? { ...m, status: 'Completed' } : m));
     } catch { /* ignore */ }
     finally { setMarkingComplete(null); }
+  }
+
+  // ── AI Quick Actions ──────────────────────────────────────
+  function buildMeetingContext(m: MeetingRow): string {
+    return `Title: ${m.title}\nDate: ${m.date}\nTime: ${m.time}\nDuration: ${m.duration}\nType: ${m.type}\nStatus: ${m.status}\nWorkspace: ${m.workspace}\nParticipants: ${(m.participants || []).join(', ')}\nLocation: ${m.location || 'N/A'}\nAgenda: ${(m.agenda || []).join('; ') || 'N/A'}\nActions extracted: ${m.actions_extracted}\nDecisions logged: ${m.decisions_logged}`;
+  }
+
+  async function handleSummarizeMinutes() {
+    const target = meetings.find(m => m.status === 'Completed' && !m.minutes_generated);
+    if (!target) { alert('No completed meetings pending minutes summarization.'); return; }
+    setAiLoading('summarize');
+    try {
+      await chatWithDocument(
+        [{ role: 'user', content: `Generate meeting minutes for:\n${buildMeetingContext(target)}` }],
+        'You are a meeting analyst. Generate professional meeting minutes based on the meeting details provided.'
+      );
+      await updateMeeting(target.id, { minutes_generated: true });
+      setMeetings(prev => prev.map(m => m.id === target.id ? { ...m, minutes_generated: true } : m));
+      navigate(`/meetings/${target.id}`);
+    } catch (err) {
+      alert(`Failed to summarize minutes: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally { setAiLoading(null); }
+  }
+
+  async function handleDraftFollowUp(meeting?: MeetingRow) {
+    const target = meeting || meetings.find(m => m.status === 'Completed');
+    if (!target) { alert('No completed meetings found.'); return; }
+    setAiLoading('followup');
+    try {
+      const result = await chatWithDocument(
+        [{ role: 'user', content: `Draft a professional follow-up email for this meeting:\n${buildMeetingContext(target)}` }],
+        'You are a professional consultant. Draft a concise follow-up email summarizing key outcomes, action items, and next steps from the meeting.'
+      );
+      try { await navigator.clipboard.writeText(result); alert('Follow-up email copied to clipboard!'); }
+      catch { alert(result); }
+    } catch (err) {
+      alert(`Failed to draft follow-up: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally { setAiLoading(null); }
+  }
+
+  async function handleGenerateReport() {
+    const recentMeetings = meetings.slice(0, 10);
+    if (recentMeetings.length === 0) { alert('No meetings found to generate a report.'); return; }
+    setAiLoading('report');
+    try {
+      const context = recentMeetings.map((m, i) => `Meeting ${i + 1}:\n${buildMeetingContext(m)}`).join('\n\n');
+      const result = await chatWithDocument(
+        [{ role: 'user', content: `Generate a summary report covering these recent meetings:\n\n${context}` }],
+        'You are a senior consultant. Generate a professional meetings summary report highlighting key themes, decisions, action items, and upcoming priorities across all meetings.'
+      );
+      try { await navigator.clipboard.writeText(result); alert('AI report copied to clipboard!'); }
+      catch { alert(result); }
+    } catch (err) {
+      alert(`Failed to generate report: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally { setAiLoading(null); }
   }
 
   // ── Derived stats ──────────────────────────────────────────
@@ -439,18 +496,20 @@ export default function Meetings() {
                             <FileText size={10} /> Summarize Minutes
                           </button>
                           <button
-                            onClick={e => { e.stopPropagation(); navigate(`/meetings/${meeting.id}`); }}
+                            onClick={e => { e.stopPropagation(); handleDraftFollowUp(meeting); }}
+                            disabled={aiLoading === 'followup'}
                             style={{
                               display: 'flex', alignItems: 'center', gap: '4px',
                               fontSize: '0.65rem', fontWeight: 700, padding: '4px 10px', borderRadius: '6px',
                               background: 'rgba(14,165,233,0.1)', color: '#38BDF8',
                               border: '1px solid rgba(14,165,233,0.22)',
-                              cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+                              cursor: aiLoading === 'followup' ? 'wait' : 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+                              opacity: aiLoading === 'followup' ? 0.6 : 1,
                             }}
-                            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.2)'; }}
+                            onMouseEnter={e => { if (!aiLoading) (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.2)'; }}
                             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.1)'; }}
                           >
-                            <Upload size={10} /> Draft Follow-up
+                            {aiLoading === 'followup' ? <><Loader2 size={10} className="animate-spin" /> Drafting...</> : <><Upload size={10} /> Draft Follow-up</>}
                           </button>
                         </div>
                       )}
@@ -605,46 +664,52 @@ export default function Meetings() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <button
-                onClick={() => setActiveFilter('Needs Action')}
+                onClick={handleSummarizeMinutes}
+                disabled={aiLoading === 'summarize'}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '6px', width: '100%',
                   fontSize: '0.72rem', fontWeight: 700, padding: '8px 12px', borderRadius: '8px',
                   background: 'rgba(16,185,129,0.1)', color: '#34D399',
                   border: '1px solid rgba(16,185,129,0.22)',
-                  cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+                  cursor: aiLoading === 'summarize' ? 'wait' : 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+                  opacity: aiLoading === 'summarize' ? 0.6 : 1,
                 }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.2)'; }}
+                onMouseEnter={e => { if (!aiLoading) (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.2)'; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.1)'; }}
               >
-                <FileText size={13} /> Summarize Minutes
+                {aiLoading === 'summarize' ? <><Loader2 size={13} className="animate-spin" /> Summarizing...</> : <><FileText size={13} /> Summarize Minutes</>}
               </button>
               <button
-                onClick={() => setActiveFilter('Completed')}
+                onClick={() => handleDraftFollowUp()}
+                disabled={aiLoading === 'followup'}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '6px', width: '100%',
                   fontSize: '0.72rem', fontWeight: 700, padding: '8px 12px', borderRadius: '8px',
                   background: 'rgba(14,165,233,0.1)', color: '#38BDF8',
                   border: '1px solid rgba(14,165,233,0.22)',
-                  cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+                  cursor: aiLoading === 'followup' ? 'wait' : 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+                  opacity: aiLoading === 'followup' ? 0.6 : 1,
                 }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.2)'; }}
+                onMouseEnter={e => { if (!aiLoading) (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.2)'; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.1)'; }}
               >
-                <Upload size={13} /> Draft Follow-up
+                {aiLoading === 'followup' ? <><Loader2 size={13} className="animate-spin" /> Drafting...</> : <><Upload size={13} /> Draft Follow-up</>}
               </button>
               <button
-                onClick={() => {}}
+                onClick={handleGenerateReport}
+                disabled={aiLoading === 'report'}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '6px', width: '100%',
                   fontSize: '0.72rem', fontWeight: 700, padding: '8px 12px', borderRadius: '8px',
                   background: 'rgba(139,92,246,0.1)', color: '#A78BFA',
                   border: '1px solid rgba(139,92,246,0.22)',
-                  cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+                  cursor: aiLoading === 'report' ? 'wait' : 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+                  opacity: aiLoading === 'report' ? 0.6 : 1,
                 }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(139,92,246,0.2)'; }}
+                onMouseEnter={e => { if (!aiLoading) (e.currentTarget as HTMLElement).style.background = 'rgba(139,92,246,0.2)'; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(139,92,246,0.1)'; }}
               >
-                <Sparkles size={13} /> Generate AI Report
+                {aiLoading === 'report' ? <><Loader2 size={13} className="animate-spin" /> Generating...</> : <><Sparkles size={13} /> Generate AI Report</>}
               </button>
             </div>
           </div>

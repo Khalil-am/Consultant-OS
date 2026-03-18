@@ -9,6 +9,7 @@ import {
   Lock, Key, AlertTriangle, Info, Code2,
 } from 'lucide-react';
 import { users } from '../data/mockData';
+import { fetchBATrafficBoard } from '../lib/trello';
 
 const adminSections = [
   { id: 'users', label: 'Users & Roles', icon: <Users size={15} /> },
@@ -76,6 +77,10 @@ export default function Admin() {
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [roleFilter, setRoleFilter] = useState<string>('All');
   const [currentPage, setCurrentPage] = useState(1);
+  const [showTrelloConfig, setShowTrelloConfig] = useState(false);
+  const [trelloTestResult, setTrelloTestResult] = useState<string | null>(null);
+  const [trelloTesting, setTrelloTesting] = useState(false);
+  const [trelloRefreshMsg, setTrelloRefreshMsg] = useState<string | null>(null);
 
 
   const filteredUsers = useMemo(() => {
@@ -128,6 +133,30 @@ export default function Admin() {
       else next.add(userId);
       return next;
     });
+  }
+
+  async function handleTrelloTest() {
+    setTrelloTesting(true);
+    setTrelloTestResult(null);
+    try {
+      await fetchBATrafficBoard();
+      setTrelloTestResult('Connection successful');
+    } catch {
+      setTrelloTestResult('Connection failed');
+    } finally {
+      setTrelloTesting(false);
+    }
+  }
+
+  async function handleTrelloRefresh() {
+    setTrelloRefreshMsg(null);
+    try {
+      await fetchBATrafficBoard();
+      setTrelloRefreshMsg('Sync successful');
+    } catch {
+      setTrelloRefreshMsg('Sync failed');
+    }
+    setTimeout(() => setTrelloRefreshMsg(null), 3000);
   }
 
   function toggleAllSelection() {
@@ -727,13 +756,21 @@ export default function Admin() {
                             {integration.status}
                           </span>
                         </div>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', position: 'relative' }}>
                           {integration.status === 'Connected' ? (
                             <>
-                              <button className="btn-ghost" style={{ flex: 1, height: '26px', fontSize: '0.7rem', justifyContent: 'center' }}>
+                              <button
+                                className="btn-ghost"
+                                style={{ flex: 1, height: '26px', fontSize: '0.7rem', justifyContent: 'center' }}
+                                onClick={() => { if (integration.name === 'Trello') setShowTrelloConfig(v => !v); }}
+                              >
                                 <Settings size={10} /> Configure
                               </button>
-                              <button className="btn-ghost" style={{ height: '26px', fontSize: '0.7rem', padding: '0 0.5rem' }}>
+                              <button
+                                className="btn-ghost"
+                                style={{ height: '26px', fontSize: '0.7rem', padding: '0 0.5rem' }}
+                                onClick={() => { if (integration.name === 'Trello') handleTrelloRefresh(); }}
+                              >
                                 <RefreshCw size={10} />
                               </button>
                             </>
@@ -743,6 +780,64 @@ export default function Admin() {
                             </button>
                           )}
                         </div>
+
+                        {/* Trello refresh toast */}
+                        {integration.name === 'Trello' && trelloRefreshMsg && (
+                          <div style={{
+                            marginTop: '0.5rem', padding: '6px 10px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 500,
+                            background: trelloRefreshMsg.includes('successful') ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)',
+                            color: trelloRefreshMsg.includes('successful') ? '#34D399' : '#EF4444',
+                            border: `1px solid ${trelloRefreshMsg.includes('successful') ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'}`,
+                          }}>
+                            {trelloRefreshMsg}
+                          </div>
+                        )}
+
+                        {/* Trello config panel */}
+                        {integration.name === 'Trello' && showTrelloConfig && (
+                          <div style={{
+                            marginTop: '0.75rem', padding: '0.875rem', borderRadius: '10px',
+                            background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)',
+                          }}>
+                            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#F1F5F9', marginBottom: '0.625rem' }}>Trello Configuration</div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', fontSize: '0.72rem' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: '#64748B' }}>Board ID</span>
+                                <span style={{ color: '#CBD5E1', fontFamily: 'monospace', fontSize: '0.68rem' }}>66c5d907fffd4029f08565a4</span>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: '#64748B' }}>API Status</span>
+                                <span style={{ color: '#34D399', fontWeight: 600 }}>Connected</span>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: '#64748B' }}>Last synced</span>
+                                <span style={{ color: '#CBD5E1' }}>{new Date().toLocaleTimeString()}</span>
+                              </div>
+                            </div>
+                            <button
+                              onClick={handleTrelloTest}
+                              disabled={trelloTesting}
+                              style={{
+                                marginTop: '0.75rem', padding: '5px 12px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 500,
+                                background: 'rgba(14,165,233,0.12)', color: '#38BDF8',
+                                border: '1px solid rgba(14,165,233,0.25)', cursor: trelloTesting ? 'wait' : 'pointer',
+                                fontFamily: 'inherit', width: '100%',
+                              }}
+                            >
+                              {trelloTesting ? 'Testing...' : 'Test Connection'}
+                            </button>
+                            {trelloTestResult && (
+                              <div style={{
+                                marginTop: '0.5rem', padding: '5px 10px', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 500, textAlign: 'center',
+                                background: trelloTestResult.includes('successful') ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)',
+                                color: trelloTestResult.includes('successful') ? '#34D399' : '#EF4444',
+                                border: `1px solid ${trelloTestResult.includes('successful') ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'}`,
+                              }}>
+                                {trelloTestResult}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

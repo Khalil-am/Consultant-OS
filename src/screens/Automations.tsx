@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLayout } from '../hooks/useLayout';
 import {
@@ -6,7 +6,7 @@ import {
   ArrowRight, Loader2, ClipboardList, Video, Monitor, Building2,
   BarChart2, Brain,
 } from 'lucide-react';
-import { automations } from '../data/mockData';
+import { automations as initialAutomations } from '../data/mockData';
 
 const categories = ['All', 'BA & Requirements', 'Meetings', 'Product', 'Procurement', 'PMO', 'Reporting', 'Knowledge', 'Productivity'];
 
@@ -40,15 +40,53 @@ export default function Automations() {
   const { width, isMobile } = useLayout();
   const [activeCategory, setActiveCategory] = useState('All');
   const [search, setSearch] = useState('');
+  const [automations, setAutomations] = useState(initialAutomations);
   const [starred, setStarred] = useState<Set<string>>(
-    new Set(automations.filter(a => a.starred).map(a => a.id))
+    new Set(initialAutomations.filter(a => a.starred).map(a => a.id))
   );
-  const [runningId, setRunningId] = useState<string | null>('auto-001');
+  const [runningId, setRunningId] = useState<string | null>(null);
+  const [runTimer, setRunTimer] = useState(0);
+  const [toast, setToast] = useState<string | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Count-up timer while running
+  useEffect(() => {
+    if (runningId) {
+      setRunTimer(0);
+      timerRef.current = setInterval(() => setRunTimer(t => t + 1), 1000);
+      return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    } else {
+      setRunTimer(0);
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+  }, [runningId]);
+
+  const handleRun = useCallback((id: string) => {
+    if (runningId) return;
+    setRunningId(id);
+    setTimeout(() => {
+      setRunningId(null);
+      setAutomations(prev => prev.map(a => a.id === id ? { ...a, runCount: a.runCount + 1 } : a));
+      const name = automations.find(a => a.id === id)?.name ?? 'Automation';
+      setToast(`${name} completed successfully`);
+      setTimeout(() => setToast(null), 3000);
+    }, 3000);
+  }, [runningId, automations]);
+
+  // Computed stats
+  const totalAutomations = automations.length;
+  const activeCount = automations.filter(a => a.status === 'Active').length;
+  const totalRuns = automations.reduce((sum, a) => sum + a.runCount, 0);
+  const avgSuccessRate = automations.length > 0
+    ? (automations.reduce((sum, a) => sum + a.successRate, 0) / automations.length).toFixed(1)
+    : '0';
 
   const filtered = automations.filter(a => {
     const matchCat  = activeCategory === 'All' || a.category === activeCategory;
-    const matchSearch = a.name.toLowerCase().includes(search.toLowerCase()) ||
-      a.description.toLowerCase().includes(search.toLowerCase());
+    const q = search.toLowerCase();
+    const matchSearch = a.name.toLowerCase().includes(q) ||
+      a.description.toLowerCase().includes(q) ||
+      a.category.toLowerCase().includes(q);
     return matchCat && matchSearch;
   });
 
@@ -69,10 +107,10 @@ export default function Automations() {
       {/* Stats Row */}
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 640 ? 4 : 2}, 1fr)`, gap: '0.875rem' }}>
         {[
-          { label: 'Total Automations', value: '14',      icon: <Zap size={16} />,         color: '#00D4FF' },
-          { label: 'Runs This Month',   value: '1,284',   icon: <Play size={16} />,        color: '#10B981' },
-          { label: 'Success Rate',      value: '96.8%',   icon: <CheckCircle size={16} />, color: '#34D399' },
-          { label: 'Hours Saved',       value: '384 hrs', icon: <TrendingUp size={16} />,  color: '#8B5CF6' },
+          { label: 'Total Automations', value: String(totalAutomations), icon: <Zap size={16} />,         color: '#00D4FF' },
+          { label: 'Active',            value: String(activeCount),      icon: <Play size={16} />,        color: '#10B981' },
+          { label: 'Total Runs',        value: totalRuns.toLocaleString(), icon: <CheckCircle size={16} />, color: '#34D399' },
+          { label: 'Avg Success Rate',  value: `${avgSuccessRate}%`,     icon: <TrendingUp size={16} />,  color: '#8B5CF6' },
         ].map(stat => (
           <div key={stat.label} style={{
             display: 'flex', alignItems: 'center', gap: '1rem',
@@ -257,14 +295,14 @@ export default function Automations() {
                   <div style={{ marginBottom: '0.875rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
                       <span style={{ fontSize: '0.7rem', color: '#00D4FF', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                        <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} /> Processing…
+                        <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} /> Processing… {runTimer}s
                       </span>
-                      <span style={{ fontSize: '0.7rem', color: '#475569' }}>Est. 2 min remaining</span>
+                      <span style={{ fontSize: '0.7rem', color: '#475569' }}>Est. {Math.max(0, 3 - runTimer)}s remaining</span>
                     </div>
                     <div style={{ height: '4px', borderRadius: '9999px', background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-                      <div style={{ width: '80%', height: '100%', borderRadius: '9999px', background: 'linear-gradient(90deg, #00D4FF, #0EA5E9)', boxShadow: '0 0 8px rgba(0,212,255,0.5)' }} />
+                      <div style={{ width: `${Math.min(100, (runTimer / 3) * 100)}%`, height: '100%', borderRadius: '9999px', background: 'linear-gradient(90deg, #00D4FF, #0EA5E9)', boxShadow: '0 0 8px rgba(0,212,255,0.5)', transition: 'width 1s linear' }} />
                     </div>
-                    <div style={{ fontSize: '0.68rem', color: '#475569', marginTop: '3px' }}>80% · Step 4/5</div>
+                    <div style={{ fontSize: '0.68rem', color: '#475569', marginTop: '3px' }}>{Math.min(100, Math.round((runTimer / 3) * 100))}%</div>
                   </div>
                 )}
 
@@ -285,14 +323,14 @@ export default function Automations() {
                   <button
                     onClick={e => {
                       e.stopPropagation();
-                      if (auto.id === 'auto-001') navigate('/automations/brd/run');
-                      else navigate(`/automations/${auto.id}`);
+                      handleRun(auto.id);
                     }}
-                    disabled={isRunning}
+                    disabled={!!runningId}
                     style={{
-                      flex: 1, height: '34px', borderRadius: '8px', border: 'none', cursor: isRunning ? 'default' : 'pointer',
+                      flex: 1, height: '34px', borderRadius: '8px', border: 'none', cursor: runningId ? 'default' : 'pointer',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem',
                       fontSize: '0.8rem', fontWeight: 600, fontFamily: 'inherit',
+                      opacity: runningId && !isRunning ? 0.5 : 1,
                       background: isRunning
                         ? 'rgba(0,212,255,0.1)'
                         : 'linear-gradient(135deg, #00D4FF 0%, #0EA5E9 100%)',
@@ -301,10 +339,10 @@ export default function Automations() {
                       transition: 'all 0.2s',
                     }}
                     onMouseEnter={e => {
-                      if (!isRunning) (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 20px rgba(0,212,255,0.5)';
+                      if (!runningId) (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 20px rgba(0,212,255,0.5)';
                     }}
                     onMouseLeave={e => {
-                      if (!isRunning) (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 12px rgba(0,212,255,0.3)';
+                      if (!runningId) (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 12px rgba(0,212,255,0.3)';
                     }}
                   >
                     {isRunning
@@ -338,8 +376,24 @@ export default function Automations() {
         })}
       </div>
 
+      {/* Success Toast */}
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: '2rem', right: '2rem', zIndex: 999,
+          display: 'flex', alignItems: 'center', gap: '0.5rem',
+          padding: '0.875rem 1.25rem', borderRadius: '10px',
+          background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)',
+          color: '#34D399', fontSize: '0.82rem', fontWeight: 600,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+          animation: 'fadeSlideUp 0.3s ease',
+        }}>
+          <CheckCircle size={16} /> {toast}
+        </div>
+      )}
+
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
     </div>
   );
