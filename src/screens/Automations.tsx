@@ -1,33 +1,45 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLayout } from '../hooks/useLayout';
-import {
-  Search, Star, Play, Settings, TrendingUp, Clock, Zap, CheckCircle
-} from 'lucide-react';
+import { Search, Star, Play, Settings2, TrendingUp, Clock, Zap, CheckCircle, ArrowRight, Loader2 } from 'lucide-react';
 import { automations } from '../data/mockData';
 
 const categories = ['All', 'BA & Requirements', 'Meetings', 'Product', 'Procurement', 'PMO', 'Reporting', 'Knowledge', 'Productivity'];
 
 const categoryIcons: Record<string, string> = {
   'BA & Requirements': '📋',
-  'Meetings': '🎥',
-  'Product': '💻',
-  'Procurement': '🏛️',
-  'PMO': '📊',
-  'Reporting': '📈',
-  'Knowledge': '🧠',
-  'Productivity': '⚡',
+  'Meetings':          '🎥',
+  'Product':           '💻',
+  'Procurement':       '🏛️',
+  'PMO':               '📊',
+  'Reporting':         '📈',
+  'Knowledge':         '🧠',
+  'Productivity':      '⚡',
+};
+
+const categoryColors: Record<string, string> = {
+  'BA & Requirements': '#0EA5E9',
+  'Meetings':          '#8B5CF6',
+  'Product':           '#10B981',
+  'Procurement':       '#F59E0B',
+  'PMO':               '#EC4899',
+  'Reporting':         '#06B6D4',
+  'Knowledge':         '#6366F1',
+  'Productivity':      '#00D4FF',
 };
 
 export default function Automations() {
   const navigate = useNavigate();
-  const { width, isMobile, isTablet } = useLayout();
+  const { width, isMobile } = useLayout();
   const [activeCategory, setActiveCategory] = useState('All');
   const [search, setSearch] = useState('');
-  const [starred, setStarred] = useState<Set<string>>(new Set(automations.filter(a => a.starred).map(a => a.id)));
+  const [starred, setStarred] = useState<Set<string>>(
+    new Set(automations.filter(a => a.starred).map(a => a.id))
+  );
+  const [runningId, setRunningId] = useState<string | null>('auto-001');
 
   const filtered = automations.filter(a => {
-    const matchCat = activeCategory === 'All' || a.category === activeCategory;
+    const matchCat  = activeCategory === 'All' || a.category === activeCategory;
     const matchSearch = a.name.toLowerCase().includes(search.toLowerCase()) ||
       a.description.toLowerCase().includes(search.toLowerCase());
     return matchCat && matchSearch;
@@ -37,178 +49,299 @@ export default function Automations() {
     e.stopPropagation();
     setStarred(prev => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
   };
 
+  const cols = width >= 1100 ? 3 : width >= 680 ? 2 : 1;
+
   return (
-    <div style={{ padding: isMobile ? '0.875rem' : '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 768 ? 4 : 2}, 1fr)`, gap: '0.875rem' }}>
+    <div style={{ padding: isMobile ? '1rem' : '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+      {/* Page Header */}
+      <div>
+        <h1 style={{ fontSize: '1.375rem', fontWeight: 800, color: '#F1F5F9', margin: 0, letterSpacing: '-0.02em' }}>
+          Automations
+        </h1>
+        <p style={{ fontSize: '0.8rem', color: '#475569', margin: '3px 0 0' }}>
+          {automations.length} automations · 1,284 runs this month
+        </p>
+      </div>
+
+      {/* Stats Row */}
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 640 ? 4 : 2}, 1fr)`, gap: '0.875rem' }}>
         {[
-          { label: 'Total Automations', value: '14',      icon: <Zap size={15} />,         color: '#00D4FF' },
-          { label: 'Runs This Month',   value: '1,284',   icon: <Play size={15} />,        color: '#10B981' },
-          { label: 'Success Rate',      value: '96.8%',   icon: <CheckCircle size={15} />, color: '#34D399' },
-          { label: 'Hours Saved',       value: '384 hrs', icon: <TrendingUp size={15} />,  color: '#8B5CF6' },
+          { label: 'Total Automations', value: '14',      icon: <Zap size={16} />,         color: '#00D4FF' },
+          { label: 'Runs This Month',   value: '1,284',   icon: <Play size={16} />,        color: '#10B981' },
+          { label: 'Success Rate',      value: '96.8%',   icon: <CheckCircle size={16} />, color: '#34D399' },
+          { label: 'Hours Saved',       value: '384 hrs', icon: <TrendingUp size={16} />,  color: '#8B5CF6' },
         ].map(stat => (
-          <div key={stat.label} className="metric-card" style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
-            <div style={{ width: 40, height: 40, borderRadius: '10px', background: `${stat.color}12`, border: `1px solid ${stat.color}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: stat.color, flexShrink: 0 }}>
+          <div key={stat.label} style={{
+            display: 'flex', alignItems: 'center', gap: '1rem',
+            padding: '1rem 1.125rem', borderRadius: '12px',
+            background: 'rgba(255,255,255,0.025)',
+            border: '1px solid rgba(255,255,255,0.06)',
+          }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: '10px',
+              background: `${stat.color}15`,
+              border: `1px solid ${stat.color}25`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: stat.color, flexShrink: 0,
+            }}>
               {stat.icon}
             </div>
             <div>
-              <div style={{ fontSize: '1.375rem', fontWeight: 900, color: '#F1F5F9', lineHeight: 1, letterSpacing: '-0.02em' }}>{stat.value}</div>
-              <div style={{ fontSize: '0.7rem', color: '#64748B', marginTop: '3px' }}>{stat.label}</div>
+              <div style={{ fontSize: '1.375rem', fontWeight: 900, color: '#F1F5F9', lineHeight: 1, letterSpacing: '-0.025em' }}>
+                {stat.value}
+              </div>
+              <div style={{ fontSize: '0.7rem', color: '#475569', marginTop: '3px' }}>{stat.label}</div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Toolbar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+      {/* Toolbar: Category Tabs + Search */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', flexWrap: 'wrap' }}>
         {/* Category Tabs */}
-        <div style={{ display: 'flex', gap: '0.25rem', overflowX: 'auto', background: 'rgba(255,255,255,0.03)', padding: '0.25rem', borderRadius: '0.625rem', border: '1px solid rgba(255,255,255,0.05)' }}>
-          {categories.map(cat => (
-            <button
-              key={cat}
-              className={`tab-item ${activeCategory === cat ? 'active' : ''}`}
-              onClick={() => setActiveCategory(cat)}
-              style={{ padding: '0.375rem 0.875rem', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
-            >
-              {cat !== 'All' && <span style={{ marginRight: '0.375rem' }}>{categoryIcons[cat]}</span>}
-              {cat}
-            </button>
-          ))}
+        <div style={{
+          display: 'flex', gap: '0.25rem', overflowX: 'auto', flex: 1,
+          background: 'rgba(255,255,255,0.025)', padding: '0.25rem',
+          borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)',
+          scrollbarWidth: 'none',
+        }}>
+          {categories.map(cat => {
+            const isActive = activeCategory === cat;
+            return (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.35rem',
+                  padding: '0.35rem 0.75rem', borderRadius: '7px', border: 'none', cursor: 'pointer',
+                  fontSize: '0.775rem', fontWeight: isActive ? 600 : 400, whiteSpace: 'nowrap',
+                  fontFamily: 'inherit', transition: 'all 0.15s',
+                  background: isActive ? 'rgba(0,212,255,0.12)' : 'transparent',
+                  color: isActive ? '#00D4FF' : '#64748B',
+                  outline: isActive ? '1px solid rgba(0,212,255,0.25)' : 'none',
+                }}
+              >
+                {cat !== 'All' && <span style={{ fontSize: '0.85rem' }}>{categoryIcons[cat]}</span>}
+                {cat}
+              </button>
+            );
+          })}
         </div>
 
         {/* Search */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0 0.75rem', height: '36px', borderRadius: '0.5rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', minWidth: '240px' }}>
-          <Search size={14} style={{ color: '#475569' }} />
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '0.5rem',
+          padding: '0 0.75rem', height: '36px', borderRadius: '8px',
+          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+          minWidth: '200px',
+        }}>
+          <Search size={13} style={{ color: '#475569', flexShrink: 0 }} />
           <input
             type="text"
             placeholder="Search automations..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: '0.8rem', color: '#F1F5F9', width: '100%', fontFamily: 'inherit' }}
+            style={{
+              background: 'transparent', border: 'none', outline: 'none',
+              fontSize: '0.8rem', color: '#F1F5F9', width: '100%', fontFamily: 'inherit',
+            }}
           />
         </div>
       </div>
 
       {/* Automation Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 1100 ? 3 : width >= 640 ? 2 : 1}, 1fr)`, gap: '1rem' }}>
-        {filtered.map(auto => (
-          <div
-            key={auto.id}
-            className="section-card"
-            style={{ cursor: 'pointer', overflow: 'hidden' }}
-            onClick={() => auto.id === 'auto-001' ? navigate('/automations/brd/run') : navigate(`/automations/${auto.id}`)}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.borderColor = `${auto.categoryColor}30`;
-              (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)';
-              (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 24px rgba(0,0,0,0.25)';
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.05)';
-              (e.currentTarget as HTMLElement).style.transform = 'translateY(0)';
-              (e.currentTarget as HTMLElement).style.boxShadow = 'none';
-            }}
-          >
-            {/* Top color strip */}
-            <div style={{ height: '3px', background: `linear-gradient(90deg, ${auto.categoryColor}, transparent)` }} />
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: '0.875rem' }}>
+        {filtered.map(auto => {
+          const isRunning = runningId === auto.id;
+          const isStarred = starred.has(auto.id);
+          const catColor  = categoryColors[auto.category] ?? auto.categoryColor ?? '#00D4FF';
 
-            <div style={{ padding: '1.125rem' }}>
-              {/* Header */}
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', flex: 1 }}>
-                  <div style={{
-                    width: '40px', height: '40px', borderRadius: '10px',
-                    background: `${auto.categoryColor}18`,
-                    border: `1px solid ${auto.categoryColor}25`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '1.25rem', flexShrink: 0,
-                  }}>
-                    {categoryIcons[auto.category] || '⚡'}
-                  </div>
-                  <div>
-                    <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#F1F5F9', margin: 0, lineHeight: 1.3 }}>{auto.name}</h3>
-                    <span style={{
-                      fontSize: '0.65rem', fontWeight: 600, padding: '1px 6px', borderRadius: '3px',
-                      background: `${auto.categoryColor}15`, color: auto.categoryColor,
-                      border: `1px solid ${auto.categoryColor}25`,
+          return (
+            <div
+              key={auto.id}
+              onClick={() => auto.id === 'auto-001' ? navigate('/automations/brd/run') : navigate(`/automations/${auto.id}`)}
+              style={{
+                borderRadius: '14px', cursor: 'pointer', overflow: 'hidden',
+                background: isRunning
+                  ? 'linear-gradient(145deg, rgba(0,212,255,0.06) 0%, rgba(8,12,24,0.95) 60%)'
+                  : 'rgba(255,255,255,0.025)',
+                border: isRunning
+                  ? '1px solid rgba(0,212,255,0.25)'
+                  : '1px solid rgba(255,255,255,0.06)',
+                transition: 'all 0.2s ease',
+                display: 'flex', flexDirection: 'column',
+              }}
+              onMouseEnter={e => {
+                const el = e.currentTarget as HTMLElement;
+                el.style.borderColor = `${catColor}30`;
+                el.style.transform = 'translateY(-2px)';
+                el.style.boxShadow = `0 8px 28px rgba(0,0,0,0.3), 0 0 0 1px ${catColor}15`;
+              }}
+              onMouseLeave={e => {
+                const el = e.currentTarget as HTMLElement;
+                el.style.borderColor = isRunning ? 'rgba(0,212,255,0.25)' : 'rgba(255,255,255,0.06)';
+                el.style.transform = 'translateY(0)';
+                el.style.boxShadow = 'none';
+              }}
+            >
+              <div style={{ padding: '1.125rem', flex: 1, display: 'flex', flexDirection: 'column', gap: 0 }}>
+
+                {/* Card Header */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', flex: 1, minWidth: 0 }}>
+                    {/* Icon */}
+                    <div style={{
+                      width: 44, height: 44, borderRadius: '12px', flexShrink: 0,
+                      background: `${catColor}18`, border: `1px solid ${catColor}28`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '1.3rem',
                     }}>
-                      {auto.category}
-                    </span>
+                      {categoryIcons[auto.category] ?? '⚡'}
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#F1F5F9', margin: '0 0 4px', lineHeight: 1.3, }}>
+                        {auto.name}
+                      </h3>
+                      {/* Category Badge */}
+                      <span style={{
+                        fontSize: '0.65rem', fontWeight: 600, padding: '2px 7px', borderRadius: '4px',
+                        background: `${catColor}15`, color: catColor, border: `1px solid ${catColor}25`,
+                        letterSpacing: '0.01em',
+                      }}>
+                        {auto.category}
+                      </span>
+                    </div>
+                  </div>
+                  {/* Star */}
+                  <button
+                    onClick={e => toggleStar(auto.id, e)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', flexShrink: 0 }}
+                  >
+                    <Star size={15} style={{ color: isStarred ? '#F59E0B' : '#334155', fill: isStarred ? '#F59E0B' : 'none', transition: 'all 0.15s' }} />
+                  </button>
+                </div>
+
+                {/* Description */}
+                <p style={{ fontSize: '0.78rem', color: '#475569', margin: '0 0 0.875rem', lineHeight: 1.55, flex: 1 }}>
+                  {auto.description.length > 110 ? auto.description.slice(0, 110) + '…' : auto.description}
+                </p>
+
+                {/* IN → OUT */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.875rem' }}>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: '0.375rem',
+                    padding: '3px 8px', borderRadius: '5px',
+                    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
+                  }}>
+                    <span style={{ fontSize: '0.6rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>IN</span>
+                    <span style={{ fontSize: '0.72rem', color: '#94A3B8' }}>{auto.inputType}</span>
+                  </div>
+                  <ArrowRight size={12} style={{ color: '#334155', flexShrink: 0 }} />
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: '0.375rem',
+                    padding: '3px 8px', borderRadius: '5px',
+                    background: `${catColor}0E`, border: `1px solid ${catColor}20`,
+                  }}>
+                    <span style={{ fontSize: '0.6rem', color: catColor, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>OUT</span>
+                    <span style={{ fontSize: '0.72rem', color: '#94A3B8' }}>{auto.outputType}</span>
                   </div>
                 </div>
-                <button
-                  onClick={(e) => toggleStar(auto.id, e)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem', flexShrink: 0 }}
-                >
-                  <Star size={15} style={{ color: starred.has(auto.id) ? '#F59E0B' : '#334155', fill: starred.has(auto.id) ? '#F59E0B' : 'none' }} />
-                </button>
-              </div>
 
-              {/* Description */}
-              <p style={{ fontSize: '0.78rem', color: '#475569', margin: '0 0 1rem', lineHeight: 1.5 }}>
-                {auto.description.slice(0, 100)}...
-              </p>
-
-              {/* Input/Output Chips */}
-              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.25rem 0.5rem', borderRadius: '4px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                  <span style={{ fontSize: '0.6rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>IN</span>
-                  <span style={{ fontSize: '0.72rem', color: '#94A3B8' }}>{auto.inputType}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.25rem 0.5rem', borderRadius: '4px', background: `${auto.categoryColor}10`, border: `1px solid ${auto.categoryColor}20` }}>
-                  <span style={{ fontSize: '0.6rem', color: auto.categoryColor, textTransform: 'uppercase', letterSpacing: '0.04em' }}>OUT</span>
-                  <span style={{ fontSize: '0.72rem', color: '#94A3B8' }}>{auto.outputType}</span>
-                </div>
-              </div>
-
-              {/* Stats Row */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                  <Play size={11} style={{ color: '#475569' }} />
-                  <span style={{ fontSize: '0.72rem', color: '#94A3B8' }}>{auto.runCount.toLocaleString()} runs</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                  <Clock size={11} style={{ color: '#475569' }} />
-                  <span style={{ fontSize: '0.72rem', color: '#475569' }}>{auto.lastRun}</span>
-                </div>
-                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                  <div style={{ width: '24px', height: '4px', borderRadius: '2px', background: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
-                    <div style={{ width: `${auto.successRate}%`, height: '100%', background: '#10B981', borderRadius: '2px' }} />
+                {/* Running progress bar (only for active running card) */}
+                {isRunning && (
+                  <div style={{ marginBottom: '0.875rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+                      <span style={{ fontSize: '0.7rem', color: '#00D4FF', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                        <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} /> Processing…
+                      </span>
+                      <span style={{ fontSize: '0.7rem', color: '#475569' }}>Est. 2 min remaining</span>
+                    </div>
+                    <div style={{ height: '4px', borderRadius: '9999px', background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                      <div style={{ width: '80%', height: '100%', borderRadius: '9999px', background: 'linear-gradient(90deg, #00D4FF, #0EA5E9)', boxShadow: '0 0 8px rgba(0,212,255,0.5)' }} />
+                    </div>
+                    <div style={{ fontSize: '0.68rem', color: '#475569', marginTop: '3px' }}>80% · Step 4/5</div>
                   </div>
-                  <span style={{ fontSize: '0.7rem', color: '#34D399' }}>{auto.successRate}%</span>
-                </div>
-              </div>
+                )}
 
-              {/* Action Buttons */}
-              <div style={{ display: 'flex', gap: '0.5rem' }} onClick={e => e.stopPropagation()}>
-                <button
-                  className="btn-primary"
-                  style={{ flex: 1, height: '32px', fontSize: '0.78rem', justifyContent: 'center' }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (auto.id === 'auto-001') navigate('/automations/brd/run');
-                    else navigate(`/automations/${auto.id}`);
-                  }}
-                >
-                  <Play size={12} /> Run Now
-                </button>
-                <button
-                  className="btn-ghost"
-                  style={{ height: '32px', fontSize: '0.78rem', padding: '0 0.75rem' }}
-                  onClick={(e) => { e.stopPropagation(); navigate(`/automations/${auto.id}`); }}
-                >
-                  <Settings size={12} /> Configure
-                </button>
+                {/* Last run + success rate */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', paddingTop: '0.625rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                    <Clock size={11} style={{ color: '#334155' }} />
+                    <span style={{ fontSize: '0.72rem', color: '#475569' }}>Last run: {auto.lastRun}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                    <div style={{ width: '6px', height: '6px', borderRadius: '9999px', background: '#10B981', boxShadow: '0 0 5px rgba(16,185,129,0.6)' }} />
+                    <span style={{ fontSize: '0.72rem', color: '#34D399', fontWeight: 600 }}>{auto.successRate}%</span>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div style={{ display: 'flex', gap: '0.5rem' }} onClick={e => e.stopPropagation()}>
+                  <button
+                    onClick={e => {
+                      e.stopPropagation();
+                      if (auto.id === 'auto-001') navigate('/automations/brd/run');
+                      else navigate(`/automations/${auto.id}`);
+                    }}
+                    disabled={isRunning}
+                    style={{
+                      flex: 1, height: '34px', borderRadius: '8px', border: 'none', cursor: isRunning ? 'default' : 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem',
+                      fontSize: '0.8rem', fontWeight: 600, fontFamily: 'inherit',
+                      background: isRunning
+                        ? 'rgba(0,212,255,0.1)'
+                        : 'linear-gradient(135deg, #00D4FF 0%, #0EA5E9 100%)',
+                      color: isRunning ? '#00D4FF' : '#060C1A',
+                      boxShadow: isRunning ? 'none' : '0 2px 12px rgba(0,212,255,0.3)',
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={e => {
+                      if (!isRunning) (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 20px rgba(0,212,255,0.5)';
+                    }}
+                    onMouseLeave={e => {
+                      if (!isRunning) (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 12px rgba(0,212,255,0.3)';
+                    }}
+                  >
+                    {isRunning
+                      ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Running</>
+                      : <><Play size={13} /> Run Now</>
+                    }
+                  </button>
+                  <button
+                    onClick={e => { e.stopPropagation(); navigate(`/automations/${auto.id}`); }}
+                    style={{
+                      width: '34px', height: '34px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)',
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: 'rgba(255,255,255,0.04)', color: '#475569', flexShrink: 0, fontFamily: 'inherit',
+                      transition: 'all 0.15s',
+                    }}
+                    onMouseEnter={e => {
+                      (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)';
+                      (e.currentTarget as HTMLElement).style.color = '#94A3B8';
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)';
+                      (e.currentTarget as HTMLElement).style.color = '#475569';
+                    }}
+                  >
+                    <Settings2 size={14} />
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
+
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 }
