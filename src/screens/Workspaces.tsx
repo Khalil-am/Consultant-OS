@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import {
   Search, Plus, Grid3X3, List, FileText, Video, CheckSquare,
   ChevronRight, TrendingUp, TrendingDown, DollarSign, RefreshCw,
-  X, AlertCircle, Briefcase, ArrowRight,
+  X, AlertCircle, Briefcase, CalendarDays, MoreVertical,
+  AlertTriangle, ShieldAlert,
 } from 'lucide-react';
 import { useLayout } from '../hooks/useLayout';
 import {
@@ -288,8 +289,13 @@ export default function Workspaces() {
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(90deg, ${stat.color}, ${stat.color}30)` }} />
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '50%', background: `linear-gradient(180deg, ${stat.color}07 0%, transparent 100%)`, pointerEvents: 'none' }} />
             <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-              <div style={{ padding: '0.5rem', borderRadius: '8px', background: `${stat.color}15`, color: stat.color }}>{stat.icon}</div>
-              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: stat.trendUp ? '#34D399' : '#FCA5A5' }}>{stat.trend}</span>
+              <div style={{ padding: '0.5rem', borderRadius: '8px', background: `${stat.color}15`, color: stat.color, display: 'flex' }}>{stat.icon}</div>
+              <span style={{
+                fontSize: '0.65rem', fontWeight: 700, padding: '2px 7px', borderRadius: '5px',
+                background: stat.trendUp ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)',
+                color: stat.trendUp ? '#34D399' : '#FCA5A5',
+                border: `1px solid ${stat.trendUp ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`,
+              }}>{stat.trend}</span>
             </div>
             <div style={{ position: 'relative' }}>
               <div style={{
@@ -485,148 +491,151 @@ export default function Workspaces() {
             }
 
             // ── Grid card ───────────────────────────────────────────────
+            const cardStatus = rag?.rag === 'Red' ? 'At Risk' : rag?.rag === 'Amber' ? 'On Hold' : ws.status;
+            const statusColor = cardStatus === 'Active' ? '#10B981' : cardStatus === 'At Risk' ? '#EF4444' : '#F59E0B';
+            const statusBg = cardStatus === 'Active' ? 'rgba(16,185,129,0.1)' : cardStatus === 'At Risk' ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)';
+
             return (
-              <div key={ws.id} style={{
-                background: '#0C1220', border: '1px solid rgba(255,255,255,0.07)',
-                borderRadius: '14px', cursor: 'pointer', overflow: 'hidden',
-                transition: 'all 0.25s', position: 'relative',
-              }}
+              <div key={ws.id}
+                onClick={() => navigate(`/workspaces/${ws.id}`)}
+                style={{
+                  background: '#0C1220',
+                  border: '1px solid rgba(255,255,255,0.07)',
+                  borderLeft: `4px solid ${sectorColor}`,
+                  borderRadius: '14px', cursor: 'pointer', overflow: 'hidden',
+                  transition: 'all 0.22s', position: 'relative',
+                  display: 'flex', flexDirection: 'column',
+                }}
                 onMouseEnter={e => {
                   const el = e.currentTarget as HTMLElement;
-                  el.style.borderColor = `${sectorColor}35`;
-                  el.style.transform = 'translateY(-3px)';
-                  el.style.boxShadow = `0 12px 32px rgba(0,0,0,0.35), 0 0 0 1px ${sectorColor}20`;
+                  el.style.borderColor = `rgba(255,255,255,0.12)`;
+                  el.style.borderLeftColor = sectorColor;
+                  el.style.transform = 'translateY(-2px)';
+                  el.style.boxShadow = `0 10px 30px rgba(0,0,0,0.3), 0 0 0 1px ${sectorColor}18`;
                 }}
                 onMouseLeave={e => {
                   const el = e.currentTarget as HTMLElement;
                   el.style.borderColor = 'rgba(255,255,255,0.07)';
+                  el.style.borderLeftColor = sectorColor;
                   el.style.transform = 'translateY(0)';
                   el.style.boxShadow = 'none';
                 }}
               >
-                {/* Top accent bar */}
-                <div style={{ height: '3px', background: `linear-gradient(90deg, ${sectorColor}, ${sectorColor}30)` }} />
-                {/* Gradient overlay inside card */}
-                <div style={{ position: 'absolute', top: 3, left: 0, right: 0, height: '80px', background: `linear-gradient(180deg, ${sectorColor}09 0%, transparent 100%)`, pointerEvents: 'none' }} />
+                {/* Left border glow overlay */}
+                <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '60px', background: `linear-gradient(90deg, ${sectorColor}08 0%, transparent 100%)`, pointerEvents: 'none', borderRadius: '0 0 0 0' }} />
 
-                <div style={{ padding: '1.125rem 1.25rem', position: 'relative' }}>
+                <div style={{ padding: '1.125rem 1.125rem 1rem', position: 'relative', flex: 1, display: 'flex', flexDirection: 'column' }}>
                   {/* Header */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.625rem' }}>
                     <div style={{ flex: 1, minWidth: 0, paddingRight: '0.5rem' }}>
-                      <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#F1F5F9', margin: 0, marginBottom: '3px', lineHeight: 1.3, letterSpacing: '-0.01em' }}>{ws.name}</h3>
+                      <h3 style={{ fontSize: '0.925rem', fontWeight: 800, color: '#F1F5F9', margin: '0 0 3px', lineHeight: 1.25, letterSpacing: '-0.01em' }}>{ws.name}</h3>
                       <p style={{ fontSize: '0.75rem', color: '#64748B', margin: 0 }}>{ws.client}</p>
                     </div>
-                    <span className={ws.status === 'Active' ? 'status-active' : 'status-pending'} style={{ fontSize: '0.62rem', flexShrink: 0 }}>{ws.status}</span>
+                    <span style={{
+                      fontSize: '0.62rem', fontWeight: 700, padding: '3px 8px', borderRadius: '6px',
+                      background: statusBg, color: statusColor,
+                      border: `1px solid ${statusColor}30`, whiteSpace: 'nowrap', flexShrink: 0,
+                    }}>{cardStatus}</span>
                   </div>
 
                   {/* Tags */}
-                  <div style={{ display: 'flex', gap: '0.375rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-                    <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '2px 8px', borderRadius: '5px', background: `${sectorColor}18`, color: sectorColor, border: `1px solid ${sectorColor}28` }}>{ws.sector}</span>
-                    <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '2px 8px', borderRadius: '5px', background: langColors[ws.language]?.bg ?? 'rgba(14,165,233,0.1)', color: langColors[ws.language]?.text ?? '#38BDF8', border: `1px solid ${langColors[ws.language]?.border ?? 'rgba(14,165,233,0.2)'}` }}>{ws.language}</span>
-                    <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '2px 8px', borderRadius: '5px', background: 'rgba(148,163,184,0.08)', color: '#94A3B8', border: '1px solid rgba(148,163,184,0.12)' }}>{ws.type}</span>
+                  <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginBottom: '0.875rem' }}>
+                    <span style={{ fontSize: '0.63rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', background: `${sectorColor}18`, color: sectorColor, border: `1px solid ${sectorColor}25` }}>{ws.sector}</span>
+                    <span style={{ fontSize: '0.63rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', background: langColors[ws.language]?.bg ?? 'rgba(14,165,233,0.1)', color: langColors[ws.language]?.text ?? '#38BDF8', border: `1px solid ${langColors[ws.language]?.border ?? 'rgba(14,165,233,0.2)'}` }}>{ws.language}</span>
+                    <span style={{ fontSize: '0.63rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', background: 'rgba(148,163,184,0.08)', color: '#94A3B8', border: '1px solid rgba(148,163,184,0.12)' }}>{ws.type}</span>
                   </div>
 
-                  {/* Financial Row */}
-                  {fin && (
-                    <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'rgba(255,255,255,0.025)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                        <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 500 }}>Contract Value</span>
-                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#F59E0B', textShadow: '0 0 12px rgba(245,158,11,0.3)' }}>{fmtSAR(fin.contract_value)}</span>
+                  {/* Financial Block */}
+                  {fin ? (
+                    <div style={{ marginBottom: '0.875rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '0.7rem', color: '#475569' }}>Contract Value</span>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#00D4FF' }}>{fmtSAR(fin.contract_value)}</span>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                        <span style={{ fontSize: '0.65rem', color: '#475569' }}>Spent {spentPct}%</span>
-                        <span style={{ fontSize: '0.65rem', color: fin.variance <= 0 ? '#34D399' : '#FCA5A5', fontWeight: 700 }}>
-                          {fin.variance === 0 ? 'On Budget' : (fin.variance > 0 ? '+' : '') + fmtSAR(Math.abs(fin.variance)) + ' variance'}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#475569' }}>Spent {spentPct ?? 0}%</span>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 700, color: fin.variance > 0 ? '#FCA5A5' : '#34D399' }}>
+                          {fin.variance === 0 ? 'On track' : (fin.variance > 0 ? 'SAR ' + (Math.abs(fin.variance) / 1000).toFixed(0) + 'K over' : 'SAR ' + (Math.abs(fin.variance) / 1000).toFixed(0) + 'K under')}
                         </span>
                       </div>
-                      <div style={{ height: '5px', borderRadius: '9999px', background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${spentPct ?? 0}%`, background: `linear-gradient(90deg, ${spentBarColor}, ${spentBarColor}cc)`, borderRadius: '9999px', transition: 'width 0.7s ease', boxShadow: `0 0 6px ${spentBarColor}60` }} />
+                      <div style={{ height: '4px', borderRadius: '9999px', background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${Math.min(spentPct ?? 0, 100)}%`, background: `linear-gradient(90deg, ${spentBarColor}, ${spentBarColor}cc)`, borderRadius: '9999px', transition: 'width 0.7s ease' }} />
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ marginBottom: '0.875rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '0.7rem', color: '#475569' }}>Delivery Progress</span>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#E2E8F0' }}>{ws.progress}%</span>
+                      </div>
+                      <div style={{ height: '4px', borderRadius: '9999px', background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${ws.progress}%`, background: progressGradient, borderRadius: '9999px', transition: 'width 0.7s ease' }} />
                       </div>
                     </div>
                   )}
 
-                  {/* RAG Indicators */}
-                  {rag && (
-                    <div style={{ display: 'flex', gap: '0.625rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-                      {([['Overall', rag.rag], ['Budget', rag.budget], ['Schedule', rag.schedule], ['Risk', rag.risk]] as [string, string][]).map(([label, status]) => (
-                        <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                          <div style={{ width: 7, height: 7, borderRadius: '50%', background: RAG_COLORS[status], boxShadow: `0 0 6px ${RAG_GLOW[status]}` }} />
-                          <span style={{ fontSize: '0.62rem', color: '#475569', fontWeight: 500 }}>{label}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Delivery Progress */}
-                  <div style={{ marginBottom: '1rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.425rem' }}>
-                      <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 500 }}>Delivery Progress</span>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#E2E8F0' }}>{ws.progress}%</span>
-                    </div>
-                    <div style={{ height: '5px', borderRadius: '9999px', background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${ws.progress}%`, background: progressGradient, borderRadius: '9999px', transition: 'width 0.7s ease' }} />
-                    </div>
-                  </div>
-
-                  {/* Stats row */}
-                  <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+                  {/* Stats dots row */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.625rem' }}>
                     {[
-                      { icon: <FileText size={12} />, count: ws.docs_count },
-                      { icon: <Video size={12} />, count: ws.meetings_count },
-                      { icon: <CheckSquare size={12} />, count: ws.tasks_count },
-                    ].map((item, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                        <span style={{ color: '#475569' }}>{item.icon}</span>
-                        <span style={{ fontSize: '0.75rem', color: '#94A3B8', fontWeight: 600 }}>{item.count}</span>
+                      { dot: '#00D4FF', icon: <CheckSquare size={11} />, count: ws.tasks_count, label: 'tasks' },
+                      { dot: '#F59E0B', icon: <AlertTriangle size={11} />, count: ws.docs_count, label: 'risks' },
+                      { dot: '#8B5CF6', icon: <ShieldAlert size={11} />, count: ws.meetings_count, label: 'issues' },
+                    ].map((s, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        {i > 0 && <span style={{ color: '#1E293B', fontSize: '0.7rem', marginRight: '1px' }}>•</span>}
+                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: s.dot, boxShadow: `0 0 5px ${s.dot}80`, flexShrink: 0 }} />
+                        <span style={{ fontSize: '0.72rem', color: '#94A3B8' }}>{s.count} {s.label}</span>
                       </div>
                     ))}
-                    <span style={{ fontSize: '0.65rem', color: '#334155', marginLeft: 'auto', alignSelf: 'center' }}>{ws.last_activity}</span>
                   </div>
 
-                  {/* Contributors */}
-                  <div style={{ display: 'flex', marginBottom: '1rem' }}>
-                    {ws.contributors.slice(0, 4).map((c, i) => (
-                      <div key={i} title={c} style={{
-                        width: 26, height: 26, borderRadius: '50%',
-                        background: avatarColors[i % avatarColors.length],
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '0.6rem', fontWeight: 800, color: 'white',
-                        border: '2px solid #0C1220', marginLeft: i > 0 ? '-7px' : 0,
-                        zIndex: 5 - i,
-                      }}>
-                        {c}
-                      </div>
-                    ))}
-                    {ws.contributors.length > 4 && (
-                      <div style={{
-                        width: 26, height: 26, borderRadius: '50%',
-                        background: 'rgba(255,255,255,0.09)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '0.6rem', fontWeight: 700, color: '#94A3B8',
-                        border: '2px solid #0C1220', marginLeft: '-7px',
-                      }}>
-                        +{ws.contributors.length - 4}
-                      </div>
-                    )}
+                  {/* Date range */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.875rem' }}>
+                    <CalendarDays size={11} style={{ color: '#475569', flexShrink: 0 }} />
+                    <span style={{ fontSize: '0.7rem', color: '#475569' }}>{ws.last_activity || 'No date set'}</span>
                   </div>
 
-                  {/* Action buttons */}
-                  <div style={{ display: 'flex', gap: '0.5rem', paddingTop: '0.875rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                    <button className="btn-primary" style={{ flex: 2, height: '32px', fontSize: '0.72rem', justifyContent: 'center' }}
-                      onClick={(e) => { e.stopPropagation(); navigate(`/workspaces/${ws.id}`); }}
+                  {/* Footer: avatars + three-dot */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                    {/* Avatar stack */}
+                    <div style={{ display: 'flex' }}>
+                      {ws.contributors.slice(0, 4).map((c, i) => (
+                        <div key={i} title={c} style={{
+                          width: 26, height: 26, borderRadius: '50%',
+                          background: avatarColors[i % avatarColors.length],
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: '0.58rem', fontWeight: 800, color: 'white',
+                          border: '2px solid #0C1220', marginLeft: i > 0 ? '-8px' : 0,
+                          zIndex: 5 - i, position: 'relative',
+                        }}>{c}</div>
+                      ))}
+                      {ws.contributors.length > 4 && (
+                        <div style={{
+                          width: 26, height: 26, borderRadius: '50%',
+                          background: 'rgba(255,255,255,0.08)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: '0.58rem', fontWeight: 700, color: '#94A3B8',
+                          border: '2px solid #0C1220', marginLeft: '-8px', position: 'relative',
+                        }}>+{ws.contributors.length - 4}</div>
+                      )}
+                      {ws.contributors.length === 0 && (
+                        <span style={{ fontSize: '0.68rem', color: '#334155' }}>No contributors</span>
+                      )}
+                    </div>
+
+                    {/* Three-dot menu */}
+                    <button
+                      onClick={e => { e.stopPropagation(); navigate(`/workspaces/${ws.id}`); }}
+                      style={{
+                        width: 28, height: 28, borderRadius: '6px', border: 'none',
+                        background: 'transparent', cursor: 'pointer', color: '#475569',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        transition: 'all 0.15s', fontFamily: 'inherit',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#94A3B8'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#475569'; }}
                     >
-                      Open <ArrowRight size={12} />
-                    </button>
-                    <button style={{
-                      flex: 1, height: '32px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
-                      borderRadius: '8px', border: '1px solid rgba(255,255,255,0.09)', background: 'rgba(255,255,255,0.04)',
-                      color: '#94A3B8', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, transition: 'all 0.15s',
-                    }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'; e.currentTarget.style.color = '#F1F5F9'; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; e.currentTarget.style.color = '#94A3B8'; }}
-                      onClick={(e) => { e.stopPropagation(); navigate(`/workspaces/${ws.id}`); }}
-                    >
-                      Financials
+                      <MoreVertical size={15} />
                     </button>
                   </div>
                 </div>
