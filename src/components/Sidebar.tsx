@@ -238,6 +238,22 @@ export default function Sidebar() {
             <div style={{ width: '7px', height: '7px', borderRadius: '9999px', background: '#10B981', boxShadow: '0 0 6px rgba(16,185,129,0.6)' }} />
           </div>
         </div>
+
+        {/* Footer */}
+        <a
+          href="https://khalil-am.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'block', textAlign: 'center', padding: '0.5rem 0', marginTop: '0.5rem',
+            fontSize: '0.6rem', color: '#334155', textDecoration: 'none',
+            letterSpacing: '0.04em', transition: 'color 0.15s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.color = '#64748B')}
+          onMouseLeave={e => (e.currentTarget.style.color = '#334155')}
+        >
+          Powered by <span style={{ fontWeight: 700, color: '#475569' }}>Khalil-am</span>
+        </a>
       </div>
     </aside>
   );

@@ -4,7 +4,7 @@ import {
   Search, Plus, Grid3X3, List, FileText, Video, CheckSquare,
   ChevronRight, TrendingUp, TrendingDown, DollarSign, RefreshCw,
   X, AlertCircle, Briefcase, CalendarDays, MoreVertical,
-  AlertTriangle, ShieldAlert,
+  AlertTriangle,
 } from 'lucide-react';
 import { useLayout } from '../hooks/useLayout';
 import {
@@ -474,8 +474,8 @@ export default function Workspaces() {
                   {fin && <div style={{ flexShrink: 0, textAlign: 'right' }}><div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#F59E0B' }}>{fmtSAR(fin.contract_value)}</div><div style={{ fontSize: '0.68rem', color: '#475569' }}>{spentPct}% spent</div></div>}
                   {rag && (
                     <div style={{ display: 'flex', gap: '0.375rem', flexShrink: 0, alignItems: 'center' }}>
-                      {(['rag', 'budget', 'schedule', 'risk'] as const).map(k => (
-                        <div key={k} title={k.charAt(0).toUpperCase() + k.slice(1)} style={{ width: 8, height: 8, borderRadius: '50%', background: RAG_COLORS[rag[k]], boxShadow: `0 0 6px ${RAG_GLOW[rag[k]]}` }} />
+                      {([['Overall', rag.rag], ['Budget', rag.budget], ['Schedule', rag.schedule], ['Risk', rag.risk]] as [string, string][]).map(([label, status]) => (
+                        <div key={label} title={label} style={{ width: 8, height: 8, borderRadius: '50%', background: RAG_COLORS[status] ?? '#475569', boxShadow: `0 0 6px ${RAG_GLOW[status] ?? 'transparent'}` }} />
                       ))}
                     </div>
                   )}
@@ -578,8 +578,8 @@ export default function Workspaces() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.625rem' }}>
                     {[
                       { dot: '#00D4FF', icon: <CheckSquare size={11} />, count: ws.tasks_count, label: 'tasks' },
-                      { dot: '#F59E0B', icon: <AlertTriangle size={11} />, count: ws.docs_count, label: 'risks' },
-                      { dot: '#8B5CF6', icon: <ShieldAlert size={11} />, count: ws.meetings_count, label: 'issues' },
+                      { dot: '#F59E0B', icon: <FileText size={11} />, count: ws.docs_count, label: 'docs' },
+                      { dot: '#8B5CF6', icon: <Video size={11} />, count: ws.meetings_count, label: 'meetings' },
                     ].map((s, i) => (
                       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                         {i > 0 && <span style={{ color: '#1E293B', fontSize: '0.7rem', marginRight: '1px' }}>•</span>}
