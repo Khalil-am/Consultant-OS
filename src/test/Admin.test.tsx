@@ -50,11 +50,11 @@ describe('Admin – Users table', () => {
   it('shows role badges for users', async () => {
     renderAdmin();
     await screen.findByText('Ahmed Khalil');
-    // Use getAllByText since "Admin" appears in sidebar too
-    const adminTexts = screen.getAllByText('Admin');
+    // Roles are displayed via roleDisplayNames mapping:
+    // Admin → 'System Admin', Manager → 'Senior Consultant'
+    const adminTexts = screen.getAllByText('System Admin');
     expect(adminTexts.length).toBeGreaterThan(0);
-    // "Manager" also appears in sidebar nav, use getAllByText
-    const managerTexts = screen.getAllByText('Manager');
+    const managerTexts = screen.getAllByText('Senior Consultant');
     expect(managerTexts.length).toBeGreaterThan(0);
   });
 
@@ -152,11 +152,10 @@ describe('Admin – Status toggle', () => {
     renderAdmin();
     await screen.findByText('Ahmed Khalil');
 
-    // The toggle is a styled div. Find by looking for the Active status indicator
-    // then clicking the sibling toggle element.
-    const statusCells = document.querySelectorAll('[style*="cursor: pointer"][style*="border-radius: 8px"]');
-    expect(statusCells.length).toBeGreaterThan(0);
-    fireEvent.click(statusCells[0]);
+    // The toggle is a 'Suspend' button for active users
+    const suspendBtns = screen.getAllByRole('button', { name: 'Suspend' });
+    expect(suspendBtns.length).toBeGreaterThan(0);
+    fireEvent.click(suspendBtns[0]);
 
     await waitFor(() => {
       const stored = JSON.parse(localStorage.getItem('admin_users') ?? '[]');
@@ -169,8 +168,8 @@ describe('Admin – Status toggle', () => {
     renderAdmin();
     await screen.findByText('Ahmed Khalil');
 
-    const toggles = document.querySelectorAll('[style*="cursor: pointer"][style*="border-radius: 8px"]');
-    fireEvent.click(toggles[0]);
+    const suspendBtns = screen.getAllByRole('button', { name: 'Suspend' });
+    fireEvent.click(suspendBtns[0]);
 
     await waitFor(() => {
       expect(localStorage.getItem('admin_users')).not.toBeNull();
@@ -184,67 +183,30 @@ describe('Admin – Section navigation', () => {
     renderAdmin();
     await screen.findByText('Ahmed Khalil');
     await userEvent.click(screen.getByText('Integrations'));
-    expect(await screen.findByText('Microsoft SharePoint')).toBeInTheDocument();
+    // Current integrations list only has Trello
+    expect(await screen.findByText('Trello')).toBeInTheDocument();
   });
 
-  it('switches to AI Models section', async () => {
+  it('shows only Users & Roles and Integrations sections', async () => {
     renderAdmin();
     await screen.findByText('Ahmed Khalil');
-    await userEvent.click(screen.getByText('AI Models'));
-    expect(await screen.findByText('AI Model Configuration')).toBeInTheDocument();
-  });
-
-  it('switches to Audit Logs section', async () => {
-    renderAdmin();
-    await screen.findByText('Ahmed Khalil');
-    await userEvent.click(screen.getByText('Audit Logs'));
-    expect(await screen.findByText('All system activity logs')).toBeInTheDocument();
-  });
-
-  it('switches to Workspaces section and shows DB workspaces', async () => {
-    renderAdmin();
-    await screen.findByText('Ahmed Khalil');
-    // "Workspaces" appears in nav AND table header; click the first (nav) one
-    await userEvent.click(screen.getAllByText('Workspaces')[0]);
-    expect(await screen.findByText('MOCI')).toBeInTheDocument();
-  });
-
-  it('switches to Prompt Library section', async () => {
-    renderAdmin();
-    await screen.findByText('Ahmed Khalil');
-    await userEvent.click(screen.getByText('Prompt Library'));
-    expect(await screen.findByText('BRD Section Extractor')).toBeInTheDocument();
-  });
-
-  it('switches to Notifications section', async () => {
-    renderAdmin();
-    await screen.findByText('Ahmed Khalil');
-    await userEvent.click(screen.getByText('Notifications'));
-    expect(await screen.findByText('Notification Rules')).toBeInTheDocument();
-  });
-
-  it('switches to Approval Rules section', async () => {
-    renderAdmin();
-    await screen.findByText('Ahmed Khalil');
-    await userEvent.click(screen.getByText('Approval Rules'));
-    expect(await screen.findByText('Approval Workflow Rules')).toBeInTheDocument();
+    // Both appear multiple times (sidebar nav + content header)
+    expect(screen.getAllByText('Users & Roles').length).toBeGreaterThan(0);
+    expect(screen.getByText('Integrations')).toBeInTheDocument();
   });
 });
 
 // ────────────────────────────────────────────────────────────
-describe('Admin – Role Permissions Matrix', () => {
-  it('shows role permissions matrix on Users section', async () => {
+describe('Admin – Role Distribution', () => {
+  it('shows role distribution section on Users page', async () => {
     renderAdmin();
     await screen.findByText('Ahmed Khalil');
-    expect(screen.getByText('Role Permissions Matrix')).toBeInTheDocument();
+    expect(screen.getByText('Role Distribution')).toBeInTheDocument();
   });
 
-  it('shows all 5 roles in permissions matrix', async () => {
+  it('shows AI Access Auditor section', async () => {
     renderAdmin();
     await screen.findByText('Ahmed Khalil');
-    // Roles in the matrix
-    expect(screen.getByText('Consultant')).toBeInTheDocument();
-    expect(screen.getByText('Analyst')).toBeInTheDocument();
-    expect(screen.getByText('Viewer')).toBeInTheDocument();
+    expect(screen.getByText('AI Access Auditor')).toBeInTheDocument();
   });
 });

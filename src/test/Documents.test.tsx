@@ -146,7 +146,7 @@ describe('Documents – Search', () => {
     renderDocuments();
     await screen.findByText('NCA Enterprise Architecture BRD v2.3');
 
-    const searchInput = screen.getByPlaceholderText(/search/i);
+    const searchInput = screen.getByPlaceholderText(/filter docs/i);
     await userEvent.type(searchInput, 'MOCI');
     expect(screen.getByText('MOCI Procurement Plan')).toBeInTheDocument();
     expect(screen.queryByText('NCA Enterprise Architecture BRD v2.3')).not.toBeInTheDocument();
@@ -158,7 +158,7 @@ describe('Documents – Search', () => {
     renderDocuments();
     await screen.findByText('NCA Enterprise Architecture BRD v2.3');
 
-    const searchInput = screen.getByPlaceholderText(/search/i);
+    const searchInput = screen.getByPlaceholderText(/filter docs/i);
     await userEvent.type(searchInput, 'MOCI');
     await userEvent.clear(searchInput);
     expect(screen.getByText('NCA Enterprise Architecture BRD v2.3')).toBeInTheDocument();

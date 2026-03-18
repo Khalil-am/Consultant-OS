@@ -98,7 +98,7 @@ describe('Reports – Initial load', () => {
 
   it('shows empty state when no reports', async () => {
     renderReports();
-    expect(await screen.findByText(/no reports found/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no reports yet/i)).toBeInTheDocument();
   });
 
   it('renders report cards from supabase', async () => {
@@ -109,16 +109,17 @@ describe('Reports – Initial load', () => {
 
   it('shows stat cards', async () => {
     renderReports();
-    expect(await screen.findByText('Reports This Month')).toBeInTheDocument();
-    expect(screen.getByText('Pending Sign-offs')).toBeInTheDocument();
-    expect(screen.getByText('Total Downloads')).toBeInTheDocument();
+    expect(await screen.findByText('Total Generated')).toBeInTheDocument();
+    expect(screen.getByText('Scheduled')).toBeInTheDocument();
+    expect(screen.getByText('Avg. Gen Time')).toBeInTheDocument();
   });
 
   it('shows board pack generator section', async () => {
     renderReports();
-    await screen.findByText('Reports This Month');
-    expect(screen.getByText('Generate Board Pack')).toBeInTheDocument();
-    expect(screen.getByText('Executive Dashboard')).toBeInTheDocument();
+    await screen.findByText('Total Generated');
+    // Board Pack section header and its first checklist item
+    expect(screen.getByText('Board Pack')).toBeInTheDocument();
+    expect(screen.getByText('Executive Summary')).toBeInTheDocument();
   });
 });
 
@@ -130,13 +131,15 @@ describe('Reports – Category filter tabs', () => {
     renderReports();
     await screen.findByText('Weekly Status Report — W10');
 
+    // Filter tabs are in the Recent Reports section header
     await userEvent.click(screen.getByRole('button', { name: 'Weekly Status' }));
     expect(screen.getByText('Weekly Status Report — W10')).toBeInTheDocument();
+    // Monthly should be filtered out
     expect(screen.queryByText('Monthly Progress')).not.toBeInTheDocument();
   });
 
   it('shows all reports after switching back to All Reports', async () => {
-    const board = { ...mockReport, id: 'r3', title: 'Board Pack', type: 'Board Summary' };
+    const board = { ...mockReport, id: 'r3', title: 'Board Pack Report', type: 'Board Summary' };
     mockGetReports.mockResolvedValueOnce([mockReport, board]);
     renderReports();
     await screen.findByText('Weekly Status Report — W10');
@@ -144,7 +147,7 @@ describe('Reports – Category filter tabs', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Board Summaries' }));
     await userEvent.click(screen.getByRole('button', { name: 'All Reports' }));
     expect(screen.getByText('Weekly Status Report — W10')).toBeInTheDocument();
-    expect(screen.getByText('Board Pack')).toBeInTheDocument();
+    expect(screen.getByText('Board Pack Report')).toBeInTheDocument();
   });
 });
 
@@ -156,7 +159,7 @@ describe('Reports – Search', () => {
     renderReports();
     await screen.findByText('Weekly Status Report — W10');
 
-    const searchInput = screen.getByPlaceholderText(/search reports/i);
+    const searchInput = screen.getByPlaceholderText(/search reports\.\.\./i);
     await userEvent.type(searchInput, 'Procurement');
     expect(screen.getByText('Procurement Summary Report')).toBeInTheDocument();
     expect(screen.queryByText('Weekly Status Report — W10')).not.toBeInTheDocument();
@@ -168,7 +171,7 @@ describe('Reports – Search', () => {
     renderReports();
     await screen.findByText('Weekly Status Report — W10');
 
-    const searchInput = screen.getByPlaceholderText(/search reports/i);
+    const searchInput = screen.getByPlaceholderText(/search reports\.\.\./i);
     await userEvent.type(searchInput, 'Risk');
     expect(screen.queryByText('Weekly Status Report — W10')).not.toBeInTheDocument();
     await userEvent.clear(searchInput);
@@ -233,7 +236,8 @@ describe('Reports – Generate Report', () => {
     await waitFor(() => expect(mockChatWithDocument).toHaveBeenCalledTimes(1));
     const callArgs = mockChatWithDocument.mock.calls[0];
     // First arg is messages array, second is system prompt
-    expect(callArgs[1]).toContain('Weekly Status Report');
+    // Default reportType is 'Status Report'
+    expect(callArgs[1]).toContain('Status Report');
   });
 });
 
@@ -341,8 +345,8 @@ describe('Reports – Workspace dropdown', () => {
 describe('Reports – Scheduled Reports', () => {
   it('shows scheduled reports table', async () => {
     renderReports();
-    await screen.findByText('Reports This Month');
+    await screen.findByText('Total Generated');
     expect(screen.getByText('Scheduled Reports')).toBeInTheDocument();
-    expect(screen.getByText('Weekly Portfolio Status')).toBeInTheDocument();
+    expect(screen.getByText('Weekly PMO Status')).toBeInTheDocument();
   });
 });

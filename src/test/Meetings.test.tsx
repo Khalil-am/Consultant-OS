@@ -135,10 +135,12 @@ describe('Meetings – Filter tabs', () => {
   it('filter tabs are all rendered', async () => {
     renderMeetings();
     await screen.findByText('No meetings found');
-    const filterNames = ['All', 'Upcoming', 'In Progress', 'Completed', 'Committee'];
-    for (const name of filterNames) {
-      expect(screen.getByRole('button', { name })).toBeInTheDocument();
-    }
+    // filterTabs = ['All', 'Upcoming', 'Completed', 'Needs Action']
+    // 'All' renders as 'All Meetings'
+    expect(screen.getByRole('button', { name: 'All Meetings' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Upcoming' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Completed' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Needs Action' })).toBeInTheDocument();
   });
 });
 

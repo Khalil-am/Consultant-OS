@@ -24,18 +24,25 @@ const typeColors: Record<string, { bg: string; text: string; border: string; acc
 const avatarBgs = ['#0EA5E9', '#8B5CF6', '#10B981', '#F59E0B', '#EF4444'];
 
 const MONTH_NAMES = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+const LONG_MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-// Current month calendar (March 2026)
-const miniCalendar = [
-  { day: 'Sun', dates: [1, 8, 15, 22, 29] },
-  { day: 'Mon', dates: [2, 9, 16, 23, 30] },
-  { day: 'Tue', dates: [3, 10, 17, 24, 31] },
-  { day: 'Wed', dates: [4, 11, 18, 25] },
-  { day: 'Thu', dates: [5, 12, 19, 26] },
-  { day: 'Fri', dates: [6, 13, 20, 27] },
-  { day: 'Sat', dates: [7, 14, 21, 28] },
-];
-const TODAY_DATE = 17;
+// Dynamic mini calendar for current month
+function buildMiniCalendar(year: number, month: number): { day: string; dates: number[] }[] {
+  const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cols: { day: string; dates: number[] }[] = DAYS.map(d => ({ day: d, dates: [] }));
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dow = (new Date(year, month, d).getDay());
+    cols[dow].dates.push(d);
+  }
+  return cols;
+}
+
+const _today = new Date();
+const miniCalendar = buildMiniCalendar(_today.getFullYear(), _today.getMonth());
+const TODAY_DATE = _today.getDate();
+const CURRENT_MONTH_LABEL = `${LONG_MONTH_NAMES[_today.getMonth()]} ${_today.getFullYear()}`;
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { bg: string; color: string; border: string; dot: string }> = {
@@ -472,6 +479,39 @@ export default function Meetings() {
                           </button>
                         </div>
                       )}
+
+                      {/* Edit / Delete buttons */}
+                      <div style={{ display: 'flex', gap: '4px', marginTop: '0.375rem' }}>
+                        <button
+                          onClick={e => openEditModal(meeting, e)}
+                          title="Edit meeting"
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '3px',
+                            fontSize: '0.62rem', fontWeight: 500, padding: '3px 8px', borderRadius: '5px',
+                            background: 'rgba(255,255,255,0.04)', color: '#64748B',
+                            border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer', fontFamily: 'inherit',
+                          }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#94A3B8'; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#64748B'; }}
+                        >
+                          <Pencil size={10} /> Edit
+                        </button>
+                        <button
+                          onClick={e => handleDeleteMeeting(meeting.id, e)}
+                          title="Delete meeting"
+                          disabled={deletingId === meeting.id}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '3px',
+                            fontSize: '0.62rem', fontWeight: 500, padding: '3px 8px', borderRadius: '5px',
+                            background: 'rgba(239,68,68,0.06)', color: '#EF4444',
+                            border: '1px solid rgba(239,68,68,0.15)', cursor: 'pointer', fontFamily: 'inherit', opacity: deletingId === meeting.id ? 0.5 : 1,
+                          }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.12)'; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.06)'; }}
+                        >
+                          <Trash2 size={10} /> Delete
+                        </button>
+                      </div>
                     </div>
 
                     {/* Right side: avatar stack + chevron */}
@@ -517,7 +557,7 @@ export default function Meetings() {
           {/* Mini Calendar */}
           <div className="section-card" style={{ padding: '1rem 1.125rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-              <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>March 2026</span>
+              <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>{CURRENT_MONTH_LABEL}</span>
               <Calendar size={13} style={{ color: 'var(--text-muted)' }} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', textAlign: 'center', marginBottom: '0.25rem' }}>

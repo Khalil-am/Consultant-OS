@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useLayout } from '../hooks/useLayout';
 import {
   Download, Calendar, Sparkles, Clock, FileText,
-  Search, X, Zap, MoreHorizontal, CheckSquare, Square,
+  Search, X, Zap, MoreHorizontal, CheckSquare, Square, Trash2,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell
@@ -93,7 +93,7 @@ function formatReportDate(dateStr: string) {
 }
 
 export default function Reports() {
-  const { width, isMobile, isTablet } = useLayout();
+  const { width, isTablet } = useLayout();
   const [reportType, setReportType] = useState('Status Report');
   const [selectedWorkspace, setSelectedWorkspace] = useState('All Workspaces');
   const [generatingPack, setGeneratingPack] = useState<string | null>(null);
@@ -109,10 +109,8 @@ export default function Reports() {
   const [deletingReportId, setDeletingReportId] = useState<string | null>(null);
   const [boardPackChecked, setBoardPackChecked] = useState<Set<number>>(new Set([0, 1]));
   const [includeAttachments, setIncludeAttachments] = useState(false);
+  const [reportFilter, setReportFilter] = useState('All Reports');
 
-  // suppress unused warnings
-  void isMobile;
-  void deletingReportId;
 
   useEffect(() => {
     getReports().then(setReports).catch(() => {});
@@ -230,7 +228,13 @@ ${contextParts || 'No workspace data available.'}`;
 
   const filtered = reports.filter(r => {
     const matchesSearch = !search || r.title.toLowerCase().includes(search.toLowerCase()) || r.workspace?.toLowerCase().includes(search.toLowerCase());
-    return matchesSearch;
+    const matchesFilter =
+      reportFilter === 'All Reports' ? true :
+      reportFilter === 'Weekly Status' ? (r.type === 'Weekly Status' || r.type?.toLowerCase().includes('weekly')) :
+      reportFilter === 'Monthly Reports' ? (r.type?.toLowerCase().includes('monthly')) :
+      reportFilter === 'Board Summaries' ? (r.type === 'Board Summary') :
+      true;
+    return matchesSearch && matchesFilter;
   });
 
   const handleGeneratePack = async (title: string, desc: string) => {
@@ -268,10 +272,8 @@ ${contextParts || 'No workspace data available.'}`;
     }
   };
 
-  // suppress unused
+  // suppress unused warning for generatedPacks (used only in setter)
   void generatedPacks;
-  void handleDeleteReport;
-  void handleDownloadReport;
 
   const selectStyle: React.CSSProperties = {
     width: '100%', padding: '0.5rem 0.75rem',
@@ -393,12 +395,30 @@ ${contextParts || 'No workspace data available.'}`;
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>Recent Reports</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  {/* Filter tabs */}
+                  <div style={{ display: 'flex', gap: '2px', background: 'rgba(255,255,255,0.03)', padding: '2px', borderRadius: '7px', border: '1px solid var(--border-subtle)' }}>
+                    {(['All Reports', 'Weekly Status', 'Monthly Reports', 'Board Summaries'] as const).map(tab => (
+                      <button
+                        key={tab}
+                        onClick={() => setReportFilter(tab)}
+                        style={{
+                          padding: '3px 9px', borderRadius: '5px', fontSize: '0.68rem', fontWeight: 500,
+                          background: reportFilter === tab ? 'rgba(14,165,233,0.15)' : 'transparent',
+                          color: reportFilter === tab ? '#38BDF8' : '#64748B',
+                          border: reportFilter === tab ? '1px solid rgba(14,165,233,0.25)' : '1px solid transparent',
+                          cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {tab}
+                      </button>
+                    ))}
+                  </div>
                   <div style={{ position: 'relative' }}>
                     <Search size={12} style={{ position: 'absolute', left: '0.6rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
                     <input
                       className="input-field"
-                      placeholder="Search..."
+                      placeholder="Search reports..."
                       value={search}
                       onChange={e => setSearch(e.target.value)}
                       style={{ paddingLeft: '1.8rem', height: '30px', fontSize: '0.72rem', width: '140px' }}
@@ -424,7 +444,7 @@ ${contextParts || 'No workspace data available.'}`;
                         <th style={{ fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700, color: 'var(--text-muted)' }}>WORKSPACE</th>
                         <th style={{ fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700, color: 'var(--text-muted)' }}>STATUS</th>
                         <th style={{ fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700, color: 'var(--text-muted)' }}>DATE</th>
-                        <th style={{ fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700, color: 'var(--text-muted)', width: '40px' }}>ACTION</th>
+                        <th style={{ fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700, color: 'var(--text-muted)', width: '72px' }}>ACTIONS</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -455,14 +475,25 @@ ${contextParts || 'No workspace data available.'}`;
                             <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{formatReportDate(report.date)}</span>
                           </td>
                           <td>
-                            <button
-                              className="btn-ghost"
-                              style={{ padding: '2px 6px', height: '24px', minWidth: 'unset' }}
-                              onClick={() => handleDownloadReport(report)}
-                              title="Download"
-                            >
-                              <MoreHorizontal size={14} />
-                            </button>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <button
+                                className="btn-ghost"
+                                style={{ padding: '2px 6px', height: '24px', minWidth: 'unset' }}
+                                onClick={() => handleDownloadReport(report)}
+                                title="Download"
+                              >
+                                <Download size={13} />
+                              </button>
+                              <button
+                                className="btn-ghost"
+                                style={{ padding: '2px 6px', height: '24px', minWidth: 'unset', color: deletingReportId === report.id ? '#EF4444' : undefined }}
+                                onClick={() => handleDeleteReport(report.id)}
+                                title="Delete"
+                                disabled={deletingReportId === report.id}
+                              >
+                                <Trash2 size={13} style={{ color: '#EF4444', opacity: 0.7 }} />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}

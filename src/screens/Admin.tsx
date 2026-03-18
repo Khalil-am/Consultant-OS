@@ -78,9 +78,6 @@ export default function Admin() {
   const [currentPage, setCurrentPage] = useState(1);
 
 
-  // suppress unused warnings
-  void width;
-
   const filteredUsers = useMemo(() => {
     if (roleFilter === 'All') return userList;
     if (roleFilter === 'Admins') return userList.filter(u => u.role === 'Admin');

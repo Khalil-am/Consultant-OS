@@ -11,7 +11,7 @@ const pageMeta: Record<string, { title: string; sub: string }> = {
   '/meetings':    { title: 'Meetings',           sub: '3 upcoming this week' },
   '/tasks':       { title: 'Tasks & Risks',      sub: '127 tasks · 19 risks tracked' },
   '/reports':     { title: 'Reports',            sub: '8 reports generated this month' },
-  '/knowledge':   { title: 'Knowledge Base',     sub: 'Semantic search across all workspace knowledge' },
+  '/ask-ai':      { title: 'Ask AI',             sub: 'Powered by advanced AI models' },
   '/templates':   { title: 'Templates',          sub: '12 templates available' },
   '/admin':       { title: 'Admin',              sub: 'System configuration and user management' },
 };
@@ -216,7 +216,7 @@ export default function TopBar() {
 
         {/* Ask AI */}
         <button
-          onClick={() => navigate('/knowledge')}
+          onClick={() => navigate('/ask-ai')}
           style={{
             height: '34px', padding: isMobile ? '0 0.625rem' : '0 0.875rem',
             fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', border: 'none',

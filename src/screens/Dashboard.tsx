@@ -221,7 +221,7 @@ export default function Dashboard() {
                 Live · Board Overview
               </span>
               <span style={{ width: '1px', height: '12px', background: 'rgba(255,255,255,0.1)' }} />
-              <span style={{ fontSize: '0.68rem', color: '#475569', letterSpacing: '0.04em' }}>16 March 2026</span>
+              <span style={{ fontSize: '0.68rem', color: '#475569', letterSpacing: '0.04em' }}>{new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
             </div>
             <h1 style={{ margin: 0, fontSize: isMobile ? '1.6rem' : '2.2rem', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1, marginBottom: '0.75rem' }}>
               <span style={{
@@ -977,7 +977,7 @@ export default function Dashboard() {
         position: 'relative',
         overflow: 'hidden',
         cursor: 'pointer',
-      }} onClick={() => navigate('/knowledge')}>
+      }} onClick={() => navigate('/ask-ai')}>
         {/* Glow orbs */}
         <div style={{ position: 'absolute', top: -60, right: 80, width: 240, height: 240, borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.12) 0%, transparent 65%)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', bottom: -40, left: 120, width: 160, height: 160, borderRadius: '50%', background: 'radial-gradient(circle, rgba(0,212,255,0.07) 0%, transparent 65%)', pointerEvents: 'none' }} />
