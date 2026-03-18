@@ -19,7 +19,6 @@ const MeetingDetail   = lazy(() => import('./screens/MeetingDetail'));
 const Tasks           = lazy(() => import('./screens/Tasks'));
 const Reports         = lazy(() => import('./screens/Reports'));
 const AskAI           = lazy(() => import('./screens/AskAI'));
-const Templates       = lazy(() => import('./screens/Templates'));
 const Admin           = lazy(() => import('./screens/Admin'));
 const BrdRunPage      = lazy(() => import('./screens/BrdRunPage'));
 
@@ -76,7 +75,6 @@ function AppShell() {
               <Route path="/tasks" element={<Tasks />} />
               <Route path="/reports" element={<Reports />} />
               <Route path="/ask-ai" element={<AskAI />} />
-              <Route path="/templates" element={<Templates />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/automations/brd/run" element={<BrdRunPage />} />
             </Routes>

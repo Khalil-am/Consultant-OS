@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Briefcase, Zap, FileText, Video,
-  CheckSquare, BarChart3, Sparkles, Layout, Settings, X,
+  CheckSquare, BarChart3, Sparkles, Settings, X,
 } from 'lucide-react';
 import { useLayout } from '../hooks/useLayout';
 
@@ -27,7 +27,6 @@ const navSections = [
     section: 'AI',
     items: [
       { label: 'Ask AI', icon: Sparkles, path: '/ask-ai' },
-      { label: 'Templates', icon: Layout, path: '/templates' },
     ],
   },
   {

@@ -12,7 +12,6 @@ const pageMeta: Record<string, { title: string; sub: string }> = {
   '/tasks':       { title: 'Tasks & Risks',      sub: '127 tasks · 19 risks tracked' },
   '/reports':     { title: 'Reports',            sub: '8 reports generated this month' },
   '/ask-ai':      { title: 'Ask AI',             sub: 'Powered by advanced AI models' },
-  '/templates':   { title: 'Templates',          sub: '12 templates available' },
   '/admin':       { title: 'Admin',              sub: 'System configuration and user management' },
 };
 
