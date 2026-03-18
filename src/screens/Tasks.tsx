@@ -1,545 +1,738 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLayout } from '../hooks/useLayout';
 import {
-  Search, ExternalLink, RefreshCw, Filter, CheckSquare,
-  Clock, MessageSquare, Paperclip, DollarSign, User, AlertTriangle,
-  ChevronDown, TrendingUp, X, BarChart2,
+  Plus, Search, Loader2, X, Pencil, Trash2, CheckCircle,
+  Clock, AlertTriangle, CheckSquare, Circle, ChevronDown,
+  ListTodo, User, CalendarDays, Layers,
 } from 'lucide-react';
-import { BA_CARDS, BA_LISTS } from '../data/baTraffic';
-import { fetchBATrafficBoard } from '../lib/trello';
-import type { BACard } from '../lib/trello';
+import { getTasks, upsertTask, updateTask, deleteTask, getWorkspaces } from '../lib/db';
+import type { TaskRow, WorkspaceRow } from '../lib/db';
+import { v4 as uuid } from 'uuid';
 
 // ── Constants ─────────────────────────────────────────────────
 
-const LIST_META: Record<string, { color: string; track: string; dot: string }> = {
-  'In Progress':              { color: '#0EA5E9', track: 'rgba(14,165,233,0.12)',  dot: '#38BDF8' },
-  'Documentation':            { color: '#8B5CF6', track: 'rgba(139,92,246,0.12)', dot: '#A78BFA' },
-  'Design':                   { color: '#EC4899', track: 'rgba(236,72,153,0.12)', dot: '#F472B6' },
-  'Ready For Configuration':  { color: '#10B981', track: 'rgba(16,185,129,0.12)', dot: '#34D399' },
-  'Pending Client(Delivery)': { color: '#F59E0B', track: 'rgba(245,158,11,0.12)', dot: '#FCD34D' },
-  "Next Week's Traffic":      { color: '#00D4FF', track: 'rgba(0,212,255,0.1)',   dot: '#00D4FF' },
-  'Backlog':                  { color: '#475569', track: 'rgba(71,85,105,0.15)',   dot: '#94A3B8' },
-  'On Hold':                  { color: '#EF4444', track: 'rgba(239,68,68,0.12)',   dot: '#FCA5A5' },
-  'Done (Business)':          { color: '#10B981', track: 'rgba(16,185,129,0.08)', dot: '#34D399' },
+const STATUS_LIST = ['Backlog', 'In Progress', 'In Review', 'Completed', 'Overdue'] as const;
+type TaskStatus = typeof STATUS_LIST[number];
+
+const PRIORITY_LIST = ['High', 'Medium', 'Low'] as const;
+type TaskPriority = typeof PRIORITY_LIST[number];
+
+const FILTER_TABS = ['All', ...STATUS_LIST] as const;
+
+const STATUS_META: Record<TaskStatus, { color: string; bg: string; border: string; dot: string }> = {
+  'Backlog':     { color: '#94A3B8', bg: 'rgba(71,85,105,0.12)',   border: 'rgba(71,85,105,0.25)',   dot: '#475569' },
+  'In Progress': { color: '#38BDF8', bg: 'rgba(14,165,233,0.1)',   border: 'rgba(14,165,233,0.22)',  dot: '#0EA5E9' },
+  'In Review':   { color: '#A78BFA', bg: 'rgba(139,92,246,0.12)',  border: 'rgba(139,92,246,0.25)',  dot: '#8B5CF6' },
+  'Completed':   { color: '#34D399', bg: 'rgba(16,185,129,0.1)',   border: 'rgba(16,185,129,0.22)',  dot: '#10B981' },
+  'Overdue':     { color: '#FCA5A5', bg: 'rgba(239,68,68,0.1)',    border: 'rgba(239,68,68,0.22)',   dot: '#EF4444' },
 };
 
-const PRIORITY_META: Record<string, { color: string; bg: string; border: string; rank: number }> = {
-  'Highest': { color: '#FCA5A5', bg: 'rgba(239,68,68,0.14)',  border: 'rgba(239,68,68,0.3)',   rank: 5 },
-  'High':    { color: '#FCD34D', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.28)', rank: 4 },
-  'Medium':  { color: '#38BDF8', bg: 'rgba(14,165,233,0.1)',  border: 'rgba(14,165,233,0.22)', rank: 3 },
-  'Low':     { color: '#34D399', bg: 'rgba(16,185,129,0.1)',  border: 'rgba(16,185,129,0.22)', rank: 2 },
-  'Lowest':  { color: '#94A3B8', bg: 'rgba(71,85,105,0.1)',   border: 'rgba(71,85,105,0.2)',   rank: 1 },
+const PRIORITY_META: Record<TaskPriority, { color: string; bg: string; border: string }> = {
+  'High':   { color: '#FCA5A5', bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.22)'   },
+  'Medium': { color: '#FCD34D', bg: 'rgba(245,158,11,0.1)',  border: 'rgba(245,158,11,0.22)'  },
+  'Low':    { color: '#34D399', bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.2)'   },
 };
 
-const PRODUCT_META: Record<string, { color: string; bg: string; border: string }> = {
-  'P+':      { color: '#93C5FD', bg: 'rgba(59,130,246,0.12)',  border: 'rgba(59,130,246,0.25)' },
-  'S+':      { color: '#C4B5FD', bg: 'rgba(139,92,246,0.12)',  border: 'rgba(139,92,246,0.25)' },
-  'Meeting': { color: '#CBD5E1', bg: 'rgba(100,116,139,0.12)', border: 'rgba(100,116,139,0.22)' },
-};
+// ── Helpers ───────────────────────────────────────────────────
 
-const DONE_LIST = 'Done (Business)';
-
-function isOverdue(card: BACard): boolean {
-  if (!card.dueDate || card.dueComplete) return false;
-  return new Date(card.dueDate) < new Date();
-}
-
-function fmtDate(d: string): string {
+function fmtDate(d: string | null | undefined): string {
   if (!d) return '—';
   const dt = new Date(d);
+  if (isNaN(dt.getTime())) return '—';
   return dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' });
 }
 
-function memberInitials(m: string): string {
-  // trello username → initials
-  const map: Record<string, string> = {
-    khalil_mushref: 'KM', khaldounalhaj2: 'KH', aalkayyali3: 'AA', hibataha4: 'HT',
-    abdulazizalftaieh1: 'AZ', walaalsayed: 'WA', salehalmufadhi: 'SA', ranarahhal: 'RR',
-  };
-  return map[m] || m.slice(0, 2).toUpperCase();
+function isOverdue(task: TaskRow): boolean {
+  if (!task.due_date) return false;
+  if (task.status === 'Completed') return false;
+  return new Date(task.due_date) < new Date();
 }
 
 // ── Sub-components ────────────────────────────────────────────
 
-function PriorityBadge({ p }: { p: string }) {
-  if (!p) return null;
-  const m = PRIORITY_META[p] || PRIORITY_META.Medium;
+function PriorityBadge({ priority }: { priority: TaskPriority }) {
+  const m = PRIORITY_META[priority];
   return (
-    <span style={{ fontSize: '0.62rem', fontWeight: 700, padding: '1px 6px', borderRadius: '9999px', background: m.bg, color: m.color, border: `1px solid ${m.border}`, whiteSpace: 'nowrap' }}>
-      {p}
+    <span style={{
+      fontSize: '0.65rem', fontWeight: 700, padding: '2px 7px',
+      borderRadius: '9999px', background: m.bg, color: m.color,
+      border: `1px solid ${m.border}`, whiteSpace: 'nowrap', letterSpacing: '0.02em',
+    }}>
+      {priority}
     </span>
   );
 }
 
-function ProductBadge({ p }: { p: string }) {
-  const m = PRODUCT_META[p] || PRODUCT_META['P+'];
+function StatusBadge({ status }: { status: TaskStatus }) {
+  const m = STATUS_META[status] ?? STATUS_META['Backlog'];
   return (
-    <span style={{ fontSize: '0.6rem', fontWeight: 700, padding: '1px 5px', borderRadius: '4px', background: m.bg, color: m.color, border: `1px solid ${m.border}` }}>
-      {p}
-    </span>
-  );
-}
-
-function BACardTile({ card, compact }: { card: BACard; compact?: boolean }) {
-  const lm = LIST_META[card.listName] || LIST_META['Backlog'];
-  const overdue = isOverdue(card);
-
-  return (
-    <div style={{
-      background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)',
-      borderLeft: `3px solid ${lm.color}`,
-      borderRadius: '8px', padding: compact ? '0.625rem' : '0.75rem',
-      transition: 'box-shadow 0.15s, border-color 0.15s', cursor: 'default',
-    }}
-      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = `0 4px 20px rgba(0,0,0,0.35)`; (e.currentTarget as HTMLElement).style.borderColor = lm.color; }}
-      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = 'none'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)'; }}
-    >
-      {/* Top row: client + products */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '0.45rem', flexWrap: 'wrap' }}>
-        {card.client && (
-          <span style={{ fontSize: '0.6rem', fontWeight: 700, padding: '1px 6px', borderRadius: '3px', background: 'rgba(0,212,255,0.1)', color: '#00D4FF', border: '1px solid rgba(0,212,255,0.2)', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {card.client}
-          </span>
-        )}
-        {card.products.map(p => <ProductBadge key={p} p={p} />)}
-        {card.relatedToPayment && (
-          <span style={{ fontSize: '0.58rem', fontWeight: 700, padding: '1px 5px', borderRadius: '3px', background: 'rgba(16,185,129,0.1)', color: '#34D399', border: '1px solid rgba(16,185,129,0.22)', display: 'flex', alignItems: 'center', gap: '2px' }}>
-            <DollarSign size={7} />PAY
-          </span>
-        )}
-      </div>
-
-      {/* Card name */}
-      <div style={{ fontSize: compact ? '0.75rem' : '0.78rem', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.4, marginBottom: '0.5rem' }}>
-        {card.name.slice(0, compact ? 60 : 80)}{card.name.length > (compact ? 60 : 80) ? '…' : ''}
-      </div>
-
-      {/* Priority + PM row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.45rem', flexWrap: 'wrap' }}>
-        {card.priority && <PriorityBadge p={card.priority} />}
-        {card.pm && (
-          <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '2px' }}>
-            <User size={9} />{card.pm.split(' ').slice(-1)[0]}
-          </span>
-        )}
-        {card.estimation && (
-          <span style={{ fontSize: '0.62rem', color: 'var(--text-faint)', marginLeft: 'auto' }}>
-            {card.estimation}h
-          </span>
-        )}
-      </div>
-
-      {/* Footer: due date + meta */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          {card.dueDate && (
-            <span style={{ fontSize: '0.63rem', display: 'flex', alignItems: 'center', gap: '2px', color: overdue ? '#FCA5A5' : card.dueComplete ? '#34D399' : 'var(--text-muted)', fontWeight: overdue ? 700 : 400 }}>
-              <Clock size={9} style={{ color: overdue ? '#EF4444' : card.dueComplete ? '#10B981' : 'var(--text-faint)' }} />
-              {fmtDate(card.dueDate)}
-            </span>
-          )}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          {card.commentCount > 0 && (
-            <span style={{ fontSize: '0.6rem', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: '2px' }}>
-              <MessageSquare size={8} />{card.commentCount}
-            </span>
-          )}
-          {card.attachmentCount > 0 && (
-            <span style={{ fontSize: '0.6rem', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: '2px' }}>
-              <Paperclip size={8} />{card.attachmentCount}
-            </span>
-          )}
-          {card.checklistTotal > 0 && (
-            <span style={{ fontSize: '0.6rem', color: card.checklistDone === card.checklistTotal ? '#34D399' : 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: '2px' }}>
-              <CheckSquare size={8} />{card.checklistDone}/{card.checklistTotal}
-            </span>
-          )}
-          <a href={card.url} target="_blank" rel="noopener noreferrer"
-            style={{ color: 'var(--text-faint)', display: 'flex', alignItems: 'center' }}
-            onMouseEnter={e => (e.currentTarget.style.color = '#38BDF8')}
-            onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-faint)')}
-            onClick={e => e.stopPropagation()}>
-            <ExternalLink size={10} />
-          </a>
-        </div>
-      </div>
-
-      {/* Delivery date if different from due */}
-      {card.deliveryDate && card.deliveryDate !== card.dueDate && (
-        <div style={{ marginTop: '0.4rem', paddingTop: '0.4rem', borderTop: '1px solid var(--border-subtle)', fontSize: '0.6rem', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: '2px' }}>
-          <TrendingUp size={8} />Plan Delivery: {fmtDate(card.deliveryDate)}
-        </div>
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: '4px',
+      fontSize: '0.65rem', fontWeight: 600, padding: '2px 8px',
+      borderRadius: '9999px', background: m.bg, color: m.color,
+      border: `1px solid ${m.border}`, whiteSpace: 'nowrap',
+    }}>
+      {status === 'In Progress' && (
+        <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: m.dot, animation: 'pulseDot 2s ease-in-out infinite', display: 'inline-block' }} />
       )}
-    </div>
+      {status}
+    </span>
   );
 }
+
+// ── Blank form ────────────────────────────────────────────────
+
+const BLANK_FORM = {
+  title: '',
+  description: '',
+  workspace_id: '',
+  workspace: '',
+  priority: 'Medium' as TaskPriority,
+  status: 'Backlog' as TaskStatus,
+  assignee: '',
+  due_date: '',
+};
 
 // ── Main Component ────────────────────────────────────────────
 
 export default function Tasks() {
-  const { width } = useLayout();
+  const { isMobile, isTablet } = useLayout();
+
+  // Data state
+  const [tasks, setTasks] = useState<TaskRow[]>([]);
+  const [workspaces, setWorkspaces] = useState<WorkspaceRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  // UI state
   const [search, setSearch] = useState('');
-  const [activeList, setActiveList] = useState<string>('All Active');
-  const [filterPM, setFilterPM] = useState('');
-  const [filterPriority, setFilterPriority] = useState('');
-  const [filterClient, setFilterClient] = useState('');
-  const [showDone, setShowDone] = useState(false);
-  const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
-  const [showFilters, setShowFilters] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('All');
+  const [workspaceFilter, setWorkspaceFilter] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [editTask, setEditTask] = useState<TaskRow | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
-  // Live Trello state
-  const [cards, setCards] = useState<BACard[]>(BA_CARDS);
-  const [trelloLists, setTrelloLists] = useState<string[]>(BA_LISTS);
-  const [loading, setLoading] = useState(false);
-  const [syncError, setSyncError] = useState('');
-  const [lastSync, setLastSync] = useState('Loading from Trello…');
+  // Form state
+  const [form, setForm] = useState({ ...BLANK_FORM });
 
-  const sync = useCallback(async () => {
+  // ── Data loading ───────────────────────────────────────────
+  useEffect(() => {
     setLoading(true);
-    setSyncError('');
-    try {
-      const data = await fetchBATrafficBoard();
-      setCards(data.cards);
-      // Derive unique list names in order from live data
-      const seen = new Set<string>();
-      const liveLists: string[] = [];
-      for (const l of data.lists) {
-        if (!seen.has(l.name)) { seen.add(l.name); liveLists.push(l.name); }
-      }
-      setTrelloLists(liveLists);
-      const now = new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' });
-      setLastSync(`Live · synced ${now}`);
-    } catch (e) {
-      setSyncError((e as Error).message ?? 'Trello sync failed');
-      setLastSync('Trello unavailable · using CSV snapshot');
-    } finally {
-      setLoading(false);
-    }
+    Promise.all([getTasks(), getWorkspaces()])
+      .then(([taskData, wsData]) => {
+        setTasks(taskData);
+        setWorkspaces(wsData);
+        setLoading(false);
+      })
+      .catch(err => {
+        setError(err?.message ?? 'Failed to load tasks');
+        setLoading(false);
+      });
   }, []);
 
-  useEffect(() => { sync(); }, [sync]);
+  async function refreshTasks() {
+    try {
+      const data = await getTasks();
+      setTasks(data);
+    } catch { /* ignore */ }
+  }
 
-  const activeLists = useMemo(() => trelloLists.filter(l => l !== DONE_LIST), [trelloLists]);
+  // ── Modal helpers ──────────────────────────────────────────
+  function openNewModal() {
+    setEditTask(null);
+    setForm({ ...BLANK_FORM });
+    setShowModal(true);
+  }
 
-  const activeCards = useMemo(() => cards.filter(c => c.listName !== DONE_LIST), [cards]);
-  const doneCards = useMemo(() => cards.filter(c => c.listName === DONE_LIST), [cards]);
+  function openEditModal(task: TaskRow, e: React.MouseEvent) {
+    e.stopPropagation();
+    setEditTask(task);
+    setForm({
+      title: task.title,
+      description: task.description ?? '',
+      workspace_id: task.workspace_id,
+      workspace: task.workspace,
+      priority: task.priority as TaskPriority,
+      status: task.status as TaskStatus,
+      assignee: task.assignee ?? '',
+      due_date: task.due_date ?? '',
+    });
+    setShowModal(true);
+  }
 
-  const ALL_PMS = useMemo(() => Array.from(new Set(activeCards.map(c => c.pm).filter(Boolean))).sort(), [activeCards]);
-  const ALL_CLIENTS = useMemo(() => Array.from(new Set(cards.map(c => c.client).filter(Boolean))).sort(), [cards]);
+  function closeModal() {
+    setShowModal(false);
+    setEditTask(null);
+    setForm({ ...BLANK_FORM });
+  }
 
+  // ── Workspace select handler ───────────────────────────────
+  function handleWorkspaceChange(wsId: string) {
+    const ws = workspaces.find(w => w.id === wsId);
+    setForm(f => ({ ...f, workspace_id: wsId, workspace: ws?.name ?? '' }));
+  }
+
+  // ── Save (create / update) ─────────────────────────────────
+  async function handleSave() {
+    if (!form.title.trim() || !form.workspace_id) return;
+    setSaving(true);
+    try {
+      if (editTask) {
+        await updateTask(editTask.id, {
+          title: form.title.trim(),
+          description: form.description.trim(),
+          workspace_id: form.workspace_id,
+          workspace: form.workspace,
+          priority: form.priority,
+          status: form.status,
+          assignee: form.assignee.trim(),
+          due_date: form.due_date || null,
+        });
+      } else {
+        await upsertTask({
+          id: uuid(),
+          title: form.title.trim(),
+          description: form.description.trim(),
+          workspace_id: form.workspace_id,
+          workspace: form.workspace,
+          priority: form.priority,
+          status: form.status,
+          assignee: form.assignee.trim(),
+          due_date: form.due_date || null,
+          linked_doc: null,
+          linked_meeting: null,
+        });
+      }
+      await refreshTasks();
+      closeModal();
+    } catch { /* ignore */ }
+    finally { setSaving(false); }
+  }
+
+  // ── Delete ─────────────────────────────────────────────────
+  async function handleDelete(id: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!window.confirm('Delete this task? This cannot be undone.')) return;
+    setDeletingId(id);
+    try {
+      await deleteTask(id);
+      setTasks(prev => prev.filter(t => t.id !== id));
+    } catch { /* ignore */ }
+    finally { setDeletingId(null); }
+  }
+
+  // ── Quick status cycle ─────────────────────────────────────
+  const STATUS_CYCLE: TaskStatus[] = ['Backlog', 'In Progress', 'In Review', 'Completed'];
+
+  async function handleCycleStatus(task: TaskRow, e: React.MouseEvent) {
+    e.stopPropagation();
+    const idx = STATUS_CYCLE.indexOf(task.status as TaskStatus);
+    const next = idx === -1 ? 'In Progress' : STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length];
+    setUpdatingId(task.id);
+    try {
+      await updateTask(task.id, { status: next });
+      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: next } : t));
+    } catch { /* ignore */ }
+    finally { setUpdatingId(null); }
+  }
+
+  // ── Derived stats ──────────────────────────────────────────
+  const totalCount      = tasks.length;
+  const inProgressCount = tasks.filter(t => t.status === 'In Progress').length;
+  const overdueCount    = tasks.filter(t => t.status === 'Overdue' || isOverdue(t)).length;
+  const completedCount  = tasks.filter(t => t.status === 'Completed').length;
+
+  // ── Filtered tasks ─────────────────────────────────────────
   const filtered = useMemo(() => {
-    const pool = showDone ? doneCards : activeCards;
-    return pool.filter(c => {
-      if (activeList !== 'All Active' && activeList !== 'All Done' && c.listName !== activeList) return false;
-      if (filterPM && c.pm !== filterPM) return false;
-      if (filterPriority && c.priority !== filterPriority) return false;
-      if (filterClient && c.client !== filterClient) return false;
+    return tasks.filter(t => {
+      if (activeTab !== 'All' && t.status !== activeTab) return false;
+      if (workspaceFilter && t.workspace_id !== workspaceFilter) return false;
       if (search) {
         const q = search.toLowerCase();
-        return c.name.toLowerCase().includes(q) || (c.client ?? '').toLowerCase().includes(q) || (c.pm ?? '').toLowerCase().includes(q) || (c.desc ?? '').toLowerCase().includes(q);
+        return (
+          t.title.toLowerCase().includes(q) ||
+          (t.description ?? '').toLowerCase().includes(q) ||
+          (t.assignee ?? '').toLowerCase().includes(q) ||
+          t.workspace.toLowerCase().includes(q)
+        );
       }
       return true;
     });
-  }, [activeCards, doneCards, showDone, activeList, filterPM, filterPriority, filterClient, search]);
+  }, [tasks, activeTab, workspaceFilter, search]);
 
-  // Stats
-  const inProgressCount = activeCards.filter(c => c.listName === 'In Progress').length;
-  const pendingDelivery = activeCards.filter(c => c.listName === 'Pending Client(Delivery)').length;
-  const highestCount = activeCards.filter(c => c.priority === 'Highest').length;
-  const overdueCount = activeCards.filter(c => isOverdue(c)).length;
-  const totalHours = activeCards.reduce((s, c) => s + (parseFloat(c.estimation) || 0), 0);
-  const paymentCards = activeCards.filter(c => c.relatedToPayment).length;
+  // ── Responsive columns ─────────────────────────────────────
+  const colCount = isMobile ? 2 : isTablet ? 2 : 4;
 
-  const hasActiveFilter = filterPM || filterPriority || filterClient;
-
+  // ── Render ─────────────────────────────────────────────────
   return (
     <div className="screen-container animate-fade-in">
 
-      {/* Stats Strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 1024 ? 6 : width >= 768 ? 3 : 2}, 1fr)`, gap: '0.75rem' }}>
+      {/* ── Stat Cards ──────────────────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${colCount}, 1fr)`, gap: '0.875rem' }}>
         {[
-          { label: 'Active Cards',       value: activeCards.length, color: '#0EA5E9', sub: `${doneCards.length} done` },
-          { label: 'In Progress',        value: inProgressCount,    color: '#00D4FF', sub: 'being worked on' },
-          { label: 'Pending Delivery',   value: pendingDelivery,    color: '#F59E0B', sub: 'awaiting client' },
-          { label: 'Highest Priority',   value: highestCount,       color: '#EF4444', sub: `${overdueCount} overdue` },
-          { label: 'Est. Hours',         value: Math.round(totalHours), color: '#8B5CF6', sub: 'remaining work' },
-          { label: 'Payment Linked',     value: paymentCards,       color: '#10B981', sub: 'billable cards' },
+          { label: 'Total Tasks',  value: totalCount,      color: '#8B5CF6', sub: 'across all workspaces', icon: <ListTodo size={14} /> },
+          { label: 'In Progress',  value: inProgressCount, color: '#0EA5E9', sub: 'actively being worked', icon: <Clock size={14} /> },
+          { label: 'Overdue',      value: overdueCount,    color: '#EF4444', sub: 'past due date',         icon: <AlertTriangle size={14} /> },
+          { label: 'Completed',    value: completedCount,  color: '#10B981', sub: 'finished tasks',        icon: <CheckCircle size={14} /> },
         ].map(s => (
-          <div key={s.label} className="metric-card" style={{ position: 'relative', overflow: 'hidden', padding: '0.875rem' }}>
+          <div key={s.label} className="metric-card" style={{ position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(90deg, ${s.color}, transparent)` }} />
-            <div className="hero-number" style={{ color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)', marginTop: '2px' }}>{s.label}</div>
-            <div style={{ fontSize: '0.62rem', color: 'var(--text-faint)', marginTop: '1px' }}>{s.sub}</div>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem' }}>
+              <div>
+                <div className="hero-number" style={{ color: s.color }}>{s.value}</div>
+                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)', marginTop: '2px' }}>{s.label}</div>
+                <div style={{ fontSize: '0.62rem', color: 'var(--text-faint)', marginTop: '1px' }}>{s.sub}</div>
+              </div>
+              <div style={{ color: s.color, opacity: 0.45, marginTop: '0.2rem', flexShrink: 0 }}>{s.icon}</div>
+            </div>
           </div>
         ))}
       </div>
 
-      {/* Board Header */}
-      <div style={{
-        background: 'linear-gradient(135deg, rgba(0,82,204,0.08), var(--bg-elevated) 60%, rgba(0,212,255,0.05))',
-        border: '1px solid rgba(0,121,191,0.18)', borderRadius: 'var(--radius-lg)',
-        padding: '1rem 1.25rem', position: 'relative', overflow: 'hidden',
-      }}>
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #0052CC, #0079BF 60%, transparent)' }} />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
-            <div style={{ width: '38px', height: '38px', background: 'rgba(0,82,204,0.15)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(0,82,204,0.28)' }}>
-              <svg viewBox="0 0 32 32" width="20" height="20" fill="none"><rect x="2" y="2" width="12" height="28" rx="3" fill="#0052CC"/><rect x="18" y="2" width="12" height="18" rx="3" fill="#0079BF"/></svg>
-            </div>
-            <div>
-              <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>BA Traffic Board</div>
-              <div style={{ fontSize: '0.67rem', color: syncError ? '#FCA5A5' : 'var(--text-faint)', marginTop: '1px', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                <RefreshCw size={9} className={loading ? 'animate-spin' : ''} />
-                {lastSync}
-              </div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <button
-              className="btn-ghost"
-              style={{ height: '32px', fontSize: '0.75rem' }}
-              onClick={sync}
-              disabled={loading}
-              title="Sync from Trello">
-              <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
-              {loading ? 'Syncing…' : 'Sync'}
-            </button>
-            <button
-              className={`btn-ghost`}
-              style={{ height: '32px', fontSize: '0.75rem', background: showDone ? 'rgba(16,185,129,0.1)' : undefined, color: showDone ? '#34D399' : undefined, border: showDone ? '1px solid rgba(16,185,129,0.22)' : undefined }}
-              onClick={() => { setShowDone(d => !d); setActiveList(showDone ? 'All Active' : 'All Done'); }}>
-              <CheckSquare size={12} /> {showDone ? 'Show Active' : `Done (${doneCards.length})`}
-            </button>
-            <button className={`btn-ghost ${viewMode === 'kanban' ? 'active' : ''}`} style={{ height: '32px', fontSize: '0.75rem' }} onClick={() => setViewMode('kanban')}>
-              <BarChart2 size={12} /> Kanban
-            </button>
-            <button className={`btn-ghost ${viewMode === 'list' ? 'active' : ''}`} style={{ height: '32px', fontSize: '0.75rem' }} onClick={() => setViewMode('list')}>
-              <Filter size={12} /> List
-            </button>
-          </div>
-        </div>
-
-        {/* PM Distribution mini */}
-        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.875rem', flexWrap: 'wrap' }}>
-          {ALL_PMS.map(pm => {
-            const cnt = activeCards.filter(c => c.pm === pm).length;
-            if (!cnt) return null;
-            return (
-              <button key={pm} onClick={() => setFilterPM(filterPM === pm ? '' : pm)}
-                style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '3px 8px', borderRadius: '9999px', border: `1px solid ${filterPM === pm ? 'rgba(0,212,255,0.4)' : 'var(--border-subtle)'}`, background: filterPM === pm ? 'rgba(0,212,255,0.1)' : 'rgba(255,255,255,0.03)', cursor: 'pointer', transition: 'all 0.15s' }}>
-                <div className="avatar" style={{ width: '18px', height: '18px', fontSize: '0.5rem', flexShrink: 0 }}>{pm.split(' ').map(w => w[0]).join('').slice(0, 2)}</div>
-                <span style={{ fontSize: '0.67rem', fontWeight: 600, color: filterPM === pm ? '#00D4FF' : 'var(--text-secondary)' }}>{pm.split(' ')[0]}</span>
-                <span style={{ fontSize: '0.62rem', color: 'var(--text-faint)' }}>{cnt}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Toolbar */}
+      {/* ── Filter Tabs + Toolbar ────────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', flexWrap: 'wrap' }}>
         {/* Search */}
-        <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
-          <Search size={12} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
-          <input className="input-field" placeholder="Search cards, client, PM…" value={search} onChange={e => setSearch(e.target.value)}
-            style={{ paddingLeft: '2.25rem', height: '34px', fontSize: '0.78rem', width: '100%' }} />
-          {search && <button onClick={() => setSearch('')} style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}><X size={12} /></button>}
+        <div style={{ position: 'relative', flex: 1, minWidth: '180px' }}>
+          <Search size={13} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+          <input
+            className="input-field"
+            placeholder="Search tasks, assignee, workspace…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ paddingLeft: '2.25rem', height: '36px', fontSize: '0.8rem', width: '100%' }}
+          />
+          {search && (
+            <button onClick={() => setSearch('')} style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: 0 }}>
+              <X size={12} />
+            </button>
+          )}
         </div>
 
-        {/* List filter tabs */}
-        <div style={{ display: 'flex', gap: '0.2rem', background: 'rgba(255,255,255,0.03)', padding: '0.2rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', overflowX: 'auto', maxWidth: '100%' }}>
-          {(showDone ? ['All Done'] : ['All Active', ...activeLists]).map(list => {
-            const lm = LIST_META[list];
-            const cnt = list === 'All Active' ? activeCards.length : list === 'All Done' ? doneCards.length : cards.filter(c => c.listName === list).length;
-            return (
-              <button key={list} onClick={() => setActiveList(list)}
-                style={{ padding: '0.25rem 0.625rem', fontSize: '0.7rem', fontWeight: 600, borderRadius: '5px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s',
-                  background: activeList === list ? (lm ? `${lm.color}18` : 'rgba(255,255,255,0.08)') : 'transparent',
-                  color: activeList === list ? (lm ? lm.color : 'var(--text-primary)') : 'var(--text-muted)',
-                }}>
-                {list === 'All Active' ? 'All' : list === 'All Done' ? 'All Done' : list} <span style={{ opacity: 0.65 }}>({cnt})</span>
-              </button>
-            );
-          })}
+        {/* Workspace filter */}
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <Layers size={12} style={{ position: 'absolute', left: '0.625rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+          <select
+            className="input-field"
+            value={workspaceFilter}
+            onChange={e => setWorkspaceFilter(e.target.value)}
+            style={{ height: '36px', fontSize: '0.78rem', paddingLeft: '1.875rem', paddingRight: '1.875rem', minWidth: '160px', appearance: 'none' }}
+          >
+            <option value="">All Workspaces</option>
+            {workspaces.map(ws => (
+              <option key={ws.id} value={ws.id}>{ws.name}</option>
+            ))}
+          </select>
+          <ChevronDown size={11} style={{ position: 'absolute', right: '0.625rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
         </div>
 
-        {/* Extra filters toggle */}
-        <button className={`btn-ghost ${hasActiveFilter ? 'active' : ''}`} style={{ height: '34px', fontSize: '0.75rem', flexShrink: 0, background: hasActiveFilter ? 'rgba(14,165,233,0.1)' : undefined, color: hasActiveFilter ? '#38BDF8' : undefined }} onClick={() => setShowFilters(s => !s)}>
-          <Filter size={12} /> Filters {hasActiveFilter && <span style={{ fontSize: '0.6rem', background: '#38BDF8', color: '#000', borderRadius: '9999px', padding: '0 4px', fontWeight: 800 }}>{[filterPM, filterPriority, filterClient].filter(Boolean).length}</span>}
-          <ChevronDown size={10} style={{ transform: showFilters ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+        {/* New Task */}
+        <button className="btn-primary" style={{ height: '36px', flexShrink: 0 }} onClick={openNewModal}>
+          <Plus size={14} /> New Task
         </button>
       </div>
 
-      {/* Extended filter row */}
-      {showFilters && (
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '0.75rem 1rem' }} className="animate-fade-in">
-          <div>
-            <label style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.3rem' }}>Priority</label>
-            <select className="input-field" value={filterPriority} onChange={e => setFilterPriority(e.target.value)} style={{ height: '30px', fontSize: '0.75rem', minWidth: '120px' }}>
-              <option value="">All</option>
-              {['Highest', 'High', 'Medium', 'Low', 'Lowest'].map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
+      {/* Status filter tabs */}
+      <div style={{ display: 'flex', gap: '0.2rem', background: 'rgba(255,255,255,0.03)', padding: '0.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', overflowX: 'auto', flexShrink: 0 }}>
+        {FILTER_TABS.map(tab => {
+          const m = tab !== 'All' ? STATUS_META[tab as TaskStatus] : null;
+          const count = tab === 'All' ? tasks.length : tasks.filter(t => t.status === tab).length;
+          return (
+            <button
+              key={tab}
+              className={`tab-item ${activeTab === tab ? 'active' : ''}`}
+              onClick={() => setActiveTab(tab)}
+              style={{ padding: '0.3rem 0.75rem', fontSize: '0.75rem', whiteSpace: 'nowrap', color: activeTab === tab && m ? m.color : undefined }}
+            >
+              {tab}
+              <span style={{ marginLeft: '0.3rem', fontSize: '0.65rem', opacity: 0.7 }}>({count})</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── Loading / Error states ───────────────────────────── */}
+      {loading && (
+        <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.82rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+          <Loader2 size={16} className="animate-spin" /> Loading tasks…
+        </div>
+      )}
+
+      {!loading && error && (
+        <div style={{ padding: '1.25rem', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 'var(--radius-lg)', color: '#FCA5A5', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <AlertTriangle size={15} />
+          {error}
+        </div>
+      )}
+
+      {/* ── Empty state ──────────────────────────────────────── */}
+      {!loading && !error && filtered.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '3.5rem 1rem', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-lg)', border: '1px dashed var(--border-subtle)' }}>
+          <CheckSquare size={36} style={{ color: 'var(--text-faint)', margin: '0 auto 0.875rem', display: 'block' }} />
+          <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.3rem' }}>
+            {tasks.length === 0 ? 'No tasks yet' : 'No tasks match your filters'}
           </div>
-          <div>
-            <label style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.3rem' }}>Client</label>
-            <select className="input-field" value={filterClient} onChange={e => setFilterClient(e.target.value)} style={{ height: '30px', fontSize: '0.75rem', minWidth: '140px' }}>
-              <option value="">All Clients</option>
-              {ALL_CLIENTS.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
+            {tasks.length === 0 ? 'Create your first task to get started' : 'Try adjusting the search or clearing filters'}
           </div>
-          {(filterPM || filterPriority || filterClient) && (
-            <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-              <button className="btn-ghost" style={{ height: '30px', fontSize: '0.72rem' }} onClick={() => { setFilterPM(''); setFilterPriority(''); setFilterClient(''); }}>
-                <X size={11} /> Clear all
-              </button>
-            </div>
+          {tasks.length === 0 && (
+            <button className="btn-primary" style={{ height: '34px', fontSize: '0.78rem' }} onClick={openNewModal}>
+              <Plus size={13} /> Create Task
+            </button>
           )}
         </div>
       )}
 
-      {/* Results count */}
-      <div style={{ fontSize: '0.72rem', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        Showing <strong style={{ color: 'var(--text-secondary)' }}>{filtered.length}</strong> cards
-        {(search || hasActiveFilter) && <span>· filtered</span>}
-        {filtered.length > 0 && <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.25rem' }}><AlertTriangle size={10} style={{ color: '#EF4444' }} />{filtered.filter(isOverdue).length} overdue</span>}
-      </div>
+      {/* ── Task List ────────────────────────────────────────── */}
+      {!loading && !error && filtered.length > 0 && (
+        <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+          {/* Table header */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr auto' : '2fr 110px 110px 120px 120px 100px auto',
+            gap: '0', padding: '0.6rem 1rem',
+            background: 'var(--bg-elevated)',
+            borderBottom: '1px solid var(--border-subtle)',
+          }}>
+            {['Task', ...(isMobile ? [] : ['Priority', 'Status', 'Workspace', 'Assignee', 'Due Date', ''])].map((h, i) => (
+              <div key={i} style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '0 0.5rem', textAlign: i > 0 && i < 6 ? 'center' : 'left' }}>
+                {h}
+              </div>
+            ))}
+          </div>
 
-      {/* ── KANBAN VIEW ── */}
-      {viewMode === 'kanban' && !showDone && (
-        <div style={{ overflowX: 'auto', paddingBottom: '0.5rem' }}>
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', minWidth: 'max-content' }}>
-            {activeLists.filter(list => activeList === 'All Active' || list === activeList).map(list => {
-              const lm = LIST_META[list] || LIST_META['Backlog'];
-              const colCards = filtered.filter(c => c.listName === list);
+          {/* Task rows */}
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {filtered.map((task, idx) => {
+              const sm = STATUS_META[task.status as TaskStatus] ?? STATUS_META['Backlog'];
+              const overdue = isOverdue(task);
+              const dueDateColor = task.status === 'Completed' ? '#34D399' : overdue ? '#FCA5A5' : 'var(--text-secondary)';
+              const isDeleting = deletingId === task.id;
+              const isUpdating = updatingId === task.id;
+
               return (
-                <div key={list} style={{ width: '248px', flexShrink: 0 }}>
-                  {/* Column header */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.625rem', padding: '0 0.25rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                      <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: lm.color, boxShadow: `0 0 6px ${lm.color}80` }} />
-                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>{list}</span>
+                <div
+                  key={task.id}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: isMobile ? '1fr auto' : '2fr 110px 110px 120px 120px 100px auto',
+                    gap: '0',
+                    padding: '0.75rem 1rem',
+                    borderBottom: idx < filtered.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+                    borderLeft: `3px solid ${sm.dot}30`,
+                    transition: 'background 0.12s',
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    opacity: isDeleting ? 0.4 : 1,
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.025)'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                  onClick={e => openEditModal(task, e)}
+                >
+                  {/* Title + description */}
+                  <div style={{ padding: '0 0.5rem', minWidth: 0 }}>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {task.title}
                     </div>
-                    <span style={{ fontSize: '0.63rem', fontWeight: 800, padding: '1px 6px', borderRadius: '9999px', background: `${lm.color}18`, color: lm.color, border: `1px solid ${lm.color}30` }}>{colCards.length}</span>
-                  </div>
-
-                  {/* Column track */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minHeight: '100px', padding: '0.5rem', borderRadius: 'var(--radius-md)', background: lm.track, border: `1px dashed ${lm.color}22` }}>
-                    {colCards.map(card => <BACardTile key={card.id} card={card} compact />)}
-                    {colCards.length === 0 && (
-                      <div style={{ padding: '1.5rem 0', textAlign: 'center', fontSize: '0.7rem', color: 'var(--text-faint)' }}>No cards</div>
+                    {task.description && (
+                      <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {task.description}
+                      </div>
                     )}
                   </div>
+
+                  {isMobile ? (
+                    /* Mobile: compact action cell */
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0 0.25rem' }}>
+                      <PriorityBadge priority={task.priority as TaskPriority} />
+                      <button
+                        className="btn-ghost"
+                        style={{ width: '26px', height: '26px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                        onClick={e => handleDelete(task.id, e)}
+                        disabled={isDeleting}
+                        title="Delete task"
+                      >
+                        <Trash2 size={12} style={{ color: '#EF4444' }} />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Priority */}
+                      <div style={{ padding: '0 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <PriorityBadge priority={task.priority as TaskPriority} />
+                      </div>
+
+                      {/* Status */}
+                      <div style={{ padding: '0 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <button
+                          onClick={e => handleCycleStatus(task, e)}
+                          title="Click to advance status"
+                          style={{ background: 'none', border: 'none', cursor: isUpdating ? 'wait' : 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
+                        >
+                          {isUpdating
+                            ? <Loader2 size={11} className="animate-spin" style={{ color: 'var(--text-muted)' }} />
+                            : <StatusBadge status={task.status as TaskStatus} />
+                          }
+                        </button>
+                      </div>
+
+                      {/* Workspace */}
+                      <div style={{ padding: '0 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <span style={{
+                          fontSize: '0.65rem', fontWeight: 600, padding: '2px 7px', borderRadius: '4px',
+                          background: 'rgba(0,212,255,0.07)', color: '#38BDF8', border: '1px solid rgba(0,212,255,0.16)',
+                          maxWidth: '108px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block',
+                        }}>
+                          {task.workspace}
+                        </span>
+                      </div>
+
+                      {/* Assignee */}
+                      <div style={{ padding: '0 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
+                        {task.assignee ? (
+                          <>
+                            <div style={{
+                              width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0,
+                              background: 'linear-gradient(135deg, #0EA5E9, #8B5CF6)',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: '0.5rem', fontWeight: 800, color: '#fff',
+                            }}>
+                              {task.assignee.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()}
+                            </div>
+                            <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80px' }}>
+                              {task.assignee.split(' ')[0]}
+                            </span>
+                          </>
+                        ) : (
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            <User size={11} /> —
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Due Date */}
+                      <div style={{ padding: '0 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
+                        <CalendarDays size={10} style={{ color: dueDateColor, flexShrink: 0 }} />
+                        <span style={{ fontSize: '0.72rem', color: dueDateColor, fontWeight: overdue ? 700 : 400 }}>
+                          {fmtDate(task.due_date)}
+                        </span>
+                      </div>
+
+                      {/* Actions */}
+                      <div style={{ padding: '0 0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
+                        <button
+                          className="btn-ghost"
+                          style={{ width: '28px', height: '28px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                          onClick={e => openEditModal(task, e)}
+                          title="Edit task"
+                        >
+                          <Pencil size={12} style={{ color: 'var(--text-muted)' }} />
+                        </button>
+                        <button
+                          className="btn-ghost"
+                          style={{ width: '28px', height: '28px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                          onClick={e => handleDelete(task.id, e)}
+                          disabled={isDeleting}
+                          title="Delete task"
+                        >
+                          {isDeleting
+                            ? <Loader2 size={12} className="animate-spin" style={{ color: '#EF4444' }} />
+                            : <Trash2 size={12} style={{ color: '#EF4444' }} />
+                          }
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               );
             })}
           </div>
-        </div>
-      )}
 
-      {/* ── KANBAN VIEW (Done) ── */}
-      {viewMode === 'kanban' && showDone && (
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 1024 ? 3 : width >= 640 ? 2 : 1}, 1fr)`, gap: '0.625rem' }}>
-          {filtered.slice(0, 60).map(card => <BACardTile key={card.id} card={card} />)}
-          {filtered.length > 60 && (
-            <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '1rem', fontSize: '0.78rem', color: 'var(--text-muted)', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-              Showing 60 of {filtered.length} completed cards
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── LIST VIEW ── */}
-      {viewMode === 'list' && (
-        <div className="section-card" style={{ overflow: 'hidden' }}>
-          <div style={{ overflowX: 'auto' }}>
-            <table className="data-table" style={{ minWidth: '900px' }}>
-              <thead>
-                <tr>
-                  <th>Card</th>
-                  <th style={{ width: '110px' }}>Client</th>
-                  <th style={{ width: '80px' }}>Product</th>
-                  <th style={{ width: '90px' }}>List</th>
-                  <th style={{ width: '85px' }}>Priority</th>
-                  <th style={{ width: '130px' }}>PM</th>
-                  <th style={{ width: '90px' }}>Due Date</th>
-                  <th style={{ width: '90px' }}>Plan Date</th>
-                  <th style={{ width: '60px' }}>Hrs</th>
-                  <th style={{ width: '70px' }}>Meta</th>
-                  <th style={{ width: '40px' }} />
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.slice(0, 200).map(card => {
-                  const lm = LIST_META[card.listName] || LIST_META['Backlog'];
-                  const overdue = isOverdue(card);
-                  return (
-                    <tr key={card.id} style={{ borderLeft: `3px solid ${lm.color}40` }}>
-                      <td style={{ maxWidth: '280px' }}>
-                        <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.4 }}>{card.name.slice(0, 72)}{card.name.length > 72 ? '…' : ''}</div>
-                        {card.desc && <div style={{ fontSize: '0.65rem', color: 'var(--text-faint)', marginTop: '1px', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.desc}</div>}
-                      </td>
-                      <td>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: 'rgba(0,212,255,0.08)', color: '#00D4FF', border: '1px solid rgba(0,212,255,0.18)', display: 'inline-block', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.client}</span>
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
-                          {card.products.map(p => <ProductBadge key={p} p={p} />)}
-                        </div>
-                      </td>
-                      <td>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', borderRadius: '9999px', background: `${lm.color}14`, color: lm.color, border: `1px solid ${lm.color}28`, whiteSpace: 'nowrap' }}>
-                          {card.listName === 'Pending Client(Delivery)' ? 'Pending' : card.listName === 'Ready For Configuration' ? 'Ready Config' : card.listName === "Next Week's Traffic" ? "Next Week" : card.listName}
-                        </span>
-                      </td>
-                      <td>{card.priority ? <PriorityBadge p={card.priority} /> : <span style={{ color: 'var(--text-faint)', fontSize: '0.72rem' }}>—</span>}</td>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                          {card.pm && <div className="avatar" style={{ width: '20px', height: '20px', fontSize: '0.52rem', flexShrink: 0 }}>{card.pm.split(' ').map(w => w[0]).join('').slice(0, 2)}</div>}
-                          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{card.pm || '—'}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <span style={{ fontSize: '0.72rem', color: overdue ? '#FCA5A5' : 'var(--text-secondary)', fontWeight: overdue ? 700 : 400 }}>
-                          {fmtDate(card.dueDate)}
-                        </span>
-                      </td>
-                      <td style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{fmtDate(card.deliveryDate)}</td>
-                      <td style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textAlign: 'center' }}>{card.estimation || '—'}</td>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                          {card.commentCount > 0 && <span style={{ fontSize: '0.6rem', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: '1px' }}><MessageSquare size={8} />{card.commentCount}</span>}
-                          {card.attachmentCount > 0 && <span style={{ fontSize: '0.6rem', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: '1px' }}><Paperclip size={8} />{card.attachmentCount}</span>}
-                          {card.relatedToPayment && <DollarSign size={10} style={{ color: '#34D399' }} />}
-                        </div>
-                      </td>
-                      <td>
-                        <a href={card.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-faint)', display: 'flex', alignItems: 'center' }}
-                          onMouseEnter={e => (e.currentTarget.style.color = '#38BDF8')}
-                          onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-faint)')}>
-                          <ExternalLink size={12} />
-                        </a>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            {filtered.length > 200 && (
-              <div style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                Showing 200 of {filtered.length} cards — use filters to narrow down
-              </div>
+          {/* Footer count */}
+          <div style={{ padding: '0.625rem 1.25rem', borderTop: '1px solid var(--border-subtle)', background: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-faint)' }}>
+              Showing <strong style={{ color: 'var(--text-secondary)' }}>{filtered.length}</strong> of {tasks.length} tasks
+            </span>
+            {overdueCount > 0 && (
+              <span style={{ fontSize: '0.7rem', color: '#FCA5A5', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <AlertTriangle size={11} /> {overdueCount} overdue
+              </span>
             )}
           </div>
         </div>
       )}
 
-      {/* ── No results ── */}
-      {filtered.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '3rem 1rem', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-lg)', border: '1px dashed var(--border-default)' }}>
-          <CheckSquare size={32} style={{ color: 'var(--text-faint)', margin: '0 auto 0.75rem', display: 'block' }} />
-          <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>No cards match your filters</div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Try adjusting the search or clearing filters</div>
+      {/* ── New / Edit Task Modal ────────────────────────────── */}
+      {showModal && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+          onClick={e => { if (e.target === e.currentTarget) closeModal(); }}
+        >
+          <div
+            className="animate-fade-in"
+            style={{
+              background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)',
+              borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: '560px',
+              maxHeight: '90vh', overflowY: 'auto',
+              boxShadow: '0 24px 80px rgba(0,0,0,0.6)',
+            }}
+          >
+            {/* Modal header */}
+            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, background: 'var(--bg-elevated)', zIndex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {editTask ? <Pencil size={14} style={{ color: '#A78BFA' }} /> : <Plus size={14} style={{ color: '#A78BFA' }} />}
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    {editTask ? 'Edit Task' : 'New Task'}
+                  </div>
+                  <div style={{ fontSize: '0.65rem', color: 'var(--text-faint)' }}>
+                    {editTask ? 'Update task details' : 'Add a new task to your workspace'}
+                  </div>
+                </div>
+              </div>
+              <button className="btn-ghost" style={{ width: '32px', height: '32px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={closeModal}>
+                <X size={14} />
+              </button>
+            </div>
+
+            {/* Modal body */}
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.125rem' }}>
+
+              {/* Title */}
+              <div>
+                <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>
+                  Title <span style={{ color: '#EF4444' }}>*</span>
+                </label>
+                <input
+                  className="input-field"
+                  placeholder="Task title…"
+                  value={form.title}
+                  onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                  style={{ width: '100%', height: '38px', fontSize: '0.85rem' }}
+                  autoFocus
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>
+                  Description
+                </label>
+                <textarea
+                  className="input-field"
+                  placeholder="Optional description…"
+                  value={form.description}
+                  onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                  rows={3}
+                  style={{ width: '100%', fontSize: '0.82rem', resize: 'vertical', minHeight: '72px', fontFamily: 'inherit' }}
+                />
+              </div>
+
+              {/* Workspace */}
+              <div>
+                <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>
+                  Workspace <span style={{ color: '#EF4444' }}>*</span>
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <select
+                    className="input-field"
+                    value={form.workspace_id}
+                    onChange={e => handleWorkspaceChange(e.target.value)}
+                    style={{ width: '100%', height: '38px', fontSize: '0.82rem', appearance: 'none', paddingRight: '2rem' }}
+                  >
+                    <option value="">Select workspace…</option>
+                    {workspaces.map(ws => (
+                      <option key={ws.id} value={ws.id}>{ws.name}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={12} style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+                </div>
+              </div>
+
+              {/* Priority + Status row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.875rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>
+                    Priority
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <select
+                      className="input-field"
+                      value={form.priority}
+                      onChange={e => setForm(f => ({ ...f, priority: e.target.value as TaskPriority }))}
+                      style={{ width: '100%', height: '38px', fontSize: '0.82rem', appearance: 'none', paddingRight: '2rem', color: PRIORITY_META[form.priority]?.color }}
+                    >
+                      {PRIORITY_LIST.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                    <ChevronDown size={12} style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+                  </div>
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>
+                    Status
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <select
+                      className="input-field"
+                      value={form.status}
+                      onChange={e => setForm(f => ({ ...f, status: e.target.value as TaskStatus }))}
+                      style={{ width: '100%', height: '38px', fontSize: '0.82rem', appearance: 'none', paddingRight: '2rem', color: STATUS_META[form.status]?.color }}
+                    >
+                      {STATUS_LIST.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                    <ChevronDown size={12} style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Assignee + Due Date row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.875rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>
+                    Assignee
+                  </label>
+                  <input
+                    className="input-field"
+                    placeholder="Full name…"
+                    value={form.assignee}
+                    onChange={e => setForm(f => ({ ...f, assignee: e.target.value }))}
+                    style={{ width: '100%', height: '38px', fontSize: '0.82rem' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>
+                    Due Date
+                  </label>
+                  <input
+                    type="date"
+                    className="input-field"
+                    value={form.due_date}
+                    onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))}
+                    style={{ width: '100%', height: '38px', fontSize: '0.82rem' }}
+                  />
+                </div>
+              </div>
+
+            </div>
+
+            {/* Modal footer */}
+            <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.625rem', background: 'var(--bg-elevated)', borderRadius: '0 0 var(--radius-lg) var(--radius-lg)' }}>
+              <button className="btn-ghost" style={{ height: '36px' }} onClick={closeModal} disabled={saving}>
+                Cancel
+              </button>
+              <button
+                className="btn-primary"
+                style={{ height: '36px', minWidth: '100px', opacity: (!form.title.trim() || !form.workspace_id) ? 0.5 : 1 }}
+                onClick={handleSave}
+                disabled={saving || !form.title.trim() || !form.workspace_id}
+              >
+                {saving ? <><Loader2 size={13} className="animate-spin" /> Saving…</> : editTask ? <><CheckCircle size={13} /> Update Task</> : <><Plus size={13} /> Create Task</>}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
