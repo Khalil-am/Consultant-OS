@@ -188,7 +188,7 @@ export default function Tasks() {
           priority: form.priority,
           status: form.status,
           assignee: form.assignee.trim(),
-          due_date: form.due_date || null,
+          due_date: form.due_date || undefined,
         });
       } else {
         await upsertTask({
@@ -200,7 +200,7 @@ export default function Tasks() {
           priority: form.priority,
           status: form.status,
           assignee: form.assignee.trim(),
-          due_date: form.due_date || null,
+          due_date: form.due_date || '',
           linked_doc: null,
           linked_meeting: null,
         });

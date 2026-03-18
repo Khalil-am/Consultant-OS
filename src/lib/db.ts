@@ -30,7 +30,7 @@ export async function getWorkspace(id: string): Promise<WorkspaceRow | null> {
   return data as WorkspaceRow | null;
 }
 
-export async function createWorkspace(ws: WorkspaceInsert): Promise<WorkspaceRow> {
+export async function createWorkspace(ws: Partial<WorkspaceInsert>): Promise<WorkspaceRow> {
   const { data, error } = await supabase.from('workspaces').insert(ws as Record<string, unknown>).select().single();
   if (error) throw error;
   return data as WorkspaceRow;

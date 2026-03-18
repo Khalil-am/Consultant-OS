@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom';
+import { beforeAll, afterAll } from 'vitest';
 
 // Mock crypto.randomUUID for test environments
 Object.defineProperty(globalThis, 'crypto', {

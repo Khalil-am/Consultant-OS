@@ -111,13 +111,13 @@ describe('getWorkspace (single)', () => {
 describe('createWorkspace', () => {
   it('inserts and returns new workspace', async () => {
     q({ id: 'new-id', name: 'New WS' });
-    const result = await createWorkspace({ name: 'New WS', type: 'BA', status: 'Active', progress: 0, language: 'EN', sector: 'Gov', contributors: [] });
+    const result = await createWorkspace({ name: 'New WS', type: 'Project', status: 'Active', progress: 0, language: 'EN', sector: 'Gov', contributors: [] });
     expect(result.id).toBe('new-id');
   });
 
   it('throws on insert error', async () => {
     q(null, { message: 'Unique constraint violation', code: '23505' });
-    await expect(createWorkspace({ name: 'Dup', type: 'BA', status: 'Active', progress: 0, language: 'EN', sector: 'Gov', contributors: [] }))
+    await expect(createWorkspace({ name: 'Dup', type: 'Project', status: 'Active', progress: 0, language: 'EN', sector: 'Gov', contributors: [] }))
       .rejects.toMatchObject({ message: 'Unique constraint violation' });
   });
 });
@@ -148,7 +148,7 @@ describe('getMeetings', () => {
 describe('upsertMeeting', () => {
   it('upserts and returns meeting', async () => {
     q({ id: 'm1', title: 'Kickoff', status: 'Upcoming' });
-    const mtg = { id: 'm1', title: 'Kickoff', type: 'Kickoff' as const, date: '2026-03-20', time: '09:00', duration: '1h', workspace: 'MOCI', workspace_id: 'ws-1', location: null, participants: null, status: 'Upcoming' as const, agenda: null, notes: null, attachments: null, action_items: null };
+    const mtg = { id: 'm1', title: 'Kickoff', type: 'Kickoff' as const, date: '2026-03-20', time: '09:00', duration: '1h', workspace: 'MOCI', workspace_id: 'ws-1', location: null, participants: [] as string[], status: 'Upcoming' as const, agenda: null, quorum_status: null as null, minutes_generated: false, actions_extracted: 0, decisions_logged: 0 };
     expect((await upsertMeeting(mtg)).title).toBe('Kickoff');
   });
 });
@@ -219,7 +219,7 @@ describe('getTasks', () => {
 describe('upsertTask', () => {
   it('creates a task', async () => {
     q({ id: 't1', title: 'Draft proposal', status: 'Todo' });
-    const task = { id: 't1', title: 'Draft proposal', status: 'Todo' as const, priority: 'Medium' as const, workspace: 'MOCI', workspace_id: 'ws-1', assignee: null, due_date: null, tags: null, column: 'Todo', description: null };
+    const task = { id: 't1', title: 'Draft proposal', status: 'Backlog' as const, priority: 'Medium' as const, workspace: 'MOCI', workspace_id: 'ws-1', assignee: '', due_date: '', description: '', linked_doc: null as string | null, linked_meeting: null as string | null };
     expect((await upsertTask(task)).status).toBe('Todo');
   });
 });
@@ -227,8 +227,8 @@ describe('upsertTask', () => {
 // ── updateTask ───────────────────────────────────────────────
 describe('updateTask', () => {
   it('moves task to Done', async () => {
-    q({ id: 't1', status: 'Done' });
-    expect((await updateTask('t1', { status: 'Done' })).status).toBe('Done');
+    q({ id: 't1', status: 'Completed' });
+    expect((await updateTask('t1', { status: 'Completed' })).status).toBe('Completed');
   });
 });
 
