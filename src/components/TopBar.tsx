@@ -4,7 +4,7 @@ import { Search, Bell, Sparkles, Plus, ChevronDown, Menu, X, FileText, Video, Ch
 import { useLayout } from '../hooks/useLayout';
 
 const pageMeta: Record<string, { title: string; sub: string }> = {
-  '/':            { title: 'Command Center',    sub: 'Good morning, Ahmed — here\'s what needs your attention' },
+  '/':            { title: 'Command Center',    sub: 'Good morning, Khalil — here\'s what needs your attention' },
   '/workspaces':  { title: 'Workspaces',         sub: '8 active workspaces across 6 clients' },
   '/automations': { title: 'Automations',        sub: '14 automations · 1,284 runs this month' },
   '/documents':   { title: 'Documents',          sub: 'All workspace documents in one place' },
@@ -333,7 +333,7 @@ export default function TopBar() {
               fontSize: '0.6rem', fontWeight: 800, color: 'white',
               boxShadow: '0 0 0 2px rgba(14,165,233,0.2)',
             }}>
-              AM
+              KA
             </div>
             <ChevronDown size={11} style={{ color: '#334155' }} />
           </div>

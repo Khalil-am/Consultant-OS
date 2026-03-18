@@ -202,10 +202,10 @@ export default function Sidebar() {
             background: 'linear-gradient(135deg, #0EA5E9, #8B5CF6)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <span style={{ fontSize: '0.58rem', fontWeight: 800, color: 'white', letterSpacing: '0.02em' }}>AC</span>
+            <span style={{ fontSize: '0.58rem', fontWeight: 800, color: 'white', letterSpacing: '0.02em' }}>MT</span>
           </div>
           <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748B', flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            Accel Consulting
+            Master Team
           </span>
           <svg width="10" height="10" viewBox="0 0 10 10" style={{ color: '#334155', flexShrink: 0 }}>
             <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
@@ -227,13 +227,13 @@ export default function Sidebar() {
             fontSize: '0.65rem', fontWeight: 800, color: 'white', letterSpacing: '0.03em',
             boxShadow: '0 0 0 2px rgba(0,212,255,0.2)',
           }}>
-            AM
+            KA
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#94A3B8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              Ahmed Al-Mahmoud
+              Khalil Abu Mushref
             </div>
-            <div style={{ fontSize: '0.62rem', color: '#334155', marginTop: '1px' }}>Senior Manager</div>
+            <div style={{ fontSize: '0.62rem', color: '#334155', marginTop: '1px' }}>Sr. Business Analyst</div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
             <div style={{ width: '7px', height: '7px', borderRadius: '9999px', background: '#10B981', boxShadow: '0 0 6px rgba(16,185,129,0.6)' }} />
