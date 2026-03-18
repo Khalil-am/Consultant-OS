@@ -175,4 +175,5 @@ export type MeetingInsert = Omit<MeetingRow, 'created_at' | 'updated_at'>;
 export type TaskInsert = Omit<TaskRow, 'created_at' | 'updated_at'>;
 export type TaskUpdate = Partial<TaskInsert>;
 export type RiskInsert = Omit<RiskRow, 'created_at' | 'updated_at'>;
+export type ReportInsert = Omit<ReportRow, 'created_at' | 'updated_at'>;
 export type ActivityInsert = Omit<ActivityRow, 'created_at'>;

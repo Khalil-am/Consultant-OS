@@ -74,9 +74,19 @@ export default function AutomationBuilder() {
   const fileInputRef = useRef<HTMLTextAreaElement>(null);
 
   const auto = automations.find(a => a.id === id) ?? automations[0];
+  const storageKey = `ab_cfg_${id ?? auto?.id ?? 'default'}`;
+  const [savedAt, setSavedAt] = useState<string | null>(() => {
+    try { return JSON.parse(localStorage.getItem(storageKey) ?? 'null')?.savedAt ?? null; } catch { return null; }
+  });
 
   if (!auto) {
     return <div style={{ padding: '2rem', color: 'var(--text-muted)', fontSize: '0.875rem' }}>Automation not found.</div>;
+  }
+
+  function handleSave() {
+    const cfg = { savedAt: new Date().toLocaleTimeString(), automationId: id ?? auto.id };
+    localStorage.setItem(storageKey, JSON.stringify(cfg));
+    setSavedAt(cfg.savedAt);
   }
 
   const handleRun = async () => {
@@ -136,8 +146,8 @@ export default function AutomationBuilder() {
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           <span className="status-active" style={{ fontSize: '0.72rem' }}>Active</span>
-          <button className="btn-ghost" style={{ height: '32px', fontSize: '0.78rem' }}>
-            <Save size={13} /> Save
+          <button className="btn-ghost" style={{ height: '32px', fontSize: '0.78rem' }} onClick={handleSave} title={savedAt ? `Last saved ${savedAt}` : 'Save configuration'}>
+            <Save size={13} /> {savedAt ? `Saved ${savedAt}` : 'Save'}
           </button>
           <button
             className="btn-primary"

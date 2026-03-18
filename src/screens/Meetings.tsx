@@ -4,9 +4,9 @@ import { useLayout } from '../hooks/useLayout';
 import {
   Plus, Video, Users, Clock, CheckCircle, FileText,
   ChevronRight, Calendar, MapPin, Search, Upload,
-  Loader2, X,
+  Loader2, X, Pencil, Trash2,
 } from 'lucide-react';
-import { getMeetings, updateMeeting, upsertMeeting, getWorkspaces } from '../lib/db';
+import { getMeetings, updateMeeting, upsertMeeting, deleteMeeting, getWorkspaces } from '../lib/db';
 import type { MeetingRow, WorkspaceRow } from '../lib/db';
 
 const filterTabs = ['All', 'Upcoming', 'In Progress', 'Completed', 'Committee'];
@@ -65,46 +65,95 @@ export default function Meetings() {
   const [loading, setLoading] = useState(true);
   const [workspaces, setWorkspaces] = useState<WorkspaceRow[]>([]);
   const [showNewModal, setShowNewModal] = useState(false);
+  const [editMeeting, setEditMeeting] = useState<MeetingRow | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [markingComplete, setMarkingComplete] = useState<string | null>(null);
   const [form, setForm] = useState({
     title: '', date: '', time: '09:00', duration: '1h', type: 'Review' as MeetingRow['type'],
     workspace: '', workspace_id: '', location: '', participants: '',
   });
 
+  function openEditModal(meeting: MeetingRow, e: React.MouseEvent) {
+    e.stopPropagation();
+    setEditMeeting(meeting);
+    setForm({
+      title: meeting.title,
+      date: meeting.date,
+      time: meeting.time || '09:00',
+      duration: meeting.duration || '1h',
+      type: meeting.type,
+      workspace: meeting.workspace,
+      workspace_id: meeting.workspace_id || '',
+      location: meeting.location || '',
+      participants: (meeting.participants || []).join(', '),
+    });
+    setShowNewModal(true);
+  }
+
   useEffect(() => {
     getMeetings().then(data => { setMeetings(data); setLoading(false); }).catch(() => setLoading(false));
     getWorkspaces().then(setWorkspaces).catch(() => {});
   }, []);
 
-  // ── Create meeting ─────────────────────────────────────────
+  // ── Create / Update meeting ────────────────────────────────
   async function handleCreateMeeting() {
     if (!form.title || !form.date || !form.workspace_id) return;
     setSaving(true);
     try {
-      const newMeeting = await upsertMeeting({
-        id: crypto.randomUUID(),
-        title: form.title,
-        date: form.date,
-        time: form.time,
-        duration: form.duration,
-        type: form.type,
-        status: 'Upcoming',
-        workspace: form.workspace,
-        workspace_id: form.workspace_id,
-        participants: form.participants.split(',').map(p => p.trim()).filter(Boolean),
-        location: form.location || null,
-        minutes_generated: false,
-        actions_extracted: 0,
-        decisions_logged: 0,
-        agenda: null,
-        quorum_status: null,
-      });
-      setMeetings(prev => [newMeeting, ...prev]);
+      if (editMeeting) {
+        // Update existing
+        const updated = await updateMeeting(editMeeting.id, {
+          title: form.title,
+          date: form.date,
+          time: form.time,
+          duration: form.duration,
+          type: form.type,
+          workspace: form.workspace,
+          workspace_id: form.workspace_id,
+          participants: form.participants.split(',').map(p => p.trim()).filter(Boolean),
+          location: form.location || null,
+        });
+        setMeetings(prev => prev.map(m => m.id === editMeeting.id ? updated : m));
+      } else {
+        // Create new
+        const newMeeting = await upsertMeeting({
+          id: crypto.randomUUID(),
+          title: form.title,
+          date: form.date,
+          time: form.time,
+          duration: form.duration,
+          type: form.type,
+          status: 'Upcoming',
+          workspace: form.workspace,
+          workspace_id: form.workspace_id,
+          participants: form.participants.split(',').map(p => p.trim()).filter(Boolean),
+          location: form.location || null,
+          minutes_generated: false,
+          actions_extracted: 0,
+          decisions_logged: 0,
+          agenda: null,
+          quorum_status: null,
+        });
+        setMeetings(prev => [newMeeting, ...prev]);
+      }
       setShowNewModal(false);
+      setEditMeeting(null);
       setForm({ title: '', date: '', time: '09:00', duration: '1h', type: 'Review', workspace: '', workspace_id: '', location: '', participants: '' });
     } catch { /* ignore */ }
     finally { setSaving(false); }
+  }
+
+  // ── Delete meeting ─────────────────────────────────────────
+  async function handleDeleteMeeting(id: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!confirm('Delete this meeting?')) return;
+    setDeletingId(id);
+    try {
+      await deleteMeeting(id);
+      setMeetings(prev => prev.filter(m => m.id !== id));
+    } catch { /* ignore */ }
+    finally { setDeletingId(null); }
   }
 
   // ── Mark complete ──────────────────────────────────────────
@@ -363,6 +412,37 @@ export default function Meetings() {
                             {meeting.minutes_generated ? 'View Minutes' : 'Upload Minutes'}
                           </button>
 
+                          {/* Edit */}
+                          <button
+                            onClick={e => openEditModal(meeting, e)}
+                            title="Edit meeting"
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '3px',
+                              fontSize: '0.65rem', fontWeight: 700, padding: '3px 8px', borderRadius: '6px',
+                              background: 'rgba(14,165,233,0.08)', color: '#38BDF8',
+                              border: '1px solid rgba(14,165,233,0.2)',
+                              cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+                            }}
+                          >
+                            <Pencil size={10} /> Edit
+                          </button>
+
+                          {/* Delete */}
+                          <button
+                            onClick={e => handleDeleteMeeting(meeting.id, e)}
+                            disabled={deletingId === meeting.id}
+                            title="Delete meeting"
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '3px',
+                              fontSize: '0.65rem', fontWeight: 700, padding: '3px 8px', borderRadius: '6px',
+                              background: 'rgba(239,68,68,0.08)', color: '#FCA5A5',
+                              border: '1px solid rgba(239,68,68,0.18)',
+                              cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+                            }}
+                          >
+                            {deletingId === meeting.id ? <Loader2 size={10} /> : <Trash2 size={10} />}
+                          </button>
+
                           <ChevronRight size={13} style={{ color: 'var(--text-faint)' }} />
                         </div>
                       </div>
@@ -506,7 +586,7 @@ export default function Meetings() {
           position: 'fixed', inset: 0, zIndex: 1000,
           background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
-        }} onClick={() => setShowNewModal(false)}>
+        }} onClick={() => { setShowNewModal(false); setEditMeeting(null); }}>
           <div style={{
             background: 'var(--bg-elevated)', border: '1px solid var(--border-default)',
             borderRadius: 'var(--radius-lg)', padding: '1.75rem', width: '100%', maxWidth: '500px',
@@ -516,10 +596,10 @@ export default function Meetings() {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <div>
-                <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>New Meeting</h2>
+                <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>{editMeeting ? 'Edit Meeting' : 'New Meeting'}</h2>
                 <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Schedule and track a meeting</p>
               </div>
-              <button onClick={() => setShowNewModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px', borderRadius: '6px' }}>
+              <button onClick={() => { setShowNewModal(false); setEditMeeting(null); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px', borderRadius: '6px' }}>
                 <X size={18} />
               </button>
             </div>
@@ -579,9 +659,9 @@ export default function Meetings() {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.75rem' }}>
-              <button className="btn-ghost" onClick={() => setShowNewModal(false)}>Cancel</button>
+              <button className="btn-ghost" onClick={() => { setShowNewModal(false); setEditMeeting(null); }}>Cancel</button>
               <button className="btn-primary" onClick={handleCreateMeeting} disabled={saving || !form.title || !form.date || !form.workspace_id}>
-                {saving ? 'Saving…' : 'Create Meeting'}
+                {saving ? 'Saving…' : editMeeting ? 'Save Changes' : 'Create Meeting'}
               </button>
             </div>
           </div>

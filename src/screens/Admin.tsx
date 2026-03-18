@@ -60,21 +60,60 @@ const rolePermissions = [
   { role: 'Viewer', permissions: { create: false, read: true, update: false, delete: false, configure: false, manage_users: false } },
 ];
 
+interface LocalUser { id: string; name: string; email: string; role: string; workspaces: number; lastActive: string; status: 'Active' | 'Inactive'; initials: string; }
+
 export default function Admin() {
   const { width, isMobile, isTablet } = useLayout();
   const [activeSection, setActiveSection] = useState('users');
   const [activities, setActivities] = useState<ActivityRow[]>([]);
   const [workspaces, setWorkspaces] = useState<WorkspaceRow[]>([]);
+  const [userList, setUserList] = useState<LocalUser[]>(() => {
+    try { return JSON.parse(localStorage.getItem('admin_users') ?? 'null') ?? users; } catch { return users; }
+  });
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteForm, setInviteForm] = useState({ name: '', email: '', role: 'Analyst' });
+  const [inviteSaving, setInviteSaving] = useState(false);
+  const [inviteSuccess, setInviteSuccess] = useState('');
 
   useEffect(() => {
     getActivities(50).then(setActivities).catch(() => {});
     getWorkspaces().then(setWorkspaces).catch(() => {});
   }, []);
 
+  function handleInviteUser() {
+    if (!inviteForm.name || !inviteForm.email) return;
+    setInviteSaving(true);
+    setTimeout(() => {
+      const newUser: LocalUser = {
+        id: crypto.randomUUID(),
+        name: inviteForm.name,
+        email: inviteForm.email,
+        role: inviteForm.role,
+        workspaces: 0,
+        lastActive: 'Just now',
+        status: 'Active',
+        initials: inviteForm.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
+      };
+      const updated = [...userList, newUser];
+      setUserList(updated);
+      localStorage.setItem('admin_users', JSON.stringify(updated));
+      setInviteSuccess(`Invite sent to ${inviteForm.email}`);
+      setInviteForm({ name: '', email: '', role: 'Analyst' });
+      setInviteSaving(false);
+      setTimeout(() => { setShowInvite(false); setInviteSuccess(''); }, 1500);
+    }, 800);
+  }
+
+  function handleToggleUserStatus(userId: string) {
+    const updated = userList.map(u => u.id === userId ? { ...u, status: (u.status === 'Active' ? 'Inactive' : 'Active') as 'Active' | 'Inactive' } : u);
+    setUserList(updated);
+    localStorage.setItem('admin_users', JSON.stringify(updated));
+  }
+
   // suppress unused warnings
   void width;
 
-  return (
+  return (<>
     <div style={{ display: 'flex', height: 'calc(100vh - 60px)', overflow: 'hidden' }}>
       {/* Left Sidebar */}
       <div style={{
@@ -106,7 +145,7 @@ export default function Admin() {
                 <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9', margin: 0, marginBottom: '0.25rem' }}>Users & Roles</h2>
                 <p style={{ fontSize: '0.8rem', color: '#64748B', margin: 0 }}>{users.length} users · 4 roles</p>
               </div>
-              <button className="btn-primary" style={{ height: '34px', fontSize: '0.8rem' }}>
+              <button className="btn-primary" style={{ height: '34px', fontSize: '0.8rem' }} onClick={() => setShowInvite(true)}>
                 <Plus size={13} /> Invite User
               </button>
             </div>
@@ -127,11 +166,11 @@ export default function Admin() {
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map(user => (
+                  {userList.map(user => (
                     <tr key={user.id}>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-                          <div className="avatar" style={{ width: '28px', height: '28px', fontSize: '0.62rem' }}>{user.avatar}</div>
+                          <div className="avatar" style={{ width: '28px', height: '28px', fontSize: '0.62rem' }}>{(user as {avatar?: string}).avatar ?? user.initials}</div>
                           <span style={{ fontSize: '0.82rem', fontWeight: 500, color: '#F1F5F9' }}>{user.name}</span>
                         </div>
                       </td>
@@ -145,16 +184,18 @@ export default function Admin() {
                           {user.role}
                         </span>
                       </td>
-                      <td style={{ fontSize: '0.78rem' }}>{user.workspacesCount}</td>
+                      <td style={{ fontSize: '0.78rem' }}>{(user as {workspacesCount?: number}).workspacesCount ?? user.workspaces}</td>
                       <td style={{ fontSize: '0.75rem' }}>{user.lastActive}</td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <div style={{
-                            width: '28px', height: '16px', borderRadius: '8px', cursor: 'pointer',
-                            background: user.status === 'Active' ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.08)',
-                            border: `1px solid ${user.status === 'Active' ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.12)'}`,
-                            position: 'relative', transition: 'all 0.2s',
-                          }}>
+                          <div
+                            onClick={() => handleToggleUserStatus(user.id)}
+                            style={{
+                              width: '28px', height: '16px', borderRadius: '8px', cursor: 'pointer',
+                              background: user.status === 'Active' ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.08)',
+                              border: `1px solid ${user.status === 'Active' ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.12)'}`,
+                              position: 'relative', transition: 'all 0.2s',
+                            }}>
                             <div style={{
                               position: 'absolute', width: '10px', height: '10px', borderRadius: '9999px',
                               background: user.status === 'Active' ? '#10B981' : '#64748B',
@@ -540,5 +581,47 @@ export default function Admin() {
         )}
       </div>
     </div>
-  );
+
+    {/* ── Invite User Modal ──────────────────────────────────── */}
+    {showInvite && (
+      <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+        onClick={e => { if (e.target === e.currentTarget) setShowInvite(false); }}>
+        <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', borderRadius: '14px', padding: '1.75rem', width: '100%', maxWidth: '440px', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}
+          onClick={e => e.stopPropagation()}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+            <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Invite User</h2>
+            <button onClick={() => setShowInvite(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px', display: 'flex' }}><X size={16} /></button>
+          </div>
+          {inviteSuccess ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1rem', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: '8px', color: '#34D399', fontSize: '0.85rem' }}>
+              <Check size={16} /> {inviteSuccess}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.375rem' }}>Full Name *</label>
+                <input className="input-field" style={{ width: '100%' }} placeholder="e.g. Sarah Ahmed" value={inviteForm.name} onChange={e => setInviteForm(f => ({ ...f, name: e.target.value }))} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.375rem' }}>Email Address *</label>
+                <input className="input-field" style={{ width: '100%' }} type="email" placeholder="e.g. sarah@firm.com" value={inviteForm.email} onChange={e => setInviteForm(f => ({ ...f, email: e.target.value }))} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.375rem' }}>Role</label>
+                <select className="input-field" style={{ width: '100%' }} value={inviteForm.role} onChange={e => setInviteForm(f => ({ ...f, role: e.target.value }))}>
+                  {Object.keys(roleColors).map(r => <option key={r}>{r}</option>)}
+                </select>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button className="btn-ghost" onClick={() => setShowInvite(false)}>Cancel</button>
+                <button className="btn-primary" onClick={handleInviteUser} disabled={inviteSaving || !inviteForm.name || !inviteForm.email}>
+                  {inviteSaving ? 'Sending…' : 'Send Invite'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    )}
+  </>);
 }

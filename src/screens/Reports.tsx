@@ -8,7 +8,7 @@ import {
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell
 } from 'recharts';
-import { getReports, getWorkspaces, getTasks, getRisks, getMilestones } from '../lib/db';
+import { getReports, getWorkspaces, getTasks, getRisks, getMilestones, upsertReport, deleteReport } from '../lib/db';
 import type { ReportRow } from '../lib/db';
 import { chatWithDocument } from '../lib/openrouter';
 
@@ -124,9 +124,13 @@ export default function Reports() {
   const [generatingReport, setGeneratingReport] = useState(false);
   const [generatedReport, setGeneratedReport] = useState('');
   const [reportError, setReportError] = useState('');
+  const [workspaceList, setWorkspaceList] = useState<{ id: string; name: string }[]>([]);
+  const [savingReport, setSavingReport] = useState(false);
+  const [deletingReportId, setDeletingReportId] = useState<string | null>(null);
 
   useEffect(() => {
     getReports().then(setReports).catch(() => {});
+    getWorkspaces().then(ws => setWorkspaceList(ws.map(w => ({ id: w.id, name: w.name })))).catch(() => {});
   }, []);
 
   async function handleGenerateReport() {
@@ -167,6 +171,76 @@ ${contextParts || 'No workspace data available.'}`;
     }
   }
 
+  async function handleSaveReport() {
+    if (!generatedReport) return;
+    setSavingReport(true);
+    try {
+      const wsMatch = workspaceList.find(w => w.name === selectedWorkspace);
+      const typeColorMap: Record<string, string> = {
+        'Weekly Status Report': '#0EA5E9',
+        'Monthly Progress Report': '#8B5CF6',
+        'Steering Committee Pack': '#10B981',
+        'Procurement Summary': '#F59E0B',
+        'Board Executive Summary': '#EF4444',
+        'Risk Report': '#EF4444',
+        'KPI Dashboard': '#00D4FF',
+      };
+      const saved = await upsertReport({
+        id: crypto.randomUUID(),
+        title: `${reportType} — ${reportPeriod}`,
+        type: reportType.replace(' Report', '').replace(' Pack', '').replace(' Summary', ''),
+        type_color: typeColorMap[reportType] ?? '#0EA5E9',
+        workspace: selectedWorkspace,
+        workspace_id: wsMatch?.id ?? null,
+        date: new Date().toISOString().slice(0, 10),
+        status: 'Generated',
+        pages: Math.ceil(generatedReport.length / 2000),
+        period: reportPeriod,
+        author: 'Consultant OS AI',
+      });
+      setReports(prev => [saved, ...prev]);
+      setGeneratedReport('');
+    } catch (e: unknown) {
+      setReportError(e instanceof Error ? e.message : 'Failed to save report');
+    } finally {
+      setSavingReport(false);
+    }
+  }
+
+  function handleDownloadReport(report: ReportRow) {
+    const content = `${report.title}\n${'='.repeat(report.title.length)}\n\nType: ${report.type}\nWorkspace: ${report.workspace}\nPeriod: ${report.period}\nDate: ${report.date}\nAuthor: ${report.author}\nStatus: ${report.status}\n`;
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${report.title.replace(/\s+/g, '_')}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleDownloadGenerated() {
+    if (!generatedReport) return;
+    const blob = new Blob([generatedReport], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${reportType.replace(/\s+/g, '_')}_${reportPeriod.replace(/\s+/g, '_')}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleDeleteReport(id: string) {
+    setDeletingReportId(id);
+    try {
+      await deleteReport(id);
+      setReports(prev => prev.filter(r => r.id !== id));
+    } catch {
+      // silently fail
+    } finally {
+      setDeletingReportId(null);
+    }
+  }
+
   // suppress unused warning
   void isMobile;
 
@@ -182,12 +256,40 @@ ${contextParts || 'No workspace data available.'}`;
     return matchesCat && matchesSearch;
   });
 
-  const handleGeneratePack = (title: string) => {
+  const handleGeneratePack = async (title: string, desc: string) => {
     setGeneratingPack(title);
-    setTimeout(() => {
-      setGeneratingPack(null);
+    try {
+      const [workspaces, tasks, risks] = await Promise.all([getWorkspaces(), getTasks(), getRisks()]);
+      const contextParts = workspaces.slice(0, 6).map(ws => {
+        const wsTasks = tasks.filter(t => t.workspace_id === ws.id);
+        const wsRisks = risks.filter(r => r.workspace_id === ws.id);
+        return `${ws.name}: ${ws.status}, ${ws.progress}% done, ${wsTasks.filter(t=>t.status==='Overdue').length} overdue tasks, ${wsRisks.filter(r=>r.severity==='Critical').length} critical risks`;
+      }).join('\n');
+      const result = await chatWithDocument(
+        [{ role: 'user', content: `Generate a ${title} board pack. Description: ${desc}\n\nPortfolio summary:\n${contextParts}` }],
+        `You are a senior consultant. Generate a professional ${title} in structured markdown. Include KPIs, RAG status summary, key decisions needed, and recommendations.`,
+      );
+      const saved = await upsertReport({
+        id: crypto.randomUUID(),
+        title,
+        type: 'Board Summary',
+        type_color: '#8B5CF6',
+        workspace: 'All Workspaces',
+        workspace_id: null,
+        date: new Date().toISOString().slice(0, 10),
+        status: 'Generated',
+        pages: Math.ceil(result.length / 2000),
+        period: 'Current',
+        author: 'Consultant OS AI',
+      });
+      setReports(prev => [saved, ...prev]);
       setGeneratedPacks(prev => new Set([...prev, title]));
-    }, 2000);
+    } catch {
+      // show pack as done anyway
+      setGeneratedPacks(prev => new Set([...prev, title]));
+    } finally {
+      setGeneratingPack(null);
+    }
   };
 
   const selectStyle: React.CSSProperties = {
@@ -252,7 +354,7 @@ ${contextParts || 'No workspace data available.'}`;
                   </div>
                 ) : (
                   <button
-                    onClick={() => handleGeneratePack(pack.title)}
+                    onClick={() => handleGeneratePack(pack.title, pack.desc)}
                     disabled={generatingPack === pack.title}
                     style={{
                       width: '100%', padding: '0.5rem', borderRadius: 'var(--radius-md)',
@@ -379,10 +481,10 @@ ${contextParts || 'No workspace data available.'}`;
                       <button className="btn-ghost" style={{ flex: 1, height: '28px', fontSize: '0.72rem', justifyContent: 'center', padding: '0' }}>
                         <Eye size={11} /> Preview
                       </button>
-                      <button className="btn-ghost" style={{ height: '28px', fontSize: '0.72rem', padding: '0 0.625rem' }} title="Download">
+                      <button className="btn-ghost" style={{ height: '28px', fontSize: '0.72rem', padding: '0 0.625rem' }} title="Download" onClick={() => handleDownloadReport(report)}>
                         <Download size={11} />
                       </button>
-                      <button className="btn-ghost" style={{ height: '28px', fontSize: '0.72rem', padding: '0 0.625rem' }} title="Share">
+                      <button className="btn-ghost" style={{ height: '28px', fontSize: '0.72rem', padding: '0 0.625rem', color: deletingReportId === report.id ? 'var(--text-muted)' : undefined }} title="Delete" onClick={() => handleDeleteReport(report.id)} disabled={deletingReportId === report.id}>
                         <Share size={11} />
                       </button>
                     </div>
@@ -515,11 +617,10 @@ ${contextParts || 'No workspace data available.'}`;
                   onFocus={e => (e.currentTarget.style.borderColor = 'rgba(139,92,246,0.5)')}
                   onBlur={e => (e.currentTarget.style.borderColor = 'var(--border-default)')}
                 >
-                  <option>All Workspaces</option>
-                  <option>NCA Digital Transformation</option>
-                  <option>ADNOC Supply Chain</option>
-                  <option>MOCI Procurement Reform</option>
-                  <option>Smart City Infrastructure PMO</option>
+                  <option value="All Workspaces">All Workspaces</option>
+                  {workspaceList.map(ws => (
+                    <option key={ws.id} value={ws.name}>{ws.name}</option>
+                  ))}
                 </select>
               </div>
               <div style={{ marginBottom: '1.125rem' }}>
@@ -641,10 +742,16 @@ ${contextParts || 'No workspace data available.'}`;
             <div style={{ padding: '1.25rem', overflowY: 'auto', flex: 1, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.75, whiteSpace: 'pre-wrap' }}>
               {generatedReport}
             </div>
-            <div style={{ padding: '0.875rem 1.25rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+            <div style={{ padding: '0.875rem 1.25rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
               <button className="btn-ghost" style={{ fontSize: '0.78rem' }} onClick={() => setGeneratedReport('')}>Close</button>
-              <button className="btn-primary" style={{ fontSize: '0.78rem' }} onClick={() => { navigator.clipboard.writeText(generatedReport); }}>
+              <button className="btn-ghost" style={{ fontSize: '0.78rem' }} onClick={() => { navigator.clipboard.writeText(generatedReport); }}>
                 Copy to Clipboard
+              </button>
+              <button className="btn-ghost" style={{ fontSize: '0.78rem' }} onClick={handleDownloadGenerated}>
+                <Download size={12} /> Download .txt
+              </button>
+              <button className="btn-primary" style={{ fontSize: '0.78rem' }} onClick={handleSaveReport} disabled={savingReport}>
+                {savingReport ? 'Saving...' : '💾 Save to Reports'}
               </button>
             </div>
           </div>

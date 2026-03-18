@@ -8,13 +8,13 @@ import type {
   MeetingRow, MeetingInsert,
   TaskRow, TaskInsert, TaskUpdate,
   RiskRow, RiskInsert,
-  ReportRow,
+  ReportRow, ReportInsert,
   ActivityRow, ActivityInsert,
 } from './database.types';
 
 export type {
   WorkspaceRow, WorkspaceFinancialRow, WorkspaceRagStatusRow, MilestoneRow,
-  DocumentRow, MeetingRow, TaskRow, RiskRow, ReportRow, ActivityRow,
+  DocumentRow, MeetingRow, TaskRow, RiskRow, ReportRow, ReportInsert, ActivityRow,
 };
 
 // ── Workspaces ──────────────────────────────────────────────
@@ -222,6 +222,17 @@ export async function getReports(workspaceId?: string): Promise<ReportRow[]> {
   const { data, error } = await query;
   if (error) throw error;
   return (data ?? []) as ReportRow[];
+}
+
+export async function upsertReport(report: ReportInsert): Promise<ReportRow> {
+  const { data, error } = await supabase.from('reports').upsert(report as Record<string, unknown>).select().single();
+  if (error) throw error;
+  return data as ReportRow;
+}
+
+export async function deleteReport(id: string): Promise<void> {
+  const { error } = await supabase.from('reports').delete().eq('id', id);
+  if (error) throw error;
 }
 
 // ── Activities ───────────────────────────────────────────────
