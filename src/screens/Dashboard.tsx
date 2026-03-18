@@ -5,7 +5,7 @@ import {
   TrendingUp, TrendingDown, Upload, Video, Sparkles, ArrowRight,
   Bot, Check, X, RefreshCw, Eye,
   Calendar, BarChart3, DollarSign, Target, Activity,
-  Brain, Layers, Users, ChevronRight,
+  Brain, Layers, Users, ChevronRight, UserPlus, ListTodo,
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip,
@@ -22,28 +22,6 @@ import { useLayout } from '../hooks/useLayout';
 
 type Period = 'today' | 'week' | 'month';
 
-const RAG_COLORS: Record<string, string> = {
-  Green: '#10B981',
-  Amber: '#F59E0B',
-  Red: '#EF4444',
-};
-
-const RAG_GLOW: Record<string, string> = {
-  Green: 'rgba(16,185,129,0.5)',
-  Amber: 'rgba(245,158,11,0.5)',
-  Red: 'rgba(239,68,68,0.5)',
-};
-
-function RagDot({ status }: { status: 'Green' | 'Amber' | 'Red' }) {
-  return (
-    <div style={{
-      width: 10, height: 10, borderRadius: '50%',
-      background: RAG_COLORS[status],
-      boxShadow: `0 0 8px ${RAG_GLOW[status]}, 0 0 2px ${RAG_COLORS[status]}`,
-      flexShrink: 0,
-    }} />
-  );
-}
 
 function fmtSAR(val: number): string {
   if (val >= 1000000) return `SAR ${(val / 1000000).toFixed(1)}M`;
@@ -142,7 +120,6 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [activityFilter, setActivityFilter] = useState<string>('All');
   const [completedDecisions, setCompletedDecisions] = useState<Set<string>>(new Set());
-  const [hoveredRagRow, setHoveredRagRow] = useState<number | null>(null);
 
   // Live Supabase data
   const [activities, setActivities] = useState<ActivityRow[]>([]);
@@ -168,13 +145,12 @@ export default function Dashboard() {
     { icon: <Upload size={18} />, label: 'Upload Doc', color: '#0EA5E9', bg: 'rgba(14,165,233,0.08)', border: 'rgba(14,165,233,0.18)', action: () => setShowUploadModal(true) },
     { icon: <Zap size={18} />, label: 'Run Automation', color: '#8B5CF6', bg: 'rgba(139,92,246,0.08)', border: 'rgba(139,92,246,0.18)', action: () => navigate('/automations') },
     { icon: <Video size={18} />, label: 'New Meeting', color: '#10B981', bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.18)', action: () => navigate('/meetings') },
-    { icon: <FileText size={18} />, label: 'Generate BRD', color: '#F59E0B', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.18)', action: () => navigate('/automations') },
-    { icon: <BarChart3 size={18} />, label: 'New Report', color: '#EC4899', bg: 'rgba(236,72,153,0.08)', border: 'rgba(236,72,153,0.18)', action: () => navigate('/reports') },
-    { icon: <Sparkles size={18} />, label: 'Ask AI', color: '#00D4FF', bg: 'rgba(0,212,255,0.08)', border: 'rgba(0,212,255,0.18)', action: () => navigate('/knowledge') },
+    { icon: <FileText size={18} />, label: 'Create Report', color: '#EF4444', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.18)', action: () => navigate('/reports') },
+    { icon: <UserPlus size={18} />, label: 'Add Client', color: '#F59E0B', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.18)', action: () => navigate('/workspaces') },
+    { icon: <ListTodo size={18} />, label: 'New Task', color: '#00D4FF', bg: 'rgba(0,212,255,0.08)', border: 'rgba(0,212,255,0.18)', action: () => navigate('/tasks') },
   ];
 
   const kpiCols = width >= 1200 ? 6 : width >= 900 ? 3 : 2;
-  const mainCols = width >= 1200 ? '1fr 280px 280px' : width >= 900 ? '1fr 1fr' : '1fr';
   const bottomCols = width >= 900 ? '1.6fr 1fr' : '1fr';
   const p = isMobile ? '0.875rem' : '1.5rem';
   const gap = isMobile ? '0.875rem' : '1.25rem';
@@ -343,91 +319,93 @@ export default function Dashboard() {
 
       {/* ── Portfolio KPI Row ─────────────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${kpiCols}, 1fr)`, gap: isMobile ? '0.625rem' : '0.875rem' }}>
-        {portfolioKPIs.map((kpi: PortfolioKPI) => (
-          <div key={kpi.label} style={{
-            background: '#0C1220',
-            border: '1px solid rgba(255,255,255,0.07)',
-            borderRadius: '12px',
-            padding: isMobile ? '0.875rem' : '1.125rem',
-            cursor: 'pointer',
-            position: 'relative',
-            overflow: 'hidden',
-            transition: 'all 0.2s',
-          }}
-            onMouseEnter={e => {
-              const el = e.currentTarget as HTMLElement;
-              el.style.borderColor = kpi.color + '35';
-              el.style.transform = 'translateY(-2px)';
-              el.style.boxShadow = `0 8px 24px rgba(0,0,0,0.3), 0 0 0 1px ${kpi.color}20`;
+        {portfolioKPIs.map((kpi: PortfolioKPI) => {
+          const trendColor = kpi.trendUp ? '#10B981' : '#EF4444';
+          const trendBg = kpi.trendUp ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)';
+          return (
+            <div key={kpi.label} style={{
+              background: `linear-gradient(135deg, ${kpi.color}12 0%, #0C1220 60%)`,
+              border: `1px solid ${kpi.color}25`,
+              borderRadius: '12px',
+              padding: isMobile ? '0.875rem' : '1.125rem',
+              cursor: 'pointer',
+              position: 'relative',
+              overflow: 'hidden',
+              transition: 'all 0.2s',
             }}
-            onMouseLeave={e => {
-              const el = e.currentTarget as HTMLElement;
-              el.style.borderColor = 'rgba(255,255,255,0.07)';
-              el.style.transform = 'translateY(0)';
-              el.style.boxShadow = 'none';
-            }}
-          >
-            {/* Top color bar */}
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(90deg, ${kpi.color}, ${kpi.color}30)` }} />
-            {/* Inner gradient overlay */}
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '60%', background: `linear-gradient(180deg, ${kpi.color}08 0%, transparent 100%)`, pointerEvents: 'none' }} />
+              onMouseEnter={e => {
+                const el = e.currentTarget as HTMLElement;
+                el.style.borderColor = kpi.color + '45';
+                el.style.transform = 'translateY(-2px)';
+                el.style.boxShadow = `0 8px 24px rgba(0,0,0,0.3), 0 0 0 1px ${kpi.color}20`;
+              }}
+              onMouseLeave={e => {
+                const el = e.currentTarget as HTMLElement;
+                el.style.borderColor = kpi.color + '25';
+                el.style.transform = 'translateY(0)';
+                el.style.boxShadow = 'none';
+              }}
+            >
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.875rem' }}>
+                <div style={{ padding: '0.5rem', borderRadius: '8px', background: kpi.color + '18', color: kpi.color }}>
+                  {kpi.icon === 'portfolio' ? <Briefcase size={15} /> :
+                   kpi.icon === 'revenue' ? <TrendingUp size={15} /> :
+                   kpi.icon === 'risk' ? <AlertTriangle size={15} /> :
+                   kpi.icon === 'milestone' ? <Target size={15} /> :
+                   kpi.icon === 'delivery' ? <Activity size={15} /> :
+                   <CheckSquare size={15} />}
+                </div>
+                {/* Trend pill badge */}
+                <span style={{
+                  display: 'flex', alignItems: 'center', gap: '2px',
+                  fontSize: '0.65rem', fontWeight: 700,
+                  padding: '2px 7px', borderRadius: '6px',
+                  background: trendBg, color: trendColor,
+                  border: `1px solid ${trendColor}30`,
+                }}>
+                  {kpi.trendUp ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                  {kpi.trend}
+                </span>
+              </div>
 
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.875rem' }}>
-              <div style={{ padding: '0.5rem', borderRadius: '8px', background: kpi.color + '15', color: kpi.color }}>
-                {kpi.icon === 'portfolio' ? <Briefcase size={15} /> :
-                 kpi.icon === 'revenue' ? <TrendingUp size={15} /> :
-                 kpi.icon === 'risk' ? <AlertTriangle size={15} /> :
-                 kpi.icon === 'milestone' ? <Target size={15} /> :
-                 kpi.icon === 'delivery' ? <Activity size={15} /> :
-                 <CheckSquare size={15} />}
+              <div style={{ position: 'relative' }}>
+                <div style={{
+                  fontSize: isMobile ? '1.4rem' : '1.75rem', fontWeight: 900,
+                  letterSpacing: '-0.03em', lineHeight: 1, color: '#F1F5F9',
+                }}>
+                  {kpi.value}
+                </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: '0.68rem', fontWeight: 700, color: kpi.trendUp ? '#34D399' : '#FCA5A5' }}>
-                {kpi.trendUp ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-                {kpi.trend}
-              </div>
+
+              <div style={{ fontSize: '0.7rem', color: '#64748B', marginTop: '0.5rem', fontWeight: 500 }}>{kpi.label}</div>
+              <div style={{ fontSize: '0.65rem', color: '#334155', marginTop: '2px' }}>{kpi.subValue}</div>
+
+              {/* Mini sparkline */}
+              {(() => {
+                const data = kpiSparks[kpi.label];
+                if (!data) return null;
+                const mn = Math.min(...data), mx = Math.max(...data), range = mx - mn || 1;
+                const w = 80, h = 24;
+                const pts = data.map((v, i) => `${(i / (data.length - 1)) * w},${h - ((v - mn) / range) * h}`).join(' ');
+                return (
+                  <svg width={w} height={h} style={{ marginTop: '0.5rem', opacity: 0.7 }}>
+                    <defs>
+                      <linearGradient id={`sg-${kpi.label.replace(/\s/g,'')}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={kpi.color} stopOpacity={0.25} />
+                        <stop offset="100%" stopColor={kpi.color} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <polygon
+                      points={`0,${h} ${pts} ${w},${h}`}
+                      fill={`url(#sg-${kpi.label.replace(/\s/g,'')})`}
+                    />
+                    <polyline points={pts} fill="none" stroke={kpi.color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                );
+              })()}
             </div>
-
-            <div style={{ position: 'relative' }}>
-              <div style={{
-                fontSize: isMobile ? '1.4rem' : '1.75rem', fontWeight: 900,
-                letterSpacing: '-0.03em', lineHeight: 1,
-                background: `linear-gradient(135deg, #F1F5F9 0%, ${kpi.color} 200%)`,
-                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-              }}>
-                {kpi.value}
-              </div>
-              {/* Subtle ambient glow behind number */}
-              <div style={{ position: 'absolute', top: '50%', left: '0', transform: 'translateY(-50%)', width: '60px', height: '30px', background: `radial-gradient(ellipse, ${kpi.color}18 0%, transparent 70%)`, pointerEvents: 'none', filter: 'blur(6px)' }} />
-            </div>
-
-            <div style={{ fontSize: '0.7rem', color: '#64748B', marginTop: '0.5rem', fontWeight: 500 }}>{kpi.label}</div>
-            <div style={{ fontSize: '0.65rem', color: '#334155', marginTop: '2px' }}>{kpi.subValue}</div>
-
-            {/* Mini sparkline */}
-            {(() => {
-              const data = kpiSparks[kpi.label];
-              if (!data) return null;
-              const mn = Math.min(...data), mx = Math.max(...data), range = mx - mn || 1;
-              const w = 80, h = 24;
-              const pts = data.map((v, i) => `${(i / (data.length - 1)) * w},${h - ((v - mn) / range) * h}`).join(' ');
-              return (
-                <svg width={w} height={h} style={{ marginTop: '0.5rem', opacity: 0.7 }}>
-                  <defs>
-                    <linearGradient id={`sg-${kpi.label.replace(/\s/g,'')}`} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={kpi.color} stopOpacity={0.25} />
-                      <stop offset="100%" stopColor={kpi.color} stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <polygon
-                    points={`0,${h} ${pts} ${w},${h}`}
-                    fill={`url(#sg-${kpi.label.replace(/\s/g,'')})`}
-                  />
-                  <polyline points={pts} fill="none" stroke={kpi.color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              );
-            })()}
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* ── Quick Actions ─────────────────────────────────────────────── */}
@@ -479,26 +457,23 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ── Portfolio Workspace Overview ─────────────────────────────── */}
-      {!isMobile && (
+      {/* ── Workspace Portfolio + Milestones (2-col) ─────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: width >= 900 ? '1.6fr 1fr' : '1fr', gap: '1rem' }}>
+
+        {/* Left: Workspace Portfolio */}
         <div style={{
           background: 'linear-gradient(160deg, #0A1220 0%, #080C18 100%)',
           border: '1px solid rgba(255,255,255,0.07)',
-          borderRadius: '14px',
-          overflow: 'hidden',
-          position: 'relative',
+          borderRadius: '14px', overflow: 'hidden', position: 'relative',
         }}>
-          {/* top accent */}
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #0EA5E9, #8B5CF6, #10B981, transparent)' }} />
+          {/* RGB moving accent */}
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #0EA5E9, #8B5CF6, #10B981, #F59E0B, #0EA5E9)', backgroundSize: '200% 100%', animation: 'shimmerBar 4s linear infinite', pointerEvents: 'none' }} />
           <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
               <div style={{ padding: '0.4rem', borderRadius: '8px', background: 'rgba(14,165,233,0.12)', color: '#0EA5E9' }}>
                 <Layers size={14} />
               </div>
-              <div>
-                <div style={{ fontSize: '0.875rem', fontWeight: 800, color: '#F1F5F9', letterSpacing: '-0.01em' }}>Workspace Portfolio</div>
-                <div style={{ fontSize: '0.68rem', color: '#475569', marginTop: '1px' }}>Delivery completion across all active engagements</div>
-              </div>
+              <span style={{ fontSize: '0.875rem', fontWeight: 800, color: '#F1F5F9', letterSpacing: '-0.01em' }}>Workspace Portfolio</span>
             </div>
             <button onClick={() => navigate('/workspaces')} style={{
               display: 'flex', alignItems: 'center', gap: '0.375rem',
@@ -513,259 +488,188 @@ export default function Dashboard() {
               All Workspaces <ChevronRight size={13} />
             </button>
           </div>
-          <div style={{ padding: '1.25rem 1.5rem', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem 2rem' }}>
-            {ragStatusData.map((row) => {
-              const pct = Math.round(40 + Math.random() * 55);
+          <div style={{ padding: '0.5rem 0' }}>
+            {ragStatusData.slice(0, 4).map((row, i) => {
+              const pct = [78, 45, 92, 28][i] ?? 50;
               const barColor = row.rag === 'Green' ? '#10B981' : row.rag === 'Amber' ? '#F59E0B' : '#EF4444';
               const glowColor = row.rag === 'Green' ? 'rgba(16,185,129,0.35)' : row.rag === 'Amber' ? 'rgba(245,158,11,0.35)' : 'rgba(239,68,68,0.35)';
+              const contractValue = workspaceFinancials[i]?.contract_value;
               return (
-                <div key={row.workspace} style={{ cursor: 'pointer' }} onClick={() => navigate('/workspaces')}>
+                <div key={row.workspace} style={{
+                  padding: '1rem 1.5rem', cursor: 'pointer',
+                  borderBottom: i < 3 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                  transition: 'background 0.15s',
+                }}
+                  onClick={() => navigate('/workspaces')}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#CBD5E1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '130px' }}>
-                      {row.workspace}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: barColor, boxShadow: `0 0 6px ${glowColor}`, flexShrink: 0 }} />
+                      <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#E2E8F0' }}>{row.workspace}</span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <div style={{ width: 7, height: 7, borderRadius: '50%', background: barColor, boxShadow: `0 0 6px ${glowColor}` }} />
-                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: barColor }}>{pct}%</span>
-                    </div>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 800, color: barColor }}>{pct}%</span>
                   </div>
-                  <div style={{ height: '6px', borderRadius: '99px', background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                  <div style={{ height: '6px', borderRadius: '99px', background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginBottom: '0.5rem' }}>
                     <div style={{
                       height: '100%', width: `${pct}%`,
                       background: `linear-gradient(90deg, ${barColor}CC, ${barColor})`,
-                      borderRadius: '99px',
-                      boxShadow: `0 0 8px ${glowColor}`,
+                      borderRadius: '99px', boxShadow: `0 0 8px ${glowColor}`,
                       transition: 'width 1.2s ease',
                     }} />
                   </div>
-                  <div style={{ fontSize: '0.62rem', color: '#334155', marginTop: '0.375rem' }}>{row.lastUpdated}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.68rem', color: '#475569' }}>Due: {row.lastUpdated}</span>
+                    {contractValue && <span style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 600 }}>{fmtSAR(contractValue)}</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Right: Milestones + Board Decisions stacked */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {/* Milestones */}
+          <div style={{ background: '#0C1220', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', overflow: 'hidden' }}>
+            <div style={{ padding: '0.875rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ padding: '0.35rem', borderRadius: '6px', background: 'rgba(245,158,11,0.12)', color: '#F59E0B' }}>
+                  <Target size={13} />
+                </div>
+                <span style={{ fontSize: '0.825rem', fontWeight: 700, color: '#F1F5F9' }}>Milestones</span>
+              </div>
+            </div>
+            <div>
+              {upcomingMilestones.slice(0, 3).map((ms, i) => {
+                const sc = milestoneStatusColor[ms.status] || '#475569';
+                return (
+                  <div key={ms.id} style={{
+                    padding: '0.875rem 1.25rem',
+                    borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                    transition: 'background 0.15s',
+                  }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem' }}>
+                      <div style={{ width: 7, height: 7, borderRadius: '50%', background: sc, boxShadow: `0 0 6px ${sc}80`, flexShrink: 0 }} />
+                      <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#E2E8F0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ms.title}</span>
+                    </div>
+                    <div style={{ fontSize: '0.68rem', color: '#64748B', marginLeft: '1.2rem', marginBottom: '0.25rem' }}>
+                      {wsNames[ms.workspace_id] || ms.workspace_id}
+                    </div>
+                    <div style={{ fontSize: '0.65rem', color: '#475569', marginLeft: '1.2rem', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <Calendar size={9} /> Due: {ms.due_date}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Board Decisions (compact) */}
+          <div style={{ background: '#0C1220', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', overflow: 'hidden' }}>
+            <div style={{ padding: '0.875rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ padding: '0.35rem', borderRadius: '6px', background: 'rgba(239,68,68,0.12)', color: '#EF4444' }}>
+                <Sparkles size={13} />
+              </div>
+              <span style={{ fontSize: '0.825rem', fontWeight: 700, color: '#F1F5F9' }}>Board Decisions</span>
+            </div>
+            <div>
+              {activeBoardDecisions.slice(0, 3).map((bd: BoardDecision, i) => {
+                const sc = bd.status === 'In Progress' ? '#0EA5E9' : bd.status === 'Pending Implementation' ? '#F59E0B' : bd.status === 'Closed' ? '#10B981' : '#EF4444';
+                const statusLabel = bd.status === 'In Progress' ? 'Pending' : bd.status === 'Closed' ? 'Approved' : bd.status === 'Pending Implementation' ? 'Approved' : 'Rejected';
+                return (
+                  <div key={bd.id} style={{
+                    padding: '0.75rem 1.25rem',
+                    borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#E2E8F0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, paddingRight: '0.75rem' }}>
+                      {bd.title}
+                    </span>
+                    <span style={{
+                      fontSize: '0.62rem', fontWeight: 700, padding: '3px 8px', borderRadius: '5px',
+                      background: `${sc}15`, color: sc, border: `1px solid ${sc}25`, flexShrink: 0,
+                    }}>
+                      {statusLabel}
+                    </span>
+                  </div>
+                );
+              })}
+              {activeBoardDecisions.length === 0 && (
+                <div style={{ padding: '1.5rem 1.25rem', textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#34D399' }}>All Clear</div>
+                  <div style={{ fontSize: '0.68rem', color: '#334155' }}>No pending decisions</div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Client Health Matrix ────────────────────────────────────────── */}
+      {!isMobile && (
+        <div style={{ background: '#0C1220', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px', overflow: 'hidden' }}>
+          <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ padding: '0.35rem', borderRadius: '6px', background: 'rgba(239,68,68,0.12)', color: '#EF4444' }}>
+                <Activity size={13} />
+              </div>
+              <span style={{ fontSize: '0.875rem', fontWeight: 800, color: '#F1F5F9' }}>Client Health Matrix</span>
+            </div>
+            <div style={{ display: 'flex', gap: '1.25rem' }}>
+              {[['Green', '#10B981', 'On Track'], ['Amber', '#F59E0B', 'At Risk'], ['Red', '#EF4444', 'Critical']].map(([, color, label]) => (
+                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: color, boxShadow: `0 0 6px ${color}80` }} />
+                  <span style={{ fontSize: '0.68rem', color: '#475569' }}>{label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ padding: '1rem 1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
+            {ragStatusData.slice(0, 4).map((row, i) => {
+              const pct = [78, 45, 92, 28][i] ?? 50;
+              const barColor = row.rag === 'Green' ? '#10B981' : row.rag === 'Amber' ? '#F59E0B' : '#EF4444';
+              const glowColor = row.rag === 'Green' ? 'rgba(16,185,129,0.35)' : row.rag === 'Amber' ? 'rgba(245,158,11,0.35)' : 'rgba(239,68,68,0.35)';
+              const contractValue = workspaceFinancials[i]?.contract_value;
+              return (
+                <div key={row.workspace} style={{
+                  padding: '1rem', borderRadius: '10px', cursor: 'pointer',
+                  background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
+                  transition: 'all 0.15s',
+                }}
+                  onClick={() => navigate('/workspaces')}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = `${barColor}30`; e.currentTarget.style.background = 'rgba(255,255,255,0.035)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: barColor, boxShadow: `0 0 6px ${glowColor}` }} />
+                      <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#E2E8F0' }}>{row.workspace}</span>
+                    </div>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 800, color: barColor }}>{pct}%</span>
+                  </div>
+                  <div style={{ height: '5px', borderRadius: '99px', background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginBottom: '0.5rem' }}>
+                    <div style={{
+                      height: '100%', width: `${pct}%`,
+                      background: `linear-gradient(90deg, ${barColor}CC, ${barColor})`,
+                      borderRadius: '99px', boxShadow: `0 0 8px ${glowColor}`,
+                      transition: 'width 1.2s ease',
+                    }} />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.68rem', color: '#475569' }}>Due: {row.lastUpdated}</span>
+                    {contractValue && <span style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 600 }}>{fmtSAR(contractValue)}</span>}
+                  </div>
                 </div>
               );
             })}
           </div>
         </div>
       )}
-
-      {/* ── Main 3-col Grid ───────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: mainCols, gap: '1rem' }}>
-
-        {/* Left: Client Health Matrix */}
-        <div style={{ background: '#0C1220', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', overflow: 'hidden' }}>
-          <div style={{ padding: '0.875rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ padding: '0.35rem', borderRadius: '6px', background: 'rgba(0,212,255,0.12)', color: '#00D4FF' }}>
-                <Activity size={13} />
-              </div>
-              <span style={{ fontSize: '0.825rem', fontWeight: 700, color: '#F1F5F9' }}>Client Health Matrix</span>
-            </div>
-            <button style={{
-              padding: '0.25rem 0.75rem', borderRadius: '7px', height: '28px',
-              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-              color: '#94A3B8', fontSize: '0.72rem', cursor: 'pointer', fontFamily: 'inherit',
-              display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500,
-              transition: 'all 0.15s',
-            }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(0,212,255,0.3)'; e.currentTarget.style.color = '#00D4FF'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#94A3B8'; }}
-              onClick={() => navigate('/workspaces')}
-            >
-              All Workspaces <ArrowRight size={11} />
-            </button>
-          </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '480px' }}>
-              <thead>
-                <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
-                  <th style={{ padding: '0.6rem 1.25rem', textAlign: 'left', fontSize: '0.65rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                    Workspace
-                  </th>
-                  {['Overall', 'Budget', 'Schedule', 'Risk'].map(h => (
-                    <th key={h} style={{ padding: '0.6rem 0.875rem', textAlign: 'center', fontSize: '0.65rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                      {h}
-                    </th>
-                  ))}
-                  <th style={{ padding: '0.6rem 0.875rem', textAlign: 'left', fontSize: '0.65rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                    Updated
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {ragStatusData.map((row, idx) => (
-                  <tr
-                    key={row.workspace}
-                    style={{
-                      cursor: 'pointer',
-                      background: hoveredRagRow === idx ? 'rgba(0,212,255,0.04)' : 'transparent',
-                      transition: 'background 0.15s',
-                      borderTop: '1px solid rgba(255,255,255,0.04)',
-                    }}
-                    onMouseEnter={() => setHoveredRagRow(idx)}
-                    onMouseLeave={() => setHoveredRagRow(null)}
-                    onClick={() => navigate('/workspaces')}
-                  >
-                    <td style={{ padding: '0.75rem 1.25rem' }}>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#E2E8F0', maxWidth: '190px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {row.workspace}
-                      </div>
-                    </td>
-                    {[row.rag, row.budget, row.schedule, row.risk].map((status, i) => (
-                      <td key={i} style={{ padding: '0.75rem 0.875rem', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', justifyContent: 'center' }}>
-                          <RagDot status={status} />
-                        </div>
-                      </td>
-                    ))}
-                    <td style={{ padding: '0.75rem 0.875rem', fontSize: '0.68rem', color: '#475569' }}>
-                      {row.lastUpdated}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div style={{ padding: '0.75rem 1.25rem', borderTop: '1px solid rgba(255,255,255,0.04)', display: 'flex', gap: '1.5rem' }}>
-            {[['Green', '#10B981', 'On Track'], ['Amber', '#F59E0B', 'At Risk'], ['Red', '#EF4444', 'Critical']].map(([, color, label]) => (
-              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: color, boxShadow: `0 0 6px ${color}80` }} />
-                <span style={{ fontSize: '0.68rem', color: '#475569' }}>{label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Center: Milestone Tracker */}
-        <div style={{ background: '#0C1220', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', overflow: 'hidden' }}>
-          <div style={{ padding: '0.875rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ padding: '0.35rem', borderRadius: '6px', background: 'rgba(245,158,11,0.12)', color: '#F59E0B' }}>
-                <Target size={13} />
-              </div>
-              <span style={{ fontSize: '0.825rem', fontWeight: 700, color: '#F1F5F9' }}>Milestones</span>
-            </div>
-            <span style={{ fontSize: '0.65rem', padding: '2px 8px', borderRadius: '99px', background: 'rgba(245,158,11,0.12)', color: '#FCD34D', border: '1px solid rgba(245,158,11,0.2)', fontWeight: 700 }}>
-              {upcomingMilestones.length} active
-            </span>
-          </div>
-          <div>
-            {upcomingMilestones.map((ms, i) => {
-              const sc = milestoneStatusColor[ms.status] || '#475569';
-              const fillClass = ms.status === 'At Risk' ? 'milestone-fill-amber' : ms.status === 'Delayed' ? 'milestone-fill-red' : 'milestone-fill-blue';
-              return (
-                <div key={ms.id} style={{
-                  padding: '0.875rem 1.25rem',
-                  borderBottom: i < upcomingMilestones.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                  transition: 'background 0.15s',
-                }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                    <div style={{ flex: 1, minWidth: 0, paddingRight: '0.5rem' }}>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#E2E8F0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {ms.title}
-                      </div>
-                      <div style={{ fontSize: '0.65rem', color: '#475569', marginTop: '2px' }}>
-                        {wsNames[ms.workspace_id] || ms.workspace_id}
-                      </div>
-                    </div>
-                    <span style={{ fontSize: '0.6rem', padding: '2px 6px', borderRadius: '4px', background: `${sc}15`, color: sc, border: `1px solid ${sc}25`, whiteSpace: 'nowrap', flexShrink: 0, fontWeight: 700 }}>
-                      {ms.status}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.375rem' }}>
-                    <div className="milestone-bar" style={{ flex: 1, height: '5px', borderRadius: '9999px', background: 'rgba(255,255,255,0.06)' }}>
-                      <div className={fillClass} style={{ width: `${ms.completion_pct}%`, height: '100%', borderRadius: '9999px', transition: 'width 0.8s ease' }} />
-                    </div>
-                    <span style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 700, flexShrink: 0 }}>{ms.completion_pct}%</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.65rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                      <Calendar size={9} /> {ms.due_date}
-                    </span>
-                    <span style={{ fontSize: '0.65rem', color: '#F59E0B', fontWeight: 700 }}>
-                      {fmtSAR(ms.value)}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Right: Board Decisions */}
-        <div style={{ background: '#0C1220', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', overflow: 'hidden' }}>
-          <div style={{ padding: '0.875rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ padding: '0.35rem', borderRadius: '6px', background: 'rgba(239,68,68,0.12)', color: '#EF4444' }}>
-                <CheckSquare size={13} />
-              </div>
-              <span style={{ fontSize: '0.825rem', fontWeight: 700, color: '#F1F5F9' }}>Board Decisions</span>
-            </div>
-            <span style={{ fontSize: '0.65rem', padding: '2px 8px', borderRadius: '99px', background: 'rgba(239,68,68,0.12)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.2)', fontWeight: 700 }}>
-              {activeBoardDecisions.length} open
-            </span>
-          </div>
-          <div>
-            {activeBoardDecisions.map((bd: BoardDecision, i) => {
-              const pc = bd.priority === 'Critical' ? '#EF4444' : bd.priority === 'High' ? '#F59E0B' : '#0EA5E9';
-              const sc = bd.status === 'In Progress' ? '#0EA5E9' : bd.status === 'Pending Implementation' ? '#F59E0B' : '#8B5CF6';
-              return (
-                <div key={bd.id} style={{
-                  padding: '0.875rem 1.25rem',
-                  borderBottom: i < activeBoardDecisions.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                  transition: 'background 0.15s',
-                }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.375rem' }}>
-                    <span style={{ fontSize: '0.6rem', padding: '2px 6px', borderRadius: '4px', background: `${pc}18`, color: pc, border: `1px solid ${pc}28`, fontWeight: 700 }}>
-                      {bd.id}
-                    </span>
-                    <span style={{ fontSize: '0.6rem', padding: '2px 6px', borderRadius: '4px', background: `${pc}10`, color: pc, fontWeight: 600 }}>
-                      {bd.priority}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#E2E8F0', marginBottom: '0.3rem', lineHeight: 1.45, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                    {bd.title}
-                  </div>
-                  <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: '0.5rem' }}>
-                    {bd.committee} · Due {bd.dueDate}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.62rem', padding: '2px 7px', borderRadius: '4px', background: `${sc}12`, color: sc, border: `1px solid ${sc}20`, fontWeight: 600 }}>
-                      {bd.status}
-                    </span>
-                    <button
-                      onClick={() => markDecisionComplete(bd.id)}
-                      style={{
-                        fontSize: '0.62rem', padding: '3px 8px', borderRadius: '5px',
-                        background: 'rgba(16,185,129,0.1)', color: '#34D399',
-                        border: '1px solid rgba(16,185,129,0.2)', cursor: 'pointer',
-                        fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '3px',
-                        fontWeight: 600, transition: 'all 0.15s',
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.2)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.1)'; }}
-                    >
-                      <Check size={9} /> Done
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-            {activeBoardDecisions.length === 0 && (
-              <div style={{ padding: '2.5rem 1.25rem', textAlign: 'center' }}>
-                <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(16,185,129,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.75rem' }}>
-                  <Check size={20} style={{ color: '#34D399' }} />
-                </div>
-                <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#34D399', marginBottom: '0.25rem' }}>All Clear</div>
-                <div style={{ fontSize: '0.72rem', color: '#334155' }}>All board decisions resolved</div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
 
       {/* ── Bottom Row: Charts ─────────────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: bottomCols, gap: '1rem' }}>
