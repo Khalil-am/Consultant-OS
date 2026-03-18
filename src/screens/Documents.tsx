@@ -262,7 +262,11 @@ export default function Documents() {
                   {folder.label}
                 </span>
               </div>
-              <span style={{ fontSize: '0.65rem', color: '#334155' }}>{folder.count || ''}</span>
+              {folder.label === 'All Documents' ? (
+                <span style={{ fontSize: '0.65rem', color: '#00D4FF', background: 'rgba(0,212,255,0.12)', padding: '1px 7px', borderRadius: '9999px', fontWeight: 600 }}>{folder.count}</span>
+              ) : (
+                <span style={{ fontSize: '0.65rem', color: '#334155' }}>{folder.count || ''}</span>
+              )}
             </div>
           ))}
         </div>
@@ -276,18 +280,18 @@ export default function Documents() {
           display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0,
           background: '#080C18', flexWrap: 'wrap',
         }}>
-          <button className="btn-primary" style={{ height: '34px', fontSize: '0.8rem' }} onClick={() => setShowUpload(true)}>
+          <button className="btn-primary" style={{ height: '34px', fontSize: '0.8rem', background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)', color: '#34D399' }} onClick={() => setShowUpload(true)}>
             <Upload size={13} /> Upload
           </button>
           <button className="btn-ai" style={{ height: '34px', fontSize: '0.8rem' }} onClick={handleSummarize} disabled={!selected || summarizing}>
-            <Sparkles size={13} /> {summarizing ? 'Summarizing…' : selected ? 'Summarize Selected' : 'Summarize'}
+            <Sparkles size={13} /> {summarizing ? 'Summarizing…' : 'AI Summarize'}
           </button>
 
           <div style={{ flex: 1 }} />
 
           {/* Status filters */}
           <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
-            {['All', ...STATUS_OPTIONS].map(s => (
+            {['All', 'Draft', 'Under Review', 'Approved'].map(s => (
               <button
                 key={s}
                 className={`tab-item ${activeStatus === s ? 'active' : ''}`}
@@ -308,7 +312,7 @@ export default function Documents() {
             <Search size={13} style={{ color: '#475569' }} />
             <input
               type="text"
-              placeholder="Search docs..."
+              placeholder="Filter docs..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: '0.78rem', color: '#F1F5F9', width: '100%', fontFamily: 'inherit' }}
@@ -333,13 +337,11 @@ export default function Documents() {
               <thead style={{ position: 'sticky', top: 0, background: '#080C18', zIndex: 1 }}>
                 <tr>
                   <th style={{ width: '32%' }}>Document</th>
-                  <th style={{ width: '14%' }}>Workspace</th>
-                  <th style={{ width: '9%' }}>Type</th>
-                  <th style={{ width: '8%' }}>Date</th>
-                  <th style={{ width: '6%' }}>Lang</th>
-                  <th style={{ width: '10%' }}>Status</th>
-                  <th style={{ width: '5%' }}>Size</th>
-                  <th style={{ width: '16%' }}></th>
+                  <th style={{ width: '16%' }}>Workspace</th>
+                  <th style={{ width: '12%' }}>Type</th>
+                  <th style={{ width: '10%' }}>Date</th>
+                  <th style={{ width: '14%' }}>Status</th>
+                  <th style={{ width: '16%' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -371,28 +373,36 @@ export default function Documents() {
                       </span>
                     </td>
                     <td>
-                      <span style={{ fontSize: '0.68rem', padding: '2px 5px', borderRadius: '3px', background: `${doc.type_color}15`, color: doc.type_color }}>
+                      <span style={{ fontSize: '0.7rem', padding: '3px 10px', borderRadius: '9999px', background: `${doc.type_color}18`, color: doc.type_color, fontWeight: 500, whiteSpace: 'nowrap' }}>
                         {doc.type}
                       </span>
                     </td>
                     <td style={{ fontSize: '0.72rem' }}>{doc.date}</td>
-                    <td>
-                      <span style={{ fontSize: '0.7rem', color: '#38BDF8' }}>{doc.language}</span>
-                    </td>
                     <td onClick={e => e.stopPropagation()}>
                       {statusChanging === doc.id ? (
                         <Loader2 size={12} style={{ animation: 'spin 1s linear infinite', color: '#475569' }} />
                       ) : (
-                        <select
-                          value={doc.status}
-                          onChange={e => handleStatusChange(doc.id, e.target.value)}
-                          style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: '0.68rem', color: doc.status === 'Approved' ? '#34D399' : doc.status === 'Final' ? '#00D4FF' : doc.status === 'Under Review' ? '#FCD34D' : '#94A3B8', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}
+                        <span
+                          onClick={() => {
+                            const idx = STATUS_OPTIONS.indexOf(doc.status as typeof STATUS_OPTIONS[number]);
+                            const next = STATUS_OPTIONS[(idx + 1) % STATUS_OPTIONS.length];
+                            handleStatusChange(doc.id, next);
+                          }}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '6px',
+                            fontSize: '0.7rem', padding: '3px 10px', borderRadius: '9999px', cursor: 'pointer', fontWeight: 500, whiteSpace: 'nowrap',
+                            background: doc.status === 'Approved' ? 'rgba(52,211,153,0.12)' : doc.status === 'Under Review' ? 'rgba(251,191,36,0.12)' : doc.status === 'Final' ? 'rgba(0,212,255,0.12)' : 'rgba(148,163,184,0.12)',
+                            color: doc.status === 'Approved' ? '#34D399' : doc.status === 'Under Review' ? '#FBBF24' : doc.status === 'Final' ? '#00D4FF' : '#94A3B8',
+                          }}
                         >
-                          {STATUS_OPTIONS.map(s => <option key={s} value={s} style={{ background: '#1E2A45', color: '#F1F5F9' }}>{s}</option>)}
-                        </select>
+                          <span style={{
+                            width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
+                            background: doc.status === 'Approved' ? '#34D399' : doc.status === 'Under Review' ? '#FBBF24' : doc.status === 'Final' ? '#00D4FF' : '#94A3B8',
+                          }} />
+                          {doc.status}
+                        </span>
                       )}
                     </td>
-                    <td style={{ fontSize: '0.72rem' }}>{doc.size}</td>
                     <td onClick={e => e.stopPropagation()}>
                       <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
                         <button
@@ -440,7 +450,7 @@ export default function Documents() {
                 ))}
                 {filtered.length === 0 && !loading && (
                   <tr>
-                    <td colSpan={8} style={{ textAlign: 'center', padding: '3rem', color: '#334155' }}>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '3rem', color: '#334155' }}>
                       {docs.length === 0 ? 'No documents yet — upload your first document.' : 'No documents match your filters.'}
                     </td>
                   </tr>
