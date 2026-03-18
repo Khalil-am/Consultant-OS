@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useLayout } from '../hooks/useLayout';
 import {
   Users, Briefcase, Zap, Shield,
@@ -9,14 +9,10 @@ import {
   Lock, Key, AlertTriangle, Info, Code2,
 } from 'lucide-react';
 import { users } from '../data/mockData';
-import { getActivities, getWorkspaces } from '../lib/db';
-import type { ActivityRow, WorkspaceRow } from '../lib/db';
 
 const adminSections = [
   { id: 'users', label: 'Users & Roles', icon: <Users size={15} /> },
-  { id: 'workspaces', label: 'Workspaces', icon: <Briefcase size={15} /> },
   { id: 'integrations', label: 'Integrations', icon: <Zap size={15} /> },
-  { id: 'security', label: 'Security', icon: <Shield size={15} /> },
 ];
 
 const roleColors: Record<string, { bg: string; text: string }> = {
@@ -36,29 +32,9 @@ const roleDisplayNames: Record<string, string> = {
 };
 
 const integrations: { name: string; category: string; status: string; logo: React.ReactNode; desc: string }[] = [
-  { name: 'Microsoft SharePoint', category: 'Storage',            status: 'Connected',    logo: <Share2 size={18} />,         desc: 'Document sync and storage' },
-  { name: 'Google Drive',         category: 'Storage',            status: 'Connected',    logo: <HardDrive size={18} />,      desc: 'File storage and collaboration' },
-  { name: 'OneDrive',             category: 'Storage',            status: 'Disconnected', logo: <Cloud size={18} />,          desc: 'Microsoft cloud storage' },
-  { name: 'Gmail',                category: 'Email',              status: 'Connected',    logo: <Mail size={18} />,           desc: 'Email integration for notifications' },
-  { name: 'Microsoft Teams',      category: 'Communication',      status: 'Connected',    logo: <MessageSquare size={18} />,  desc: 'Notifications and meeting sync' },
-  { name: 'Slack',                category: 'Communication',      status: 'Disconnected', logo: <Hash size={18} />,           desc: 'Team messaging and alerts' },
-  { name: 'Jira',                 category: 'Project Management', status: 'Connected',    logo: <LayoutDashboard size={18} />,desc: 'Task and issue tracking sync' },
-  { name: 'Notion',               category: 'Knowledge',          status: 'Disconnected', logo: <BookOpen size={18} />,       desc: 'Knowledge base sync' },
-  { name: 'GitHub',               category: 'Development',        status: 'Disconnected', logo: <Github size={18} />,         desc: 'Code repository integration' },
-  { name: 'Azure Form Recognizer',category: 'AI',                 status: 'Connected',    logo: <ScanLine size={18} />,       desc: 'OCR and document intelligence' },
-  { name: 'OpenAI GPT-4o',        category: 'AI',                 status: 'Connected',    logo: <Sparkles size={18} />,       desc: 'Primary LLM for generation' },
-  { name: 'Anthropic Claude',     category: 'AI',                 status: 'Connected',    logo: <Brain size={18} />,          desc: 'Secondary LLM for analysis' },
+  { name: 'Trello', category: 'Project Management', status: 'Connected', logo: <LayoutDashboard size={18} />, desc: 'BA Traffic Board — live task sync from Trello API' },
 ];
 
-const auditLogs = [
-  { time: '2026-03-15 14:32', user: 'AM', action: 'Document uploaded', resource: 'NCA Enterprise Architecture BRD v2.3', ip: '192.168.1.45' },
-  { time: '2026-03-15 14:15', user: 'RT', action: 'Automation run triggered', resource: 'Meeting Minutes Generator', ip: '10.0.2.18' },
-  { time: '2026-03-15 13:58', user: 'SK', action: 'User role changed', resource: 'Paul Lee → Analyst', ip: '192.168.1.67' },
-  { time: '2026-03-15 13:45', user: 'YA', action: 'Integration configured', resource: 'Microsoft Teams webhook updated', ip: '10.0.2.3' },
-  { time: '2026-03-15 12:30', user: 'JL', action: 'Risk status updated', resource: 'RISK-003 Smart City Contractor', ip: '192.168.1.102' },
-  { time: '2026-03-15 11:15', user: 'AM', action: 'Report generated', resource: 'NCA Weekly Status W10', ip: '192.168.1.45' },
-  { time: '2026-03-15 10:00', user: 'YA', action: 'New workspace created', resource: 'Retail Digital Commerce', ip: '10.0.2.3' },
-];
 
 interface LocalUser { id: string; name: string; email: string; role: string; workspaces: number; lastActive: string; status: 'Active' | 'Inactive'; initials: string; }
 
@@ -90,8 +66,6 @@ void Code2;
 export default function Admin() {
   const { width, isMobile } = useLayout();
   const [activeSection, setActiveSection] = useState('users');
-  const [activities, setActivities] = useState<ActivityRow[]>([]);
-  const [workspaces, setWorkspaces] = useState<WorkspaceRow[]>([]);
   const [userList, setUserList] = useState<LocalUser[]>(() => {
     try { return JSON.parse(localStorage.getItem('admin_users') ?? 'null') ?? users; } catch { return users; }
   });
@@ -103,10 +77,6 @@ export default function Admin() {
   const [roleFilter, setRoleFilter] = useState<string>('All');
   const [currentPage, setCurrentPage] = useState(1);
 
-  useEffect(() => {
-    getActivities(50).then(setActivities).catch(() => {});
-    getWorkspaces().then(setWorkspaces).catch(() => {});
-  }, []);
 
   // suppress unused warnings
   void width;
@@ -754,87 +724,6 @@ export default function Admin() {
         )}
 
         {/* ═══ Security (Audit Logs) ═══ */}
-        {activeSection === 'security' && (
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
-              <div>
-                <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9', margin: 0, marginBottom: '0.25rem' }}>Audit Logs</h2>
-                <p style={{ fontSize: '0.8rem', color: '#64748B', margin: 0 }}>All system activity logs</p>
-              </div>
-              <button className="btn-ghost" style={{ height: '34px', fontSize: '0.8rem' }}>
-                <ExternalLink size={13} /> Export Logs
-              </button>
-            </div>
-            <div className="section-card">
-              <div style={{ overflowX: 'auto' }}>
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Timestamp</th>
-                    <th>User</th>
-                    <th>Action</th>
-                    <th>Resource</th>
-                    <th>IP Address</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(activities.length > 0 ? activities : auditLogs.map((l, i) => ({ id: String(i), user: l.user, action: l.action, target: l.resource, workspace: '', workspace_id: null, time: l.time, type: 'system', created_at: l.time }))).map((log) => (
-                    <tr key={log.id}>
-                      <td style={{ fontFamily: 'monospace', fontSize: '0.72rem', color: '#00D4FF' }}>{log.created_at?.slice(0, 16).replace('T', ' ')}</td>
-                      <td>
-                        <div className="avatar" style={{ width: '22px', height: '22px', fontSize: '0.6rem', display: 'inline-flex' }}>{(log.user || '').slice(0, 2).toUpperCase()}</div>
-                      </td>
-                      <td style={{ fontSize: '0.82rem', color: '#F1F5F9', fontWeight: 500 }}>{log.action}</td>
-                      <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.78rem' }}>{log.target}</td>
-                      <td style={{ fontFamily: 'monospace', fontSize: '0.72rem', color: 'var(--text-muted)' }}>{log.workspace || '\u2014'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ═══ Workspaces ═══ */}
-        {activeSection === 'workspaces' && (
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
-              <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9', margin: 0 }}>Workspace Configuration</h2>
-              <button className="btn-primary" style={{ height: '34px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}><Plus size={14} /> New Workspace</button>
-            </div>
-            <div className="section-card">
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
-                  <thead>
-                    <tr>
-                      {['Workspace Name', 'Type', 'Members', 'Language', 'Confidentiality', 'Status', 'Actions'].map(h => (
-                        <th key={h} style={{ padding: '0.625rem 1rem', textAlign: 'left', fontSize: '0.65rem', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid rgba(255,255,255,0.05)', whiteSpace: 'nowrap' }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {workspaces.map((ws) => (
-                      <tr key={ws.id} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', fontWeight: 500, color: '#F1F5F9', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>{ws.name}</td>
-                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', color: '#94A3B8', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>{ws.type}</td>
-                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', color: '#94A3B8', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>{ws.contributors?.length ?? 0}</td>
-                        <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}><span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: 'rgba(14,165,233,0.1)', color: '#38BDF8', border: '1px solid rgba(14,165,233,0.2)' }}>{ws.language}</span></td>
-                        <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}><span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: 'rgba(148,163,184,0.07)', color: '#94A3B8' }}>{ws.sector}</span></td>
-                        <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                          <span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: ws.status === 'Active' ? 'rgba(16,185,129,0.1)' : 'rgba(100,116,139,0.1)', color: ws.status === 'Active' ? '#34D399' : '#94A3B8' }}>{ws.status}</span>
-                        </td>
-                        <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                          <button style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '3px 8px', fontSize: '0.68rem', color: '#94A3B8', cursor: 'pointer', fontFamily: 'inherit' }}>Configure</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
 
