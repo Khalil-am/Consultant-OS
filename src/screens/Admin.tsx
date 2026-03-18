@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLayout } from '../hooks/useLayout';
 import {
   Users, Briefcase, Zap, Shield,
