@@ -59,16 +59,6 @@ export default function Automations() {
   return (
     <div style={{ padding: isMobile ? '1rem' : '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
-      {/* Page Header */}
-      <div>
-        <h1 style={{ fontSize: '1.375rem', fontWeight: 800, color: '#F1F5F9', margin: 0, letterSpacing: '-0.02em' }}>
-          Automations
-        </h1>
-        <p style={{ fontSize: '0.8rem', color: '#475569', margin: '3px 0 0' }}>
-          {automations.length} automations · 1,284 runs this month
-        </p>
-      </div>
-
       {/* Stats Row */}
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 640 ? 4 : 2}, 1fr)`, gap: '0.875rem' }}>
         {[
