@@ -270,7 +270,7 @@ export default function Workspaces() {
       </div>
 
       {/* ── Financial Stats Row ─────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 768 ? 4 : 2}, 1fr)`, gap: '0.875rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 768 ? 4 : width >= 480 ? 2 : 1}, 1fr)`, gap: '0.875rem' }}>
         {[
           { label: 'Total Contract Value', value: fmtSAR(totalContract), icon: <DollarSign size={15} />, color: '#00D4FF', trend: `${workspaces.length} engagements`, trendUp: true },
           { label: 'Revenue Recognized', value: fmtSAR(totalSpent), icon: <TrendingUp size={15} />, color: '#10B981', trend: `${totalContract > 0 ? Math.round((totalSpent / totalContract) * 100) : 0}% collected`, trendUp: true },
@@ -656,7 +656,7 @@ export default function Workspaces() {
         >
           <div style={{
             background: '#0C1220', border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: '16px', padding: '2rem', width: '100%', maxWidth: '540px',
+            borderRadius: '16px', padding: isMobile ? '1.25rem' : '2rem', width: '100%', maxWidth: isMobile ? '95vw' : '540px',
             maxHeight: '90vh', overflowY: 'auto', position: 'relative', overflow: 'hidden',
             boxShadow: '0 32px 80px rgba(0,0,0,0.7)',
           }}>

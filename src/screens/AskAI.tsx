@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Send, Mic, Plus, Sparkles, ChevronDown, Share2, History,
-  User, Image, FileText, Code2, MessageSquare, Bot,
+  User, Image, FileText, Code2, MessageSquare, Bot, Menu, X,
 } from 'lucide-react';
+import { useLayout } from '../hooks/useLayout';
 import {
   getWorkspaces, getTasks, getRisks, getMilestones, getDocuments, getReports,
 } from '../lib/db';
@@ -269,6 +270,7 @@ function renderMarkdown(text: string) {
 // AskAI Component
 // ══════════════════════════════════════════════════════════════
 export default function AskAI() {
+  const { isMobile } = useLayout();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -277,6 +279,7 @@ export default function AskAI() {
   const [selectedThread, setSelectedThread] = useState<string | null>(null);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
   const [ragContext, setRagContext] = useState<string | null>(null);
+  const [showSidebar, setShowSidebar] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -386,10 +389,22 @@ export default function AskAI() {
       {/* ── Top bar ──────────────────────────────────────────── */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '16px 24px', borderBottom: '1px solid rgba(255,255,255,0.07)',
+        padding: isMobile ? '12px 16px' : '16px 24px', borderBottom: '1px solid rgba(255,255,255,0.07)',
         background: '#0A0F1C', flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {isMobile && (
+            <button
+              onClick={() => setShowSidebar(v => !v)}
+              style={{
+                width: 34, height: 34, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+                color: '#94A3B8', cursor: 'pointer', flexShrink: 0,
+              }}
+            >
+              <Menu size={16} />
+            </button>
+          )}
           <div style={{
             width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
             background: 'linear-gradient(135deg, #10B981, #059669)',
@@ -398,35 +413,69 @@ export default function AskAI() {
           </div>
           <div>
             <h1 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#F1F5F9' }}>Ask AI</h1>
-            <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748B' }}>Powered by advanced AI models</p>
+            {!isMobile && <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748B' }}>Powered by advanced AI models</p>}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button style={{
-            display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8,
-            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
-            color: '#94A3B8', fontSize: '0.8rem', cursor: 'pointer',
-          }}>
-            <History size={14} /> History
-          </button>
-          <button style={{
-            display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8,
-            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
-            color: '#94A3B8', fontSize: '0.8rem', cursor: 'pointer',
-          }}>
-            <Share2 size={14} /> Share
-          </button>
-        </div>
+        {!isMobile && (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button style={{
+              display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8,
+              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+              color: '#94A3B8', fontSize: '0.8rem', cursor: 'pointer',
+            }}>
+              <History size={14} /> History
+            </button>
+            <button style={{
+              display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8,
+              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+              color: '#94A3B8', fontSize: '0.8rem', cursor: 'pointer',
+            }}>
+              <Share2 size={14} /> Share
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Body: sidebar + chat ─────────────────────────────── */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
+        {/* ── Mobile sidebar overlay backdrop ─────────────────── */}
+        {isMobile && showSidebar && (
+          <div
+            onClick={() => setShowSidebar(false)}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 40,
+              background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(2px)',
+            }}
+          />
+        )}
+
         {/* ── Left sidebar ───────────────────────────────────── */}
         <div style={{
           width: 240, minWidth: 240, borderRight: '1px solid rgba(255,255,255,0.07)',
           background: '#0A0F1C', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          ...(isMobile ? {
+            position: 'fixed' as const, top: 0, left: 0, bottom: 0, zIndex: 50,
+            transform: showSidebar ? 'translateX(0)' : 'translateX(-100%)',
+            transition: 'transform 0.25s ease',
+            boxShadow: showSidebar ? '4px 0 24px rgba(0,0,0,0.5)' : 'none',
+          } : {}),
         }}>
+          {/* Close button on mobile overlay */}
+          {isMobile && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '10px 10px 0' }}>
+              <button
+                onClick={() => setShowSidebar(false)}
+                style={{
+                  width: 28, height: 28, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                  color: '#94A3B8', cursor: 'pointer',
+                }}
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
           {/* Recent Threads */}
           <div style={{ padding: '16px 14px 8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
@@ -510,7 +559,7 @@ export default function AskAI() {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
           {/* Messages */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '16px 12px' : '24px 32px' }}>
             {messages.length === 0 && !isLoading && (
               <div style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -583,7 +632,7 @@ export default function AskAI() {
 
                 {/* Bubble */}
                 <div style={{
-                  maxWidth: '75%', minWidth: 0,
+                  maxWidth: isMobile ? '90%' : '75%', minWidth: 0,
                 }}>
                   {/* Header for AI messages */}
                   {msg.role === 'assistant' && (
@@ -648,7 +697,7 @@ export default function AskAI() {
           </div>
 
           {/* ── Input bar ──────────────────────────────────────── */}
-          <div style={{ padding: '0 32px 20px', flexShrink: 0 }}>
+          <div style={{ padding: isMobile ? '0 10px 14px' : '0 32px 20px', flexShrink: 0 }}>
             <div style={{
               display: 'flex', alignItems: 'flex-end', gap: 10, padding: '10px 14px',
               background: '#0C1220', border: '1px solid rgba(255,255,255,0.08)',
@@ -693,7 +742,7 @@ export default function AskAI() {
                   }}
                 >
                   <MessageSquare size={12} />
-                  {selectedModel.label}
+                  {!isMobile && selectedModel.label}
                   <ChevronDown size={12} style={{ transform: showModelDropdown ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
                 </button>
 
@@ -701,7 +750,7 @@ export default function AskAI() {
                   <div style={{
                     position: 'absolute', bottom: '100%', right: 0, marginBottom: 6,
                     background: '#0F1629', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12,
-                    padding: 6, minWidth: 220, boxShadow: '0 12px 40px rgba(0,0,0,0.5)', zIndex: 50,
+                    padding: 6, minWidth: isMobile ? 180 : 220, boxShadow: '0 12px 40px rgba(0,0,0,0.5)', zIndex: 50,
                   }}>
                     {MODELS.map(m => (
                       <button

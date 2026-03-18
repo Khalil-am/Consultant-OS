@@ -227,7 +227,7 @@ export default function Meetings() {
     <div className="screen-container animate-fade-in">
 
       {/* ── Stats Strip ──────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 768 ? 4 : 2}, 1fr)`, gap: '0.875rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 768 ? 4 : width >= 480 ? 2 : 1}, 1fr)`, gap: '0.875rem' }}>
 
         {/* Total Meetings */}
         <div className="metric-card" style={{ position: 'relative', overflow: 'hidden' }}>
@@ -321,7 +321,7 @@ export default function Meetings() {
                 style={{ paddingLeft: '2.25rem', height: '36px', fontSize: '0.8rem' }}
               />
             </div>
-            <div style={{ display: 'flex', gap: '0.25rem', background: 'rgba(255,255,255,0.03)', padding: '0.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', overflowX: 'auto' }}>
+            <div style={{ display: 'flex', gap: '0.25rem', background: 'rgba(255,255,255,0.03)', padding: '0.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
               {filterTabs.map(tab => (
                 <button key={tab} className={`tab-item ${activeFilter === tab ? 'active' : ''}`} onClick={() => setActiveFilter(tab)} style={{ padding: '0.3rem 0.75rem', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
                   {tab === 'All' ? 'All Meetings' : tab}
@@ -367,7 +367,7 @@ export default function Meetings() {
                     (e.currentTarget as HTMLElement).style.boxShadow = 'none';
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'flex-start', padding: '0.875rem 1.125rem', gap: '0.875rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', padding: isMobile ? '0.625rem 0.75rem' : '0.875rem 1.125rem', gap: isMobile ? '0.625rem' : '0.875rem' }}>
 
                     {/* Date Badge */}
                     <div style={{
@@ -423,7 +423,7 @@ export default function Meetings() {
 
                       {/* Action buttons for completed meetings */}
                       {meeting.status === 'Completed' && (
-                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
                           <button
                             onClick={e => { e.stopPropagation(); navigate(`/meetings/${meeting.id}`); }}
                             style={{

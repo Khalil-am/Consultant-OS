@@ -165,7 +165,7 @@ export default function Tasks() {
     });
   }, [enrichedCards, activeTab, listFilter, search]);
 
-  const colCount = isMobile ? 2 : isTablet ? 2 : 4;
+  const colCount = isMobile ? 1 : isTablet ? 2 : 4;
 
   return (
     <div className="screen-container animate-fade-in">
@@ -226,7 +226,7 @@ export default function Tasks() {
 
       {/* ── Filter Tabs + Toolbar ──────────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', flexWrap: 'wrap' }}>
-        <div style={{ position: 'relative', flex: 1, minWidth: '180px' }}>
+        <div style={{ position: 'relative', flex: 1, minWidth: isMobile ? '100%' : '180px' }}>
           <Search size={13} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
           <input
             className="input-field"
@@ -261,7 +261,7 @@ export default function Tasks() {
       </div>
 
       {/* Status filter tabs */}
-      <div style={{ display: 'flex', gap: '0.2rem', background: 'rgba(255,255,255,0.03)', padding: '0.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', overflowX: 'auto', flexShrink: 0 }}>
+      <div style={{ display: 'flex', gap: '0.2rem', background: 'rgba(255,255,255,0.03)', padding: '0.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', overflowX: 'auto', WebkitOverflowScrolling: 'touch', flexShrink: 0 }}>
         {FILTER_TABS.map(tab => {
           const m = tab !== 'All' ? STATUS_META[tab] : null;
           const count = tab === 'All' ? enrichedCards.length : enrichedCards.filter(c => c.status === tab).length;
@@ -313,7 +313,7 @@ export default function Tasks() {
           {/* Table header */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr auto' : '2fr 90px 110px 140px 120px 90px auto',
+            gridTemplateColumns: isMobile ? '1fr auto' : 'minmax(0, 2fr) 90px 110px minmax(100px, 140px) minmax(80px, 120px) 90px auto',
             gap: '0', padding: '0.6rem 1rem',
             background: 'var(--bg-elevated)',
             borderBottom: '1px solid var(--border-subtle)',
@@ -340,7 +340,7 @@ export default function Tasks() {
                   rel="noopener noreferrer"
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: isMobile ? '1fr auto' : '2fr 90px 110px 140px 120px 90px auto',
+                    gridTemplateColumns: isMobile ? '1fr auto' : 'minmax(0, 2fr) 90px 110px minmax(100px, 140px) minmax(80px, 120px) 90px auto',
                     gap: '0',
                     padding: '0.75rem 1rem',
                     borderBottom: idx < filtered.length - 1 ? '1px solid var(--border-subtle)' : 'none',

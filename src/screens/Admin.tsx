@@ -64,7 +64,7 @@ const lastActivityTimes: Record<string, string> = {
 void Code2;
 
 export default function Admin() {
-  const { width, isMobile } = useLayout();
+  const { width, isMobile, isTablet } = useLayout();
   const [activeSection, setActiveSection] = useState('users');
   const [userList, setUserList] = useState<LocalUser[]>(() => {
     try { return JSON.parse(localStorage.getItem('admin_users') ?? 'null') ?? users; } catch { return users; }
@@ -194,28 +194,56 @@ export default function Admin() {
 
   return (<>
     <div style={{ display: 'flex', height: 'calc(100vh - 60px)', overflow: 'hidden' }}>
-      {/* Left Sidebar */}
-      <div style={{
-        width: '220px', minWidth: '220px', borderRight: '1px solid rgba(255,255,255,0.05)',
-        padding: '1rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '2px',
-        background: '#0C1220',
-      }}>
-        <div className="sidebar-section-label" style={{ marginBottom: '0.375rem' }}>Administration</div>
-        {adminSections.map(section => (
-          <button
-            key={section.id}
-            className={`nav-item ${activeSection === section.id ? 'active' : ''}`}
-            onClick={() => setActiveSection(section.id)}
-            style={{ justifyContent: 'flex-start', background: 'none', width: '100%' }}
-          >
-            <span style={{ opacity: activeSection === section.id ? 1 : 0.6 }}>{section.icon}</span>
-            <span>{section.label}</span>
-          </button>
-        ))}
-      </div>
+      {/* Left Sidebar — hidden on tablet/mobile */}
+      {!isTablet && (
+        <div style={{
+          width: '220px', minWidth: '220px', borderRight: '1px solid rgba(255,255,255,0.05)',
+          padding: '1rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '2px',
+          background: '#0C1220',
+        }}>
+          <div className="sidebar-section-label" style={{ marginBottom: '0.375rem' }}>Administration</div>
+          {adminSections.map(section => (
+            <button
+              key={section.id}
+              className={`nav-item ${activeSection === section.id ? 'active' : ''}`}
+              onClick={() => setActiveSection(section.id)}
+              style={{ justifyContent: 'flex-start', background: 'none', width: '100%' }}
+            >
+              <span style={{ opacity: activeSection === section.id ? 1 : 0.6 }}>{section.icon}</span>
+              <span>{section.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Main Content */}
       <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '0.875rem' : '1.5rem' }}>
+
+        {/* Horizontal section pills for tablet/mobile */}
+        {isTablet && (
+          <div style={{
+            display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.75rem',
+            marginBottom: '0.5rem', WebkitOverflowScrolling: 'touch',
+          }}>
+            {adminSections.map(section => (
+              <button
+                key={section.id}
+                onClick={() => setActiveSection(section.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.375rem',
+                  padding: '6px 14px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 500,
+                  whiteSpace: 'nowrap', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0,
+                  background: activeSection === section.id ? 'rgba(14,165,233,0.15)' : 'rgba(255,255,255,0.04)',
+                  color: activeSection === section.id ? '#38BDF8' : '#94A3B8',
+                  border: activeSection === section.id ? '1px solid rgba(14,165,233,0.3)' : '1px solid rgba(255,255,255,0.08)',
+                }}
+              >
+                {section.icon}
+                <span>{section.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* ═══ Users & Roles ═══ */}
         {activeSection === 'users' && (
@@ -232,7 +260,7 @@ export default function Admin() {
             </div>
 
             {/* Stats Row */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.875rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 1024 ? 4 : width >= 640 ? 2 : 1}, 1fr)`, gap: '0.875rem' }}>
               {statsCards.map((card) => (
                 <div key={card.title} className="section-card" style={{ padding: '1rem 1.125rem', position: 'relative', overflow: 'hidden' }}>
                   {/* Icon badge top-right */}
@@ -286,9 +314,9 @@ export default function Admin() {
             </div>
 
             {/* Main 2-column layout */}
-            <div style={{ display: 'flex', gap: '1.25rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: width >= 1024 ? '1fr 300px' : '1fr', gap: '1.25rem' }}>
               {/* Left: Users Directory */}
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ minWidth: 0 }}>
                 <div className="section-card" style={{ padding: 0 }}>
                   {/* Table header bar */}
                   <div style={{ padding: '0.875rem 1.125rem', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
@@ -380,8 +408,8 @@ export default function Admin() {
                           <th>User</th>
                           <th>Role</th>
                           <th>Status</th>
-                          <th>Last Activity</th>
-                          <th>2FA</th>
+                          {!isMobile && <th>Last Activity</th>}
+                          {!isMobile && <th>2FA</th>}
                           <th></th>
                         </tr>
                       </thead>
@@ -438,12 +466,16 @@ export default function Admin() {
                                   </span>
                                 </div>
                               </td>
-                              <td style={{ fontSize: '0.75rem', color: '#94A3B8' }}>
-                                {lastActivityTimes[user.id] ?? user.lastActive}
-                              </td>
-                              <td>
-                                <Shield size={14} style={{ color: twoFA ? '#10B981' : '#334155' }} />
-                              </td>
+                              {!isMobile && (
+                                <td style={{ fontSize: '0.75rem', color: '#94A3B8' }}>
+                                  {lastActivityTimes[user.id] ?? user.lastActive}
+                                </td>
+                              )}
+                              {!isMobile && (
+                                <td>
+                                  <Shield size={14} style={{ color: twoFA ? '#10B981' : '#334155' }} />
+                                </td>
+                              )}
                               <td>
                                 <div style={{ display: 'flex', gap: '0.25rem' }}>
                                   <button
@@ -520,7 +552,7 @@ export default function Admin() {
               </div>
 
               {/* Right Sidebar */}
-              <div style={{ width: '300px', minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
                 {/* AI Access Auditor */}
                 <div style={{
@@ -728,7 +760,7 @@ export default function Admin() {
     {showInvite && (
       <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
         onClick={e => { if (e.target === e.currentTarget) setShowInvite(false); }}>
-        <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', borderRadius: '14px', padding: '1.75rem', width: '100%', maxWidth: '440px', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}
+        <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', borderRadius: '14px', padding: '1.75rem', width: '100%', maxWidth: isMobile ? 'calc(100% - 1rem)' : '440px', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}
           onClick={e => e.stopPropagation()}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
             <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Invite User</h2>

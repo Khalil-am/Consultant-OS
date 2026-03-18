@@ -93,7 +93,7 @@ function formatReportDate(dateStr: string) {
 }
 
 export default function Reports() {
-  const { width, isTablet } = useLayout();
+  const { width, isMobile, isTablet } = useLayout();
   const [reportType, setReportType] = useState('Status Report');
   const [selectedWorkspace, setSelectedWorkspace] = useState('All Workspaces');
   const [generatingPack, setGeneratingPack] = useState<string | null>(null);
@@ -327,7 +327,7 @@ ${contextParts || 'No workspace data available.'}`;
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
           {/* Board Pack + Recent Reports side by side */}
-          <div style={{ display: 'grid', gridTemplateColumns: width >= 900 ? '35% 1fr' : '1fr', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: width >= 768 ? '1fr 1.8fr' : '1fr', gap: '1rem' }}>
 
             {/* Board Pack Card */}
             <div className="section-card" style={{ overflow: 'hidden' }}>
@@ -421,7 +421,7 @@ ${contextParts || 'No workspace data available.'}`;
                       placeholder="Search reports..."
                       value={search}
                       onChange={e => setSearch(e.target.value)}
-                      style={{ paddingLeft: '1.8rem', height: '30px', fontSize: '0.72rem', width: '140px' }}
+                      style={{ paddingLeft: '1.8rem', height: '30px', fontSize: '0.72rem', width: isMobile ? '100%' : '140px' }}
                     />
                   </div>
                   <button className="btn-ghost" style={{ padding: '0 0.5rem', height: '28px', fontSize: '0.7rem', color: '#0EA5E9' }}>
@@ -437,7 +437,7 @@ ${contextParts || 'No workspace data available.'}`;
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Generate a report to get started</div>
                   </div>
                 ) : (
-                  <table className="data-table" style={{ minWidth: '460px' }}>
+                  <table className="data-table" style={{ minWidth: '460px', fontSize: isMobile ? '0.7rem' : undefined }}>
                     <thead>
                       <tr>
                         <th style={{ fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700, color: 'var(--text-muted)' }}>NAME</th>
@@ -510,7 +510,7 @@ ${contextParts || 'No workspace data available.'}`;
               <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>Generation Volume</span>
             </div>
             <div style={{ padding: '1.125rem 1rem 0.875rem' }}>
-              <ResponsiveContainer width="100%" height={180}>
+              <ResponsiveContainer width="100%" height={isMobile ? 140 : 180}>
                 <BarChart data={reportVolumeData} barCategoryGap="20%">
                   <XAxis dataKey="month" tick={{ fill: '#64748B', fontSize: 11, fontWeight: 500 }} axisLine={false} tickLine={false} />
                   <YAxis hide />

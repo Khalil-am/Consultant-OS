@@ -629,7 +629,7 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
-          <div style={{ padding: '1rem 1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
+          <div style={{ padding: '1rem 1.5rem', display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? '220px' : '280px'}, 1fr))`, gap: '1rem' }}>
             {ragStatusData.slice(0, 4).map((row, i) => {
               const pct = [78, 45, 92, 28][i] ?? 50;
               const barColor = row.rag === 'Green' ? '#10B981' : row.rag === 'Amber' ? '#F59E0B' : '#EF4444';

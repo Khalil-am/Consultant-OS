@@ -62,7 +62,7 @@ function statusClass(s: string) {
 
 export default function Documents() {
   const navigate = useNavigate();
-  const { isTablet } = useLayout();
+  const { isMobile, isTablet } = useLayout();
 
   const [docs, setDocs] = useState<DocumentRow[]>([]);
   const [workspaces, setWorkspaces] = useState<WorkspaceRow[]>([]);
@@ -233,7 +233,7 @@ export default function Documents() {
   }
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 60px)', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: 'calc(100vh - 60px)', overflow: 'hidden', position: 'relative' }}>
       {/* Left sidebar */}
       {!isTablet && (
         <div style={{
@@ -307,7 +307,7 @@ export default function Documents() {
           <div style={{
             display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0 0.75rem',
             height: '34px', borderRadius: '0.5rem', background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(255,255,255,0.08)', width: '200px',
+            border: '1px solid rgba(255,255,255,0.08)', width: isMobile ? '100%' : '200px',
           }}>
             <Search size={13} style={{ color: '#475569' }} />
             <input
@@ -464,10 +464,25 @@ export default function Documents() {
       {/* Right Preview Panel */}
       {selected && (
         <div style={{
-          width: '280px', minWidth: '280px', borderLeft: '1px solid rgba(255,255,255,0.05)',
+          ...(isTablet
+            ? { position: 'absolute' as const, top: 0, right: 0, bottom: 0, width: '100%', zIndex: 20 }
+            : { width: '280px', minWidth: '280px' }),
+          borderLeft: isTablet ? 'none' : '1px solid rgba(255,255,255,0.05)',
           display: 'flex', flexDirection: 'column', overflowY: 'auto', background: '#0C1220',
           padding: '1rem', animation: 'fadeIn 0.2s ease-out',
         }}>
+          {isTablet && (
+            <button
+              onClick={() => setSelectedDoc(null)}
+              style={{
+                alignSelf: 'flex-end', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '6px', padding: '0.25rem 0.5rem', cursor: 'pointer', color: '#94A3B8',
+                fontSize: '0.75rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem',
+              }}
+            >
+              <X size={14} /> Close
+            </button>
+          )}
           <div style={{ marginBottom: '1rem' }}>
             <div style={{ padding: '0.5rem', borderRadius: '8px', background: `${selected.type_color}15`, color: selected.type_color, display: 'inline-flex', marginBottom: '0.5rem' }}>
               <FileText size={18} />
@@ -559,7 +574,7 @@ export default function Documents() {
       {/* Upload Modal */}
       {showUpload && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
-          <div style={{ background: '#0C1220', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.75rem', padding: '1.5rem', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div style={{ background: '#0C1220', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.75rem', padding: '1.5rem', width: '100%', maxWidth: isMobile ? 'calc(100% - 1rem)' : '520px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#F1F5F9' }}>Upload Document</h2>
               <button onClick={() => { setShowUpload(false); setUploadError(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569' }}>
