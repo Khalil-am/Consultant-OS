@@ -1,21 +1,28 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLayout } from '../hooks/useLayout';
-import { Search, Star, Play, Settings2, TrendingUp, Clock, Zap, CheckCircle, ArrowRight, Loader2 } from 'lucide-react';
+import {
+  Search, Star, Play, Settings2, TrendingUp, Clock, Zap, CheckCircle,
+  ArrowRight, Loader2, ClipboardList, Video, Monitor, Building2,
+  BarChart2, Brain,
+} from 'lucide-react';
 import { automations } from '../data/mockData';
 
 const categories = ['All', 'BA & Requirements', 'Meetings', 'Product', 'Procurement', 'PMO', 'Reporting', 'Knowledge', 'Productivity'];
 
-const categoryIcons: Record<string, string> = {
-  'BA & Requirements': '📋',
-  'Meetings':          '🎥',
-  'Product':           '💻',
-  'Procurement':       '🏛️',
-  'PMO':               '📊',
-  'Reporting':         '📈',
-  'Knowledge':         '🧠',
-  'Productivity':      '⚡',
-};
+function getCategoryIcon(cat: string, size = 14): React.ReactNode {
+  const icons: Record<string, React.ReactElement> = {
+    'BA & Requirements': <ClipboardList size={size} />,
+    'Meetings':          <Video size={size} />,
+    'Product':           <Monitor size={size} />,
+    'Procurement':       <Building2 size={size} />,
+    'PMO':               <BarChart2 size={size} />,
+    'Reporting':         <TrendingUp size={size} />,
+    'Knowledge':         <Brain size={size} />,
+    'Productivity':      <Zap size={size} />,
+  };
+  return icons[cat] ?? <Zap size={size} />;
+}
 
 const categoryColors: Record<string, string> = {
   'BA & Requirements': '#0EA5E9',
@@ -117,7 +124,7 @@ export default function Automations() {
                   outline: isActive ? '1px solid rgba(0,212,255,0.25)' : 'none',
                 }}
               >
-                {cat !== 'All' && <span style={{ fontSize: '0.85rem' }}>{categoryIcons[cat]}</span>}
+                {cat !== 'All' && <span style={{ display: 'flex', opacity: 0.8 }}>{getCategoryIcon(cat, 13)}</span>}
                 {cat}
               </button>
             );
@@ -192,7 +199,9 @@ export default function Automations() {
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: '1.3rem',
                     }}>
-                      {categoryIcons[auto.category] ?? '⚡'}
+                      <span style={{ display: 'flex', color: catColor }}>
+                        {getCategoryIcon(auto.category, 20)}
+                      </span>
                     </div>
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#F1F5F9', margin: '0 0 4px', lineHeight: 1.3, }}>

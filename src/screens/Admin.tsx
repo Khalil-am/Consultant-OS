@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { useLayout } from '../hooks/useLayout';
 import {
   Users, Briefcase, Zap, Brain, FileText, Bell, Shield,
-  List, Check, X, Settings, Plus, RefreshCw, ExternalLink
+  List, Check, X, Settings, Plus, RefreshCw, ExternalLink,
+  Share2, HardDrive, Cloud, Mail, MessageSquare, Hash,
+  LayoutDashboard, BookOpen, Github, ScanLine, Sparkles, Code2,
 } from 'lucide-react';
 import { users } from '../data/mockData';
 import { getActivities, getWorkspaces } from '../lib/db';
@@ -27,19 +29,19 @@ const roleColors: Record<string, { bg: string; text: string }> = {
   Viewer: { bg: 'rgba(148,163,184,0.1)', text: '#94A3B8' },
 };
 
-const integrations = [
-  { name: 'Microsoft SharePoint', category: 'Storage', status: 'Connected', logo: '🔷', desc: 'Document sync and storage' },
-  { name: 'Google Drive', category: 'Storage', status: 'Connected', logo: '📁', desc: 'File storage and collaboration' },
-  { name: 'OneDrive', category: 'Storage', status: 'Disconnected', logo: '☁️', desc: 'Microsoft cloud storage' },
-  { name: 'Gmail', category: 'Email', status: 'Connected', logo: '📧', desc: 'Email integration for notifications' },
-  { name: 'Microsoft Teams', category: 'Communication', status: 'Connected', logo: '💬', desc: 'Notifications and meeting sync' },
-  { name: 'Slack', category: 'Communication', status: 'Disconnected', logo: '📢', desc: 'Team messaging and alerts' },
-  { name: 'Jira', category: 'Project Management', status: 'Connected', logo: '🔵', desc: 'Task and issue tracking sync' },
-  { name: 'Notion', category: 'Knowledge', status: 'Disconnected', logo: '📓', desc: 'Knowledge base sync' },
-  { name: 'GitHub', category: 'Development', status: 'Disconnected', logo: '🐙', desc: 'Code repository integration' },
-  { name: 'Azure Form Recognizer', category: 'AI', status: 'Connected', logo: '🤖', desc: 'OCR and document intelligence' },
-  { name: 'OpenAI GPT-4o', category: 'AI', status: 'Connected', logo: '✨', desc: 'Primary LLM for generation' },
-  { name: 'Anthropic Claude', category: 'AI', status: 'Connected', logo: '🧠', desc: 'Secondary LLM for analysis' },
+const integrations: { name: string; category: string; status: string; logo: React.ReactNode; desc: string }[] = [
+  { name: 'Microsoft SharePoint', category: 'Storage',            status: 'Connected',    logo: <Share2 size={18} />,         desc: 'Document sync and storage' },
+  { name: 'Google Drive',         category: 'Storage',            status: 'Connected',    logo: <HardDrive size={18} />,      desc: 'File storage and collaboration' },
+  { name: 'OneDrive',             category: 'Storage',            status: 'Disconnected', logo: <Cloud size={18} />,          desc: 'Microsoft cloud storage' },
+  { name: 'Gmail',                category: 'Email',              status: 'Connected',    logo: <Mail size={18} />,           desc: 'Email integration for notifications' },
+  { name: 'Microsoft Teams',      category: 'Communication',      status: 'Connected',    logo: <MessageSquare size={18} />,  desc: 'Notifications and meeting sync' },
+  { name: 'Slack',                category: 'Communication',      status: 'Disconnected', logo: <Hash size={18} />,           desc: 'Team messaging and alerts' },
+  { name: 'Jira',                 category: 'Project Management', status: 'Connected',    logo: <LayoutDashboard size={18} />,desc: 'Task and issue tracking sync' },
+  { name: 'Notion',               category: 'Knowledge',          status: 'Disconnected', logo: <BookOpen size={18} />,       desc: 'Knowledge base sync' },
+  { name: 'GitHub',               category: 'Development',        status: 'Disconnected', logo: <Github size={18} />,         desc: 'Code repository integration' },
+  { name: 'Azure Form Recognizer',category: 'AI',                 status: 'Connected',    logo: <ScanLine size={18} />,       desc: 'OCR and document intelligence' },
+  { name: 'OpenAI GPT-4o',        category: 'AI',                 status: 'Connected',    logo: <Sparkles size={18} />,       desc: 'Primary LLM for generation' },
+  { name: 'Anthropic Claude',     category: 'AI',                 status: 'Connected',    logo: <Brain size={18} />,          desc: 'Secondary LLM for analysis' },
 ];
 
 const auditLogs = [
@@ -291,7 +293,7 @@ export default function Admin() {
                       <div key={integration.name} className="elevated-card" style={{ padding: '1rem' }}>
                         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.625rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-                            <span style={{ fontSize: '1.25rem' }}>{integration.logo}</span>
+                            <span style={{ display: 'flex', color: 'inherit' }}>{integration.logo}</span>
                             <div>
                               <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#F1F5F9' }}>{integration.name}</div>
                               <div style={{ fontSize: '0.68rem', color: '#334155' }}>{integration.desc}</div>

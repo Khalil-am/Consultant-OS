@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Upload, FileText, CheckCircle, AlertCircle, Clock,
   ChevronRight, Download, Eye, RefreshCw, BarChart2, X, Loader,
-  Zap, Shield, GitCompare, RotateCcw, Play
+  Zap, Shield, GitCompare, RotateCcw, Play,
+  Inbox, Search, Brain, PenLine, Package, Trophy, Globe, Code2,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -47,15 +48,15 @@ interface RunState {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const PIPELINE_STAGES = [
-  { id: 'queued',                   label: 'Intake',              icon: '📥', wf: 'WF01' },
-  { id: 'parsing',                  label: 'Parsing',             icon: '📄', wf: 'WF02' },
-  { id: 'quality_check',            label: 'Quality Gate',        icon: '🛡️', wf: 'WF03' },
-  { id: 'analyzing_sample',         label: 'Sample Analysis',     icon: '🔍', wf: 'WF04' },
-  { id: 'extracting_requirements',  label: 'BRD Extraction',      icon: '🧠', wf: 'WF05' },
-  { id: 'generating_sections',      label: 'Draft Generation',    icon: '✍️', wf: 'WF07' },
-  { id: 'validating',               label: 'QA Validation',       icon: '✅', wf: 'WF08' },
-  { id: 'exporting',                label: 'Export',              icon: '📦', wf: 'WF09' },
-  { id: 'completed',                label: 'Complete',            icon: '🎉', wf: 'WF10' },
+  { id: 'queued',                   label: 'Intake',              icon: <Inbox size={13} />,        wf: 'WF01' },
+  { id: 'parsing',                  label: 'Parsing',             icon: <FileText size={13} />,     wf: 'WF02' },
+  { id: 'quality_check',            label: 'Quality Gate',        icon: <Shield size={13} />,       wf: 'WF03' },
+  { id: 'analyzing_sample',         label: 'Sample Analysis',     icon: <Search size={13} />,       wf: 'WF04' },
+  { id: 'extracting_requirements',  label: 'BRD Extraction',      icon: <Brain size={13} />,        wf: 'WF05' },
+  { id: 'generating_sections',      label: 'Draft Generation',    icon: <PenLine size={13} />,      wf: 'WF07' },
+  { id: 'validating',               label: 'QA Validation',       icon: <CheckCircle size={13} />,  wf: 'WF08' },
+  { id: 'exporting',                label: 'Export',              icon: <Package size={13} />,      wf: 'WF09' },
+  { id: 'completed',                label: 'Complete',            icon: <Trophy size={13} />,       wf: 'WF10' },
 ];
 
 const PROMPT_TEMPLATES = [
@@ -437,7 +438,7 @@ export default function BrdRunPage() {
                   {isDone ? <CheckCircle size={14} style={{ color: '#34D399' }} /> :
                     isActive && !isError ? <Loader size={14} style={{ color: '#A78BFA', animation: 'spin 1s linear infinite' }} /> :
                       isError ? <AlertCircle size={14} style={{ color: '#FCA5A5' }} /> :
-                        <span>{stage.icon}</span>}
+                        <span style={{ display: 'flex', color: '#475569' }}>{stage.icon}</span>}
                 </div>
 
                 {/* Label */}
@@ -688,14 +689,14 @@ export default function BrdRunPage() {
             <div style={{ maxWidth: 520 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {[
-                  { label: 'BRD Document (Word)', sublabel: 'Branded .docx with TOC, title page, tables', icon: '📄', color: '#0EA5E9', format: 'docx' },
-                  { label: 'BRD Document (PDF)', sublabel: 'Print-ready PDF with Consultant OS branding', icon: '📋', color: '#8B5CF6', format: 'pdf' },
-                  { label: 'HTML Preview', sublabel: 'Web-based interactive preview', icon: '🌐', color: '#10B981', format: 'html' },
-                  { label: 'BRD Model (JSON)', sublabel: 'Structured semantic model — for integrations', icon: '⚙️', color: '#F59E0B', format: 'json' },
+                  { label: 'BRD Document (Word)', sublabel: 'Branded .docx with TOC, title page, tables', icon: <FileText size={18} />, color: '#0EA5E9', format: 'docx' },
+                  { label: 'BRD Document (PDF)', sublabel: 'Print-ready PDF with Consultant OS branding', icon: <Download size={18} />, color: '#8B5CF6', format: 'pdf' },
+                  { label: 'HTML Preview', sublabel: 'Web-based interactive preview', icon: <Globe size={18} />, color: '#10B981', format: 'html' },
+                  { label: 'BRD Model (JSON)', sublabel: 'Structured semantic model — for integrations', icon: <Code2 size={18} />, color: '#F59E0B', format: 'json' },
                 ].map(item => (
                   <div key={item.format} className="section-card"
                     style={{ padding: '1rem 1.125rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <div style={{ width: 40, height: 40, borderRadius: 10, background: `${item.color}12`, border: `1px solid ${item.color}25`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', flexShrink: 0 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 10, background: `${item.color}12`, border: `1px solid ${item.color}25`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.color, flexShrink: 0 }}>
                       {item.icon}
                     </div>
                     <div style={{ flex: 1 }}>
