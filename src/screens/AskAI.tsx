@@ -28,14 +28,29 @@ const PERSONAS = [
   { id: 'change', name: 'Change Manager', initials: 'CM', color: '#F59E0B', desc: 'Organizational change and adoption expert' },
 ];
 
-// ── Thread stubs ─────────────────────────────────────────────
-const THREADS = [
-  { id: '1', title: 'Risk Analysis Q1 2026', time: '2 hours ago' },
-  { id: '2', title: 'Migration Strategy Review', time: 'Yesterday' },
-  { id: '3', title: 'Budget Forecast Analysis', time: '3 days ago' },
-  { id: '4', title: 'Stakeholder Mapping', time: '1 week ago' },
-  { id: '5', title: 'Technical Architecture', time: '2 weeks ago' },
-];
+// ── Thread storage ────────────────────────────────────────────
+interface StoredThread {
+  id: string;
+  title: string;
+  time: string;
+  messages: ChatMessage[];
+  personaId: string;
+  modelId: string;
+}
+
+const THREAD_STORAGE_KEY = 'askai_threads';
+
+function loadThreads(): StoredThread[] {
+  try {
+    const raw = localStorage.getItem(THREAD_STORAGE_KEY);
+    if (raw) return JSON.parse(raw) as StoredThread[];
+  } catch { /* ignore */ }
+  return [];
+}
+
+function saveThreads(threads: StoredThread[]) {
+  try { localStorage.setItem(THREAD_STORAGE_KEY, JSON.stringify(threads.slice(0, 20))); } catch { /* ignore */ }
+}
 
 // ── Types ────────────────────────────────────────────────────
 interface ChatMessage {
@@ -272,6 +287,7 @@ function renderMarkdown(text: string) {
 export default function AskAI() {
   const { isMobile } = useLayout();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [threads, setThreads] = useState<StoredThread[]>(() => loadThreads());
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState(MODELS[0]);
@@ -357,7 +373,12 @@ export default function AskAI() {
         model: selectedModel.label,
       };
 
-      setMessages(prev => [...prev, aiMsg]);
+      setMessages(prev => {
+        const updated = [...prev, aiMsg];
+        // Auto-save thread after assistant replies
+        saveCurrentThread(updated);
+        return updated;
+      });
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : 'Unknown error';
       const errorChat: ChatMessage = {
@@ -398,7 +419,43 @@ export default function AskAI() {
     }
   }, [messages, selectedPersona]);
 
+  const saveCurrentThread = useCallback((msgs: ChatMessage[]) => {
+    if (msgs.length === 0) return;
+    const firstUser = msgs.find(m => m.role === 'user');
+    const title = firstUser
+      ? firstUser.content.slice(0, 50) + (firstUser.content.length > 50 ? '…' : '')
+      : 'New Thread';
+    const threadId = selectedThread ?? crypto.randomUUID();
+    const thread: StoredThread = {
+      id: threadId,
+      title,
+      time: 'Just now',
+      messages: msgs,
+      personaId: selectedPersona.id,
+      modelId: selectedModel.id,
+    };
+    setThreads(prev => {
+      const filtered = prev.filter(t => t.id !== threadId);
+      const updated = [thread, ...filtered];
+      saveThreads(updated);
+      return updated;
+    });
+  }, [selectedThread, selectedPersona.id, selectedModel.id]);
+
+  const handleLoadThread = (thread: StoredThread) => {
+    saveCurrentThread(messages);
+    const persona = PERSONAS.find(p => p.id === thread.personaId) ?? PERSONAS[0];
+    const model = MODELS.find(m => m.id === thread.modelId) ?? MODELS[0];
+    setSelectedPersona(persona);
+    setSelectedModel(model);
+    setMessages(thread.messages.map(m => ({ ...m, timestamp: new Date(m.timestamp) })));
+    setSelectedThread(thread.id);
+    setShowHistory(false);
+    setShowSidebar(false);
+  };
+
   const handleNewThread = () => {
+    saveCurrentThread(messages);
     setMessages([]);
     setSelectedThread(null);
     setRagContext(null);
@@ -463,10 +520,12 @@ export default function AskAI() {
                   <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '4px 8px 8px' }}>
                     Recent Threads
                   </div>
-                  {THREADS.map(t => (
+                  {threads.length === 0 ? (
+                    <div style={{ fontSize: '0.75rem', color: '#475569', padding: '8px 10px' }}>No saved threads yet</div>
+                  ) : threads.map(t => (
                     <button
                       key={t.id}
-                      onClick={() => { setSelectedThread(t.id); setShowHistory(false); }}
+                      onClick={() => handleLoadThread(t)}
                       style={{
                         display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
                         background: selectedThread === t.id ? 'rgba(16,185,129,0.10)' : 'transparent',
@@ -555,10 +614,12 @@ export default function AskAI() {
               </button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {THREADS.map(t => (
+              {threads.length === 0 ? (
+                <div style={{ fontSize: '0.75rem', color: '#475569', padding: '8px 10px' }}>No saved threads yet. Start chatting!</div>
+              ) : threads.map(t => (
                 <button
                   key={t.id}
-                  onClick={() => setSelectedThread(t.id)}
+                  onClick={() => handleLoadThread(t)}
                   style={{
                     textAlign: 'left', padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
                     background: selectedThread === t.id ? 'rgba(16,185,129,0.10)' : 'transparent',

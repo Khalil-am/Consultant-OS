@@ -113,7 +113,13 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { isMobile, width } = useLayout();
   const [period, setPeriod] = useState<Period>('week');
-  const [approvals, setApprovals] = useState<Approval[]>(initialApprovals);
+  const [approvals, setApprovals] = useState<Approval[]>(() => {
+    try {
+      const saved = localStorage.getItem('dashboard_approvals');
+      if (saved) return JSON.parse(saved) as Approval[];
+    } catch { /* ignore */ }
+    return initialApprovals;
+  });
   const [recommendations, setRecommendations] = useState(initialRecommendations);
   const [uploadDrag, setUploadDrag] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -132,8 +138,16 @@ export default function Dashboard() {
     getWorkspaceFinancials().then(setWorkspaceFinancials).catch(() => {});
   }, []);
 
-  const handleApprove = (id: number) => setApprovals(prev => prev.map(a => a.id === id ? { ...a, status: 'approved' as const } : a));
-  const handleReject = (id: number) => setApprovals(prev => prev.map(a => a.id === id ? { ...a, status: 'rejected' as const } : a));
+  const handleApprove = (id: number) => setApprovals(prev => {
+    const next = prev.map(a => a.id === id ? { ...a, status: 'approved' as const } : a);
+    try { localStorage.setItem('dashboard_approvals', JSON.stringify(next)); } catch { /* ignore */ }
+    return next;
+  });
+  const handleReject = (id: number) => setApprovals(prev => {
+    const next = prev.map(a => a.id === id ? { ...a, status: 'rejected' as const } : a);
+    try { localStorage.setItem('dashboard_approvals', JSON.stringify(next)); } catch { /* ignore */ }
+    return next;
+  });
   const dismissRec = (id: number) => setRecommendations(prev => prev.filter(r => r.id !== id));
   const handleRefresh = () => { setRefreshing(true); setTimeout(() => setRefreshing(false), 1200); };
   const markDecisionComplete = (id: string) => setCompletedDecisions(prev => new Set([...prev, id]));

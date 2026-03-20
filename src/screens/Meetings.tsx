@@ -7,7 +7,7 @@ import {
   Loader2, X, Pencil, Trash2, Monitor, FolderOpen,
   TrendingUp, Sparkles, MessageSquareQuote,
 } from 'lucide-react';
-import { getMeetings, updateMeeting, upsertMeeting, deleteMeeting, getWorkspaces } from '../lib/db';
+import { getMeetings, updateMeeting, upsertMeeting, deleteMeeting, getWorkspaces, upsertDocument } from '../lib/db';
 import type { MeetingRow, WorkspaceRow } from '../lib/db';
 import { chatWithDocument } from '../lib/openrouter';
 
@@ -229,8 +229,26 @@ export default function Meetings() {
         [{ role: 'user', content: `Draft a professional follow-up email for this meeting:\n${buildMeetingContext(target)}` }],
         'You are a professional consultant. Draft a concise follow-up email summarizing key outcomes, action items, and next steps from the meeting.'
       );
-      try { await navigator.clipboard.writeText(result); alert('Follow-up email copied to clipboard!'); }
-      catch { alert(result); }
+      // Save as a document record
+      await upsertDocument({
+        id: crypto.randomUUID(),
+        name: `Follow-up: ${target.title}`,
+        type: 'Meeting Minutes',
+        type_color: '#10B981',
+        workspace: target.workspace,
+        workspace_id: target.workspace_id ?? '',
+        date: new Date().toISOString().slice(0, 10),
+        language: 'EN',
+        status: 'Draft',
+        size: `${Math.ceil(result.length / 100) * 0.1} KB`,
+        author: 'Consultant OS AI',
+        pages: 1,
+        summary: result,
+        tags: ['follow-up', 'meeting', 'AI-generated'],
+        file_url: null,
+      }).catch(() => { /* silently ignore if DB unavailable */ });
+      try { await navigator.clipboard.writeText(result); alert('Follow-up email drafted and saved to Documents. Also copied to clipboard!'); }
+      catch { alert('Follow-up email drafted and saved to Documents.\n\n' + result); }
     } catch (err) {
       alert(`Failed to draft follow-up: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally { setAiLoading(null); }

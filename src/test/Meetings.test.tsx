@@ -6,13 +6,14 @@ import { MemoryRouter } from 'react-router-dom';
 // ── Hoisted mocks ────────────────────────────────────────────
 const {
   mockGetMeetings, mockGetWorkspaces, mockUpsertMeeting,
-  mockUpdateMeeting, mockDeleteMeeting,
+  mockUpdateMeeting, mockDeleteMeeting, mockUpsertDocument,
 } = vi.hoisted(() => ({
   mockGetMeetings: vi.fn(),
   mockGetWorkspaces: vi.fn(),
   mockUpsertMeeting: vi.fn(),
   mockUpdateMeeting: vi.fn(),
   mockDeleteMeeting: vi.fn(),
+  mockUpsertDocument: vi.fn(),
 }));
 
 vi.mock('../lib/db', () => ({
@@ -21,6 +22,7 @@ vi.mock('../lib/db', () => ({
   upsertMeeting: mockUpsertMeeting,
   updateMeeting: mockUpdateMeeting,
   deleteMeeting: mockDeleteMeeting,
+  upsertDocument: mockUpsertDocument,
 }));
 
 vi.mock('../hooks/useLayout', () => ({
@@ -63,6 +65,7 @@ beforeEach(() => {
   mockUpsertMeeting.mockResolvedValue({ ...mockMeeting });
   mockUpdateMeeting.mockResolvedValue({ ...mockMeeting, status: 'Completed' });
   mockDeleteMeeting.mockResolvedValue(undefined);
+  mockUpsertDocument.mockResolvedValue({ id: 'doc-1' });
   // Mock window.confirm — handleDeleteMeeting calls confirm()
   vi.spyOn(window, 'confirm').mockReturnValue(true);
 });

@@ -72,6 +72,7 @@ const mockMilestone = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.clear();
   mockGetActivities.mockResolvedValue([]);
   mockGetMilestones.mockResolvedValue([]);
   mockGetWorkspaceFinancials.mockResolvedValue([]);
@@ -351,5 +352,51 @@ describe('Dashboard – Overdue alert banner', () => {
     renderDashboard();
     await screen.findByText(/live · board overview/i);
     expect(screen.getByRole('button', { name: /review tasks/i })).toBeInTheDocument();
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+describe('Dashboard – Approval localStorage persistence', () => {
+  it('saves approved status to localStorage', async () => {
+    renderDashboard();
+    await screen.findByText('NCA BRD v2.3');
+    const approveButtons = screen.getAllByRole('button', { name: /approve/i });
+    fireEvent.click(approveButtons[0]);
+    await waitFor(() => {
+      const stored = localStorage.getItem('dashboard_approvals');
+      expect(stored).not.toBeNull();
+      const parsed = JSON.parse(stored!);
+      const approved = parsed.find((a: { id: number }) => a.id === 1);
+      expect(approved?.status).toBe('approved');
+    });
+  });
+
+  it('saves rejected status to localStorage', async () => {
+    renderDashboard();
+    await screen.findByText('NCA BRD v2.3');
+    const rejectButtons = screen.getAllByRole('button', { name: /reject/i });
+    fireEvent.click(rejectButtons[0]);
+    await waitFor(() => {
+      const stored = localStorage.getItem('dashboard_approvals');
+      expect(stored).not.toBeNull();
+      const parsed = JSON.parse(stored!);
+      const rejected = parsed.find((a: { id: number }) => a.id === 1);
+      expect(rejected?.status).toBe('rejected');
+    });
+  });
+
+  it('restores approval state from localStorage on mount', async () => {
+    const savedApprovals = [
+      { id: 1, title: 'NCA BRD v2.3', requester: 'AM', type: 'Document Approval', urgency: 'High', status: 'approved' },
+      { id: 2, title: 'SC-10 Budget SAR 2.4M', requester: 'RT', type: 'Budget Approval', urgency: 'High', status: 'pending' },
+      { id: 3, title: 'MOCI Vendor Shortlist', requester: 'FH', type: 'Procurement Decision', urgency: 'Medium', status: 'pending' },
+      { id: 4, title: 'Healthcare Strategy Report', requester: 'SK', type: 'Report Sign-off', urgency: 'Low', status: 'pending' },
+    ];
+    localStorage.setItem('dashboard_approvals', JSON.stringify(savedApprovals));
+    renderDashboard();
+    await screen.findByText('NCA BRD v2.3');
+    await waitFor(() => {
+      expect(screen.getByText('approved')).toBeInTheDocument();
+    });
   });
 });

@@ -41,9 +41,13 @@ export default function Automations() {
   const [activeCategory, setActiveCategory] = useState('All');
   const [search, setSearch] = useState('');
   const [automations, setAutomations] = useState(initialAutomations);
-  const [starred, setStarred] = useState<Set<string>>(
-    new Set(initialAutomations.filter(a => a.starred).map(a => a.id))
-  );
+  const [starred, setStarred] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('automation_starred');
+      if (saved) return new Set(JSON.parse(saved) as string[]);
+    } catch { /* ignore */ }
+    return new Set(initialAutomations.filter(a => a.starred).map(a => a.id));
+  });
   const [runningId, setRunningId] = useState<string | null>(null);
   const [runTimer, setRunTimer] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
@@ -95,6 +99,7 @@ export default function Automations() {
     setStarred(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
+      try { localStorage.setItem('automation_starred', JSON.stringify([...next])); } catch { /* ignore */ }
       return next;
     });
   };
