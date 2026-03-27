@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { chatWithDocument } from '../lib/openrouter';
+import { insertAutomationRun, insertActivity, upsertDocument } from '../lib/db';
 import {
   ArrowLeft, Upload, FileText, CheckCircle, AlertCircle, Clock,
   ChevronRight, Download, Eye, RefreshCw, BarChart2, X, Loader,
@@ -180,6 +182,10 @@ export default function BrdRunPage() {
   const [run, setRun] = useState<RunState | null>(null);
   const [outputTab, setOutputTab] = useState<OutputTab>('preview');
   const [regeneratingSection, setRegeneratingSection] = useState<string | null>(null);
+  const [aiContent, setAiContent] = useState<Record<string, string>>({});
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [savedToDocuments, setSavedToDocuments] = useState(false);
+  const [savingToDocuments, setSavingToDocuments] = useState(false);
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Simulate pipeline progression for demo
@@ -240,6 +246,55 @@ export default function BrdRunPage() {
 
       if (status === 'completed') {
         clearInterval(progressIntervalRef.current!);
+        // Persist run record and activity to DB (best-effort)
+        const templateLabel = PROMPT_TEMPLATES.find(t => t.id === selectedTemplate)?.name ?? 'BRD Standard';
+        insertAutomationRun({
+          id: `run-${runId}`,
+          automation_id: 'auto-001',
+          automation_name: 'BRD Generator from Requirements',
+          status: 'success',
+          duration_ms: stage * 1800,
+          run_at: new Date().toISOString(),
+        }).catch(() => {});
+        insertActivity({
+          id: `act-${runId}`,
+          user: 'System',
+          action: 'generated BRD',
+          target: brdFile?.name ?? 'Requirements document',
+          workspace: null,
+          workspace_id: null,
+          time: 'Just now',
+          type: 'automation',
+        }).catch(() => {});
+        // Attempt real AI generation for preview content
+        const systemPrompt = `You are an expert Business Analyst generating a professional Business Requirements Document (BRD).
+Template: ${templateLabel}
+Language: ${language === 'en' ? 'English' : language === 'ar' ? 'Arabic' : 'Bilingual (English with Arabic headings)'}
+${sampleFiles.length > 0 ? `Style reference: ${sampleFiles.map(f => f.name).join(', ')}` : ''}
+${notes ? `Special instructions: ${notes}` : ''}
+${strictMatch ? 'Apply strict template structure matching.' : ''}
+
+Generate concise, professional BRD content for each section. Format as JSON object with section names as keys and content as values. Keep each section 2-4 sentences.`;
+
+        const userMsg = `Source document: ${brdFile?.name ?? 'Requirements document'}
+Generate a complete BRD with these sections: ${CANONICAL_SECTIONS.join(', ')}.
+Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background & Business Context": "...", ...}`;
+
+        setAiGenerating(true);
+        chatWithDocument([{ role: 'user', content: userMsg }], systemPrompt)
+          .then(response => {
+            try {
+              // Extract JSON from response (may be wrapped in markdown code block)
+              const jsonMatch = response.match(/\{[\s\S]*\}/);
+              if (jsonMatch) {
+                const parsed = JSON.parse(jsonMatch[0]) as Record<string, string>;
+                setAiContent(parsed);
+              }
+            } catch { /* use mock content if parse fails */ }
+          })
+          .catch(() => { /* AI unavailable, show placeholder text */ })
+          .finally(() => setAiGenerating(false));
+
         setTimeout(() => setScreen('output'), 800);
       }
     }, 1800);
@@ -247,7 +302,61 @@ export default function BrdRunPage() {
 
   const handleStartRun = () => {
     if (!brdFile) return;
+    setAiContent({});
+    setSavedToDocuments(false);
     simulateRun();
+  };
+
+  const handleSaveToDocuments = () => {
+    if (!brdFile || !run || savingToDocuments || savedToDocuments) return;
+    setSavingToDocuments(true);
+    const docName = `BRD – ${brdFile.name.replace(/\.[^/.]+$/, '')}`;
+    upsertDocument({
+      id: `doc-brd-${run.runId}`,
+      name: docName,
+      type: 'BRD',
+      type_color: '#0EA5E9',
+      workspace: '',
+      workspace_id: '',
+      date: new Date().toISOString().slice(0, 10),
+      language: language === 'en' ? 'EN' : language === 'ar' ? 'AR' : 'Bilingual',
+      status: 'Draft',
+      size: `${CANONICAL_SECTIONS.length} sections`,
+      author: 'System',
+      pages: Math.ceil(CANONICAL_SECTIONS.length * 0.8),
+      summary: `Auto-generated BRD from ${brdFile.name} using ${PROMPT_TEMPLATES.find(t => t.id === selectedTemplate)?.name ?? 'BRD Standard'}.`,
+      tags: ['BRD', 'AI-Generated'],
+      file_url: null,
+    }).then(() => {
+      setSavedToDocuments(true);
+      insertActivity({
+        id: `act-save-${run.runId}`,
+        user: 'System',
+        action: 'saved BRD to Documents',
+        target: docName,
+        workspace: null,
+        workspace_id: null,
+        time: 'Just now',
+        type: 'document',
+      }).catch(() => {});
+    }).catch(() => {
+      setSavedToDocuments(false);
+    }).finally(() => {
+      setSavingToDocuments(false);
+    });
+  };
+
+  const handleRegenerateSection = (sectionName: string) => {
+    if (!sectionName) return;
+    setRegeneratingSection(sectionName);
+    const systemPrompt = `You are an expert Business Analyst. Regenerate only the "${sectionName}" section of a BRD. Return only the section content as plain text, 3-5 sentences, professional consulting tone.`;
+    chatWithDocument([{ role: 'user', content: `Regenerate the "${sectionName}" section for the BRD document: ${brdFile?.name ?? 'Requirements doc'}` }], systemPrompt)
+      .then(response => {
+        setAiContent(prev => ({ ...prev, [sectionName]: response }));
+        setOutputTab('preview');
+      })
+      .catch(() => { setOutputTab('preview'); })
+      .finally(() => setRegeneratingSection(null));
   };
 
   useEffect(() => {
@@ -514,6 +623,20 @@ export default function BrdRunPage() {
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <ScoreBadge score={run.qualityScore} label="Quality" />
             {run.comparison.sampleCoverage > 0 && <ScoreBadge score={run.comparison.sampleCoverage} label="Coverage" />}
+            <button
+              onClick={handleSaveToDocuments}
+              disabled={savingToDocuments || savedToDocuments}
+              style={{
+                height: 34, padding: '0 0.875rem', borderRadius: '8px', border: 'none', cursor: savingToDocuments || savedToDocuments ? 'default' : 'pointer',
+                display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.78rem', fontWeight: 600, fontFamily: 'inherit',
+                background: savedToDocuments ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.06)',
+                color: savedToDocuments ? '#34D399' : '#94A3B8',
+                border: `1px solid ${savedToDocuments ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.08)'}`,
+                opacity: savingToDocuments ? 0.7 : 1,
+              }}
+            >
+              {savedToDocuments ? <><CheckCircle size={12} /> Saved</> : savingToDocuments ? <>Saving…</> : <><FileText size={12} /> Save to Docs</>}
+            </button>
             <button className="btn-primary" style={{ height: 34, fontSize: '0.78rem', marginLeft: '0.5rem' }} onClick={() => setScreen('config')}>
               <Play size={12} /> New Run
             </button>
@@ -556,26 +679,48 @@ export default function BrdRunPage() {
 
                 {/* Sections */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {aiGenerating && (
+                    <div style={{ padding: '0.875rem 1rem', borderRadius: '0.625rem', background: 'rgba(0,212,255,0.05)', border: '1px solid rgba(0,212,255,0.2)', display: 'flex', alignItems: 'center', gap: '0.625rem', fontSize: '0.78rem', color: '#00D4FF' }}>
+                      <Loader size={13} style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+                      AI is generating section content…
+                    </div>
+                  )}
                   {CANONICAL_SECTIONS.map((sectionName, i) => {
-                    const confidence = 0.85 + (Math.random() * 0.12 - 0.06);
+                    const confidence = 0.85 + ((i * 7) % 12) / 100;
+                    const content = aiContent[sectionName];
                     return (
                       <div key={i} className="section-card" style={{ padding: '1.125rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
                           <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#F1F5F9', margin: 0 }}>{sectionName}</h3>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            {content && (
+                              <span style={{ fontSize: '0.65rem', color: '#00D4FF', background: 'rgba(0,212,255,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid rgba(0,212,255,0.2)' }}>
+                                AI
+                              </span>
+                            )}
                             <span style={{ fontSize: '0.65rem', color: '#34D399', background: 'rgba(16,185,129,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid rgba(16,185,129,0.15)' }}>
                               {Math.round(confidence * 100)}% conf.
                             </span>
                             <button className="btn-ghost" style={{ height: 24, padding: '0 0.5rem', fontSize: '0.65rem' }}
-                              onClick={() => { setRegeneratingSection(sectionName); setOutputTab('regenerate'); }}>
+                              onClick={() => handleRegenerateSection(sectionName)}>
                               <RotateCcw size={10} /> Regen
                             </button>
                           </div>
                         </div>
-                        <div style={{ fontSize: '0.8rem', color: '#64748B', lineHeight: 1.7 }}>
-                          <em style={{ color: '#334155', fontSize: '0.73rem' }}>
-                            [Generated content for "{sectionName}" will appear here after the n8n pipeline runs. Content is stored in <code>automation_run_sections</code> in Supabase and fetched via WF09.]
-                          </em>
+                        <div style={{ fontSize: '0.8rem', color: content ? '#94A3B8' : '#64748B', lineHeight: 1.7 }}>
+                          {regeneratingSection === sectionName ? (
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#475569', fontSize: '0.75rem' }}>
+                              <Loader size={12} style={{ animation: 'spin 1s linear infinite' }} /> Regenerating…
+                            </span>
+                          ) : content ? (
+                            content
+                          ) : (
+                            <em style={{ color: '#334155', fontSize: '0.73rem' }}>
+                              {aiGenerating
+                                ? 'Generating…'
+                                : 'AI content unavailable — add VITE_OPENROUTER_API_KEY to .env.local to enable generation.'}
+                            </em>
+                          )}
                         </div>
                       </div>
                     );
@@ -703,7 +848,17 @@ export default function BrdRunPage() {
                       <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>{item.label}</div>
                       <div style={{ fontSize: '0.72rem', color: '#475569' }}>{item.sublabel}</div>
                     </div>
-                    <button className="btn-primary" style={{ height: 32, fontSize: '0.75rem', padding: '0 0.875rem' }}>
+                    <button className="btn-primary" style={{ height: 32, fontSize: '0.75rem', padding: '0 0.875rem' }}
+                      onClick={() => {
+                        const hasAi = Object.keys(aiContent).length > 0;
+                        const text = hasAi
+                          ? CANONICAL_SECTIONS.map(s => `# ${s}\n\n${aiContent[s] ?? '[Section not generated]'}`).join('\n\n---\n\n')
+                          : `BRD Document\nGenerated from: ${brdFile?.name ?? 'Requirements doc'}\n\n` + CANONICAL_SECTIONS.map(s => `# ${s}\n\n[Content pending AI generation]`).join('\n\n');
+                        const blob = new Blob([text], { type: item.format === 'json' ? 'application/json' : 'text/plain' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a'); a.href = url; a.download = `BRD_${brdFile?.name?.replace(/\.[^/.]+$/, '') ?? 'document'}.${item.format === 'docx' || item.format === 'pdf' ? 'txt' : item.format}`;
+                        a.click(); URL.revokeObjectURL(url);
+                      }}>
                       <Download size={12} /> Download
                     </button>
                   </div>
@@ -716,27 +871,39 @@ export default function BrdRunPage() {
           {outputTab === 'regenerate' && (
             <div style={{ maxWidth: 600 }}>
               <div style={{ fontSize: '0.8rem', color: '#475569', marginBottom: '1.25rem' }}>
-                Select a section to regenerate independently. The pipeline will re-run only WF07 for the selected section with updated instructions.
+                Select a section to regenerate. AI will rewrite that section independently using the same context.
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {CANONICAL_SECTIONS.map(s => (
-                  <div key={s} style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem',
-                    borderRadius: '0.625rem', background: regeneratingSection === s ? 'rgba(139,92,246,0.08)' : 'rgba(255,255,255,0.02)',
-                    border: `1px solid ${regeneratingSection === s ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.05)'}`,
-                    cursor: 'pointer', transition: 'all 0.15s',
-                  }} onClick={() => setRegeneratingSection(regeneratingSection === s ? null : s)}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: regeneratingSection === s ? '#8B5CF6' : '#334155' }} />
-                      <span style={{ fontSize: '0.82rem', color: regeneratingSection === s ? '#F1F5F9' : '#94A3B8' }}>{s}</span>
+                {CANONICAL_SECTIONS.map(s => {
+                  const isRegen = regeneratingSection === s;
+                  const hasContent = !!aiContent[s];
+                  return (
+                    <div key={s} style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem',
+                      borderRadius: '0.625rem', background: isRegen ? 'rgba(139,92,246,0.08)' : 'rgba(255,255,255,0.02)',
+                      border: `1px solid ${isRegen ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.05)'}`,
+                      cursor: 'pointer', transition: 'all 0.15s',
+                    }} onClick={() => !isRegen && setRegeneratingSection(s)}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: isRegen ? '#8B5CF6' : hasContent ? '#10B981' : '#334155' }} />
+                        <span style={{ fontSize: '0.82rem', color: isRegen ? '#F1F5F9' : '#94A3B8' }}>{s}</span>
+                        {hasContent && !isRegen && <span style={{ fontSize: '0.62rem', color: '#10B981' }}>✓ AI</span>}
+                      </div>
+                      {isRegen && (
+                        <div style={{ display: 'flex', gap: '0.375rem' }}>
+                          <button className="btn-ghost" style={{ height: 28, fontSize: '0.72rem', padding: '0 0.625rem' }}
+                            onClick={e => { e.stopPropagation(); setRegeneratingSection(null); }}>
+                            Cancel
+                          </button>
+                          <button className="btn-primary" style={{ height: 28, fontSize: '0.72rem', padding: '0 0.75rem' }}
+                            onClick={e => { e.stopPropagation(); handleRegenerateSection(s); }}>
+                            <RotateCcw size={11} /> Regenerate
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    {regeneratingSection === s && (
-                      <button className="btn-primary" style={{ height: 28, fontSize: '0.72rem', padding: '0 0.75rem' }}>
-                        <RotateCcw size={11} /> Regenerate
-                      </button>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

@@ -4,12 +4,12 @@ import {
   Search, Plus, Grid3X3, List, FileText, Video, CheckSquare,
   ChevronRight, TrendingUp, TrendingDown, DollarSign, RefreshCw,
   X, AlertCircle, Briefcase, CalendarDays, MoreVertical,
-  AlertTriangle,
+  AlertTriangle, Pencil, Trash2,
 } from 'lucide-react';
 import { useLayout } from '../hooks/useLayout';
 import {
   getWorkspaces, getWorkspaceFinancials, getWorkspaceRagStatuses, createWorkspace,
-  upsertWorkspaceFinancial,
+  updateWorkspace, deleteWorkspace, upsertWorkspaceFinancial,
   type WorkspaceRow, type WorkspaceFinancialRow, type WorkspaceRagStatusRow,
 } from '../lib/db';
 
@@ -114,6 +114,16 @@ export default function Workspaces() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
 
+  // Edit workspace state
+  const [editingWorkspace, setEditingWorkspace] = useState<WorkspaceRow | null>(null);
+  const [editForm, setEditForm] = useState<NewWorkspaceForm>(defaultForm);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState('');
+
+  // Delete workspace state
+  const [deletingWorkspace, setDeletingWorkspace] = useState<WorkspaceRow | null>(null);
+  const [deleteConfirming, setDeleteConfirming] = useState(false);
+
   const loadData = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
@@ -182,6 +192,47 @@ export default function Workspaces() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleEditWorkspace = async () => {
+    if (!editingWorkspace || !editForm.name.trim() || !editForm.client.trim()) {
+      setEditError('Name and client are required.');
+      return;
+    }
+    setEditSaving(true);
+    setEditError('');
+    try {
+      const sectorColor = sectorColors[editForm.sector] ?? '#0EA5E9';
+      await updateWorkspace(editingWorkspace.id, {
+        name: editForm.name.trim(), client: editForm.client.trim(),
+        sector: editForm.sector, sector_color: sectorColor, type: editForm.type,
+        language: editForm.language, description: editForm.description.trim(),
+      });
+      setEditingWorkspace(null);
+      await loadData(true);
+    } catch (e: unknown) {
+      setEditError((e as Error).message ?? 'Failed to update workspace');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleDeleteWorkspace = async () => {
+    if (!deletingWorkspace) return;
+    setDeleteConfirming(true);
+    try {
+      await deleteWorkspace(deletingWorkspace.id);
+      setDeletingWorkspace(null);
+      await loadData(true);
+    } catch { /* ignore */ } finally {
+      setDeleteConfirming(false);
+    }
+  };
+
+  const openEditModal = (ws: WorkspaceRow) => {
+    setEditingWorkspace(ws);
+    setEditForm({ name: ws.name, client: ws.client, sector: ws.sector, type: ws.type as typeof TYPES[number], language: ws.language as typeof LANGUAGES[number], description: ws.description });
+    setEditError('');
   };
 
   // ── Loading state ──────────────────────────────────────────────────────────
@@ -623,19 +674,24 @@ export default function Workspaces() {
                       )}
                     </div>
 
-                    {/* Three-dot menu */}
+                    {/* Edit + Delete actions */}
                     <button
-                      onClick={e => { e.stopPropagation(); navigate(`/workspaces/${ws.id}`); }}
-                      style={{
-                        width: 28, height: 28, borderRadius: '6px', border: 'none',
-                        background: 'transparent', cursor: 'pointer', color: '#475569',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        transition: 'all 0.15s', fontFamily: 'inherit',
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#94A3B8'; }}
+                      onClick={e => { e.stopPropagation(); openEditModal(ws); }}
+                      title="Edit workspace"
+                      style={{ width: 28, height: 28, borderRadius: '6px', border: 'none', background: 'transparent', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s', fontFamily: 'inherit' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(14,165,233,0.1)'; e.currentTarget.style.color = '#38BDF8'; }}
                       onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#475569'; }}
                     >
-                      <MoreVertical size={15} />
+                      <Pencil size={13} />
+                    </button>
+                    <button
+                      onClick={e => { e.stopPropagation(); setDeletingWorkspace(ws); }}
+                      title="Delete workspace"
+                      style={{ width: 28, height: 28, borderRadius: '6px', border: 'none', background: 'transparent', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s', fontFamily: 'inherit' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; e.currentTarget.style.color = '#FCA5A5'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#475569'; }}
+                    >
+                      <Trash2 size={13} />
                     </button>
                   </div>
                 </div>
@@ -795,6 +851,71 @@ export default function Workspaces() {
                   )}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Edit Workspace Modal ────────────────────────────────────────── */}
+      {editingWorkspace && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+          <div style={{ background: '#0C1220', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '1.75rem', width: '100%', maxWidth: '520px', boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#F1F5F9', margin: 0 }}>Edit Workspace</h3>
+              <button onClick={() => { setEditingWorkspace(null); setEditError(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569' }}><X size={16} /></button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.875rem' }}>
+                <div><FieldLabel>Workspace Name *</FieldLabel><input style={inputStyle} value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))} /></div>
+                <div><FieldLabel>Client *</FieldLabel><input style={inputStyle} value={editForm.client} onChange={e => setEditForm(p => ({ ...p, client: e.target.value }))} /></div>
+                <div><FieldLabel>Sector</FieldLabel>
+                  <select style={inputStyle} value={editForm.sector} onChange={e => setEditForm(p => ({ ...p, sector: e.target.value }))}>
+                    {SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div><FieldLabel>Type</FieldLabel>
+                  <select style={inputStyle} value={editForm.type} onChange={e => setEditForm(p => ({ ...p, type: e.target.value as typeof TYPES[number] }))}>
+                    {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div><FieldLabel>Language</FieldLabel>
+                  <select style={inputStyle} value={editForm.language} onChange={e => setEditForm(p => ({ ...p, language: e.target.value as typeof LANGUAGES[number] }))}>
+                    {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div><FieldLabel>Description</FieldLabel><textarea style={{ ...inputStyle, minHeight: '72px', resize: 'vertical' }} value={editForm.description} onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))} /></div>
+              {editError && <div style={{ fontSize: '0.78rem', color: '#FCA5A5', padding: '0.5rem 0.75rem', background: 'rgba(239,68,68,0.08)', borderRadius: '6px' }}>{editError}</div>}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.625rem', marginTop: '0.5rem' }}>
+                <button className="btn-ghost" onClick={() => { setEditingWorkspace(null); setEditError(''); }}>Cancel</button>
+                <button className="btn-primary" onClick={handleEditWorkspace} disabled={editSaving} style={{ minWidth: '120px', justifyContent: 'center' }}>
+                  {editSaving ? <><span style={{ width: 13, height: 13, border: '2px solid rgba(5,8,15,0.4)', borderTopColor: '#05080F', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />Saving…</> : 'Save Changes'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Workspace Confirmation ───────────────────────────────── */}
+      {deletingWorkspace && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+          <div style={{ background: '#0C1220', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '16px', padding: '1.75rem', width: '100%', maxWidth: '420px', boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(239,68,68,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <AlertTriangle size={18} style={{ color: '#EF4444' }} />
+              </div>
+              <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#F1F5F9', margin: 0 }}>Delete Workspace</h3>
+            </div>
+            <p style={{ fontSize: '0.85rem', color: '#94A3B8', lineHeight: 1.6, margin: '0 0 1.25rem' }}>
+              Are you sure you want to delete <strong style={{ color: '#F1F5F9' }}>{deletingWorkspace.name}</strong>? This will permanently remove the workspace and all associated data.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.625rem' }}>
+              <button className="btn-ghost" onClick={() => setDeletingWorkspace(null)}>Cancel</button>
+              <button onClick={handleDeleteWorkspace} disabled={deleteConfirming}
+                style={{ height: 36, padding: '0 1rem', borderRadius: '8px', border: 'none', background: '#EF4444', color: '#fff', cursor: deleteConfirming ? 'not-allowed' : 'pointer', fontSize: '0.82rem', fontWeight: 600, fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '0.375rem', opacity: deleteConfirming ? 0.6 : 1 }}>
+                {deleteConfirming ? 'Deleting…' : <><Trash2 size={13} /> Delete</>}
+              </button>
             </div>
           </div>
         </div>

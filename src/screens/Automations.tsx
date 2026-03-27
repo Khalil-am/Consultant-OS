@@ -4,9 +4,11 @@ import { useLayout } from '../hooks/useLayout';
 import {
   Search, Star, Play, Settings2, TrendingUp, Clock, Zap, CheckCircle,
   ArrowRight, Loader2, ClipboardList, Video, Monitor, Building2,
-  BarChart2, Brain,
+  BarChart2, Brain, History,
 } from 'lucide-react';
 import { automations as initialAutomations } from '../data/mockData';
+import { insertAutomationRun, insertActivity, getAutomationRuns } from '../lib/db';
+import type { AutomationRunRow } from '../lib/db';
 
 const categories = ['All', 'BA & Requirements', 'Meetings', 'Product', 'Procurement', 'PMO', 'Reporting', 'Knowledge', 'Productivity'];
 
@@ -40,7 +42,16 @@ export default function Automations() {
   const { width, isMobile } = useLayout();
   const [activeCategory, setActiveCategory] = useState('All');
   const [search, setSearch] = useState('');
-  const [automations, setAutomations] = useState(initialAutomations);
+  const [automations, setAutomations] = useState(() => {
+    try {
+      const savedCounts = localStorage.getItem('automation_run_counts');
+      if (savedCounts) {
+        const counts = JSON.parse(savedCounts) as Record<string, number>;
+        return initialAutomations.map(a => ({ ...a, runCount: counts[a.id] ?? a.runCount }));
+      }
+    } catch { /* ignore */ }
+    return initialAutomations;
+  });
   const [starred, setStarred] = useState<Set<string>>(() => {
     try {
       const saved = localStorage.getItem('automation_starred');
@@ -52,6 +63,8 @@ export default function Automations() {
   const [runTimer, setRunTimer] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [recentRuns, setRecentRuns] = useState<AutomationRunRow[]>([]);
+  const [showRunHistory, setShowRunHistory] = useState(false);
 
   // Count-up timer while running
   useEffect(() => {
@@ -65,13 +78,49 @@ export default function Automations() {
     }
   }, [runningId]);
 
+  // Load recent runs from DB on mount
+  useEffect(() => {
+    getAutomationRuns().then(runs => setRecentRuns(runs)).catch(() => {});
+  }, []);
+
   const handleRun = useCallback((id: string) => {
     if (runningId) return;
     setRunningId(id);
+    const startTime = Date.now();
     setTimeout(() => {
+      const durationMs = Date.now() - startTime;
       setRunningId(null);
-      setAutomations(prev => prev.map(a => a.id === id ? { ...a, runCount: a.runCount + 1 } : a));
+      setAutomations(prev => {
+        const next = prev.map(a => a.id === id ? { ...a, runCount: a.runCount + 1 } : a);
+        try {
+          const counts: Record<string, number> = {};
+          next.forEach(a => { counts[a.id] = a.runCount; });
+          localStorage.setItem('automation_run_counts', JSON.stringify(counts));
+        } catch { /* ignore */ }
+        return next;
+      });
       const name = automations.find(a => a.id === id)?.name ?? 'Automation';
+      // Persist run record and activity to DB (best-effort)
+      insertAutomationRun({
+        id: `run-${Date.now()}`,
+        automation_id: id,
+        automation_name: name,
+        status: 'success',
+        duration_ms: durationMs,
+        run_at: new Date().toISOString(),
+      }).catch(() => {});
+      insertActivity({
+        id: `act-${Date.now()}`,
+        user: 'System',
+        action: 'ran automation',
+        target: name,
+        workspace: null,
+        workspace_id: null,
+        time: 'Just now',
+        type: 'automation',
+      }).catch(() => {});
+      // Refresh run history
+      getAutomationRuns().then(runs => setRecentRuns(runs)).catch(() => {});
       setToast(`${name} completed successfully`);
       setTimeout(() => setToast(null), 3000);
     }, 3000);
@@ -380,6 +429,37 @@ export default function Automations() {
           );
         })}
       </div>
+
+      {/* Recent Runs History */}
+      {recentRuns.length > 0 && (
+        <div style={{ borderRadius: '12px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+          <button
+            onClick={() => setShowRunHistory(v => !v)}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.875rem 1.125rem', background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', fontFamily: 'inherit' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', fontWeight: 600 }}>
+              <History size={14} style={{ color: '#475569' }} />
+              Recent Runs
+              <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(0,212,255,0.1)', color: '#00D4FF', border: '1px solid rgba(0,212,255,0.2)' }}>{recentRuns.length}</span>
+            </div>
+            <span style={{ fontSize: '0.72rem', color: '#334155' }}>{showRunHistory ? '▲ Collapse' : '▼ Expand'}</span>
+          </button>
+          {showRunHistory && (
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+              {recentRuns.slice(0, 10).map((run, i) => (
+                <div key={run.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.625rem 1.125rem', borderBottom: i < Math.min(recentRuns.length, 10) - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: run.status === 'success' ? '#10B981' : run.status === 'failed' ? '#EF4444' : '#F59E0B', boxShadow: `0 0 5px ${run.status === 'success' ? 'rgba(16,185,129,0.5)' : run.status === 'failed' ? 'rgba(239,68,68,0.5)' : 'rgba(245,158,11,0.5)'}` }} />
+                  <span style={{ fontSize: '0.78rem', color: '#94A3B8', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{run.automation_name}</span>
+                  {run.duration_ms != null && (
+                    <span style={{ fontSize: '0.68rem', color: '#475569' }}>{run.duration_ms >= 1000 ? `${(run.duration_ms / 1000).toFixed(1)}s` : `${run.duration_ms}ms`}</span>
+                  )}
+                  <span style={{ fontSize: '0.68rem', color: '#334155' }}>{new Date(run.run_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Success Toast */}
       {toast && (

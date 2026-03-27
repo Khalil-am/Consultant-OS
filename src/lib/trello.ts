@@ -115,7 +115,7 @@ export interface MappedRisk {
 }
 
 // ── List-name → TaskStatus mapping ──────────────────────────
-function mapListToStatus(listName: string): TaskStatus {
+export function mapListToStatus(listName: string): TaskStatus {
   const n = listName.toLowerCase();
   if (n.includes('done') || n.includes('complete') || n.includes('finished') || n.includes('closed')) return 'Completed';
   if (n.includes('review') || n.includes('testing') || n.includes('qa') || n.includes('approval')) return 'In Review';
@@ -125,7 +125,7 @@ function mapListToStatus(listName: string): TaskStatus {
 }
 
 // ── Label color → TaskPriority mapping ──────────────────────
-function mapLabelsToPriority(labels: TrelloLabel[]): TaskPriority {
+export function mapLabelsToPriority(labels: TrelloLabel[]): TaskPriority {
   for (const l of labels) {
     const c = (l.color ?? '').toLowerCase();
     const n = (l.name ?? '').toLowerCase();
@@ -138,13 +138,13 @@ function mapLabelsToPriority(labels: TrelloLabel[]): TaskPriority {
 }
 
 // ── Label color → RiskSeverity mapping ──────────────────────
-function mapLabelsToSeverity(labels: TrelloLabel[]): RiskSeverity {
+export function mapLabelsToSeverity(labels: TrelloLabel[]): RiskSeverity {
   const priority = mapLabelsToPriority(labels);
   return priority; // same mapping
 }
 
 // ── Detect risk cards ────────────────────────────────────────
-function isRiskCard(card: TrelloCard, listName: string): boolean {
+export function isRiskCard(card: TrelloCard, listName: string): boolean {
   const n = listName.toLowerCase();
   const labels = card.labels.map(l => (l.name ?? '').toLowerCase());
   return (
@@ -154,7 +154,7 @@ function isRiskCard(card: TrelloCard, listName: string): boolean {
 }
 
 // ── Detect risk category from labels/name ────────────────────
-function mapRiskCategory(card: TrelloCard): string {
+export function mapRiskCategory(card: TrelloCard): string {
   const text = (card.name + ' ' + card.desc + ' ' + card.labels.map(l => l.name).join(' ')).toLowerCase();
   if (text.includes('technical') || text.includes('tech') || text.includes('system')) return 'Technical';
   if (text.includes('financial') || text.includes('budget') || text.includes('cost')) return 'Financial';
@@ -283,7 +283,7 @@ async function getCardsWithCustomFields(boardId: string): Promise<TrelloCardWith
   });
 }
 
-function extractClient(name: string, labels: TrelloLabel[]): string {
+export function extractClient(name: string, labels: TrelloLabel[]): string {
   // Try [CLIENT] prefix pattern
   const m = name.match(/^\[([^\]]+)\]/);
   if (m) return m[1].trim();
@@ -296,7 +296,7 @@ function extractClient(name: string, labels: TrelloLabel[]): string {
   return '';
 }
 
-function extractProducts(labels: TrelloLabel[]): string[] {
+export function extractProducts(labels: TrelloLabel[]): string[] {
   const products: string[] = [];
   for (const l of labels) {
     const n = (l.name ?? '').trim().toLowerCase();
@@ -307,7 +307,7 @@ function extractProducts(labels: TrelloLabel[]): string[] {
   return products;
 }
 
-function resolveCustomFields(
+export function resolveCustomFields(
   items: TrelloCustomFieldItem[],
   fields: TrelloCustomField[],
 ): { priority: string; pm: string; estimation: string; deliveryDate: string; relatedToPayment: boolean } {

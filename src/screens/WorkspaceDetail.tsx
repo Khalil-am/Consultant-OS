@@ -17,6 +17,7 @@ import {
   upsertRisk, updateRisk, deleteRisk,
   upsertMilestone, deleteMilestone,
   upsertWorkspaceFinancial,
+  upsertWorkspaceRagStatus,
   updateWorkspace, deleteWorkspace,
   type WorkspaceRow, type WorkspaceFinancialRow, type WorkspaceRagStatusRow,
   type MilestoneRow, type DocumentRow, type MeetingRow, type TaskRow, type RiskRow,
@@ -79,6 +80,7 @@ interface NewRiskForm { title: string; category: string; probability: string; im
 interface EditWsForm { name: string; client: string; sector: string; type: WorkspaceRow['type']; language: WorkspaceRow['language']; description: string; progress: string; status: WorkspaceRow['status']; }
 interface EditFinForm { contract_value: string; spent: string; forecast: string; variance: string; billing_model: string; last_invoice: string; next_milestone_value: string; }
 interface MilestoneForm { title: string; due_date: string; status: MilestoneRow['status']; value: string; owner: string; completion_pct: string; }
+interface EditRagForm { rag: 'Green' | 'Amber' | 'Red'; budget: 'Green' | 'Amber' | 'Red'; schedule: 'Green' | 'Amber' | 'Red'; risk: 'Green' | 'Amber' | 'Red'; }
 
 // ── Main Component ─────────────────────────────────────────────────────────
 export default function WorkspaceDetail() {
@@ -140,6 +142,12 @@ export default function WorkspaceDetail() {
   // Delete workspace confirm
   const [showDeleteWs, setShowDeleteWs] = useState(false);
   const [deletingWs, setDeletingWs] = useState(false);
+
+  // Edit RAG status modal
+  const [showEditRag, setShowEditRag] = useState(false);
+  const [editRagForm, setEditRagForm] = useState<EditRagForm>({ rag: 'Green', budget: 'Green', schedule: 'Green', risk: 'Green' });
+  const [editRagSaving, setEditRagSaving] = useState(false);
+  const [editRagError, setEditRagError] = useState('');
 
   // Generic delete confirm (id of item being deleted, or null)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -390,6 +398,39 @@ export default function WorkspaceDetail() {
     finally { setEditFinSaving(false); }
   };
 
+  // ── RAG Status CRUD ──────────────────────────────────────────
+  const openEditRag = () => {
+    if (!data) return;
+    const rag = data.rag;
+    setEditRagForm({
+      rag: (rag?.rag ?? 'Green') as EditRagForm['rag'],
+      budget: (rag?.budget ?? 'Green') as EditRagForm['budget'],
+      schedule: (rag?.schedule ?? 'Green') as EditRagForm['schedule'],
+      risk: (rag?.risk ?? 'Green') as EditRagForm['risk'],
+    });
+    setEditRagError('');
+    setShowEditRag(true);
+  };
+
+  const handleSaveRag = async () => {
+    if (!id || !data) return;
+    setEditRagSaving(true); setEditRagError('');
+    try {
+      await upsertWorkspaceRagStatus({
+        id: data.rag?.id ?? `rag-${id}`,
+        workspace_id: id,
+        rag: editRagForm.rag,
+        budget: editRagForm.budget,
+        schedule: editRagForm.schedule,
+        risk: editRagForm.risk,
+        last_updated: new Date().toISOString().slice(0, 10),
+      });
+      setShowEditRag(false);
+      await loadData(true);
+    } catch (e: unknown) { setEditRagError((e as Error).message ?? 'Failed to update RAG status'); }
+    finally { setEditRagSaving(false); }
+  };
+
   // ── Milestone CRUD ────────────────────────────────────────────
   const openAddMs = () => {
     setEditingMs(null);
@@ -489,14 +530,22 @@ export default function WorkspaceDetail() {
               <span style={{ color: '#334155' }}>·</span>
               <span className={ws.status === 'Active' ? 'status-active' : 'status-pending'}>{ws.status}</span>
               {rag && (
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
                   {([['Budget', rag.budget], ['Schedule', rag.schedule], ['Risk', rag.risk], ['Overall', rag.rag]] as [string, string][]).map(([label, status]) => (
                     <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '2px 7px', borderRadius: '4px', background: `${RAG_COLORS[status]}12`, border: `1px solid ${RAG_COLORS[status]}25` }}>
                       <div style={{ width: 6, height: 6, borderRadius: '50%', background: RAG_COLORS[status], boxShadow: `0 0 4px ${RAG_COLORS[status]}80` }} />
                       <span style={{ fontSize: '0.6rem', color: RAG_COLORS[status], fontWeight: 600 }}>{label}</span>
                     </div>
                   ))}
+                  <button onClick={openEditRag} title="Update RAG Status" style={{ padding: '1px 5px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', cursor: 'pointer', color: '#475569', fontSize: '0.6rem', display: 'flex', alignItems: 'center', gap: '3px', fontFamily: 'inherit' }}>
+                    <Pencil size={8} /> Update RAG
+                  </button>
                 </div>
+              )}
+              {!rag && (
+                <button onClick={openEditRag} title="Set RAG Status" style={{ padding: '2px 7px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', cursor: 'pointer', color: '#475569', fontSize: '0.6rem', display: 'flex', alignItems: 'center', gap: '3px', fontFamily: 'inherit' }}>
+                  <Pencil size={8} /> Set RAG
+                </button>
               )}
             </div>
             <h1 style={{ fontSize: isMobile ? '1.25rem' : '1.625rem', fontWeight: 900, background: `linear-gradient(135deg, #F1F5F9 0%, ${ws.sector_color} 100%)`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', margin: 0, marginBottom: '0.375rem', letterSpacing: '-0.02em' }}>{ws.name}</h1>
@@ -504,7 +553,7 @@ export default function WorkspaceDetail() {
             <p style={{ fontSize: '0.8rem', color: '#475569', margin: 0, maxWidth: '600px', lineHeight: 1.5 }}>{ws.description}</p>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
-            <button className="btn-ghost" style={{ fontSize: '0.8rem' }}><Zap size={14} /> Run Automation</button>
+            <button className="btn-ghost" style={{ fontSize: '0.8rem' }} onClick={() => navigate('/automations')}><Zap size={14} /> Run Automation</button>
             <button className="btn-primary" style={{ fontSize: '0.8rem' }} onClick={() => { setShowTaskModal(true); setActiveTab('Tasks'); }}><Plus size={14} /> Add Task</button>
           </div>
         </div>
@@ -1155,6 +1204,40 @@ export default function WorkspaceDetail() {
             <Field label="Mitigation Plan"><textarea style={{ ...inputStyle, resize: 'vertical' }} rows={2} value={riskForm.mitigation} onChange={e => setRiskForm(f => ({ ...f, mitigation: e.target.value }))} /></Field>
             <Field label="Financial Exposure (SAR)"><input style={inputStyle} type="number" min="0" value={riskForm.financial_exposure} onChange={e => setRiskForm(f => ({ ...f, financial_exposure: e.target.value }))} placeholder="e.g. 500000" /></Field>
             <ModalFooter onCancel={() => { setShowRiskModal(false); setRiskError(''); }} onConfirm={handleCreateRisk} saving={riskSaving} label="Log Risk" />
+          </div>
+        </Modal>
+      )}
+
+      {/* Edit RAG Status modal */}
+      {showEditRag && (
+        <Modal title="Update RAG Status" onClose={() => { setShowEditRag(false); setEditRagError(''); }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+            <p style={{ fontSize: '0.78rem', color: '#64748B', margin: 0 }}>Set the RAG health indicators for this workspace.</p>
+            {(['rag', 'budget', 'schedule', 'risk'] as const).map(field => (
+              <Field key={field} label={field === 'rag' ? 'Overall Status' : field.charAt(0).toUpperCase() + field.slice(1)}>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  {(['Green', 'Amber', 'Red'] as const).map(color => (
+                    <button
+                      key={color}
+                      onClick={() => setEditRagForm(f => ({ ...f, [field]: color }))}
+                      style={{
+                        flex: 1, padding: '0.5rem', borderRadius: '6px',
+                        border: `2px solid ${editRagForm[field] === color ? RAG_COLORS[color] : 'rgba(255,255,255,0.08)'}`,
+                        background: editRagForm[field] === color ? `${RAG_COLORS[color]}18` : 'rgba(255,255,255,0.02)',
+                        cursor: 'pointer', color: editRagForm[field] === color ? RAG_COLORS[color] : '#475569',
+                        fontSize: '0.78rem', fontWeight: editRagForm[field] === color ? 700 : 400, fontFamily: 'inherit',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', transition: 'all 0.15s',
+                      }}
+                    >
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: RAG_COLORS[color], flexShrink: 0 }} />
+                      {color}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+            ))}
+            {editRagError && <ErrorBanner msg={editRagError} />}
+            <ModalFooter onCancel={() => { setShowEditRag(false); setEditRagError(''); }} onConfirm={handleSaveRag} saving={editRagSaving} label="Save RAG Status" />
           </div>
         </Modal>
       )}

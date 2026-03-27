@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { users } from '../data/mockData';
 import { fetchBATrafficBoard } from '../lib/trello';
+import { getUsers, upsertUser, updateUser } from '../lib/db';
 
 const adminSections = [
   { id: 'users', label: 'Users & Roles', icon: <Users size={15} /> },
@@ -70,6 +71,7 @@ export default function Admin() {
   const [userList, setUserList] = useState<LocalUser[]>(() => {
     try { return JSON.parse(localStorage.getItem('admin_users') ?? 'null') ?? users; } catch { return users; }
   });
+  const [dbUsersLoaded, setDbUsersLoaded] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
   const [inviteForm, setInviteForm] = useState({ name: '', email: '', role: 'Analyst' });
   const [inviteSaving, setInviteSaving] = useState(false);
@@ -96,34 +98,58 @@ export default function Admin() {
 
   useEffect(() => { setCurrentPage(1); }, [roleFilter]);
 
-  function handleInviteUser() {
+  // Load users from DB on mount (fall back to localStorage/mockData if unavailable)
+  useEffect(() => {
+    if (dbUsersLoaded) return;
+    getUsers().then(dbRows => {
+      if (dbRows.length > 0) {
+        const mapped: LocalUser[] = dbRows.map(u => ({
+          id: u.id, name: u.name, email: u.email ?? '', role: u.role,
+          workspaces: u.workspaces ?? 0, lastActive: 'Recently',
+          status: u.status, initials: u.initials,
+        }));
+        setUserList(mapped);
+        localStorage.setItem('admin_users', JSON.stringify(mapped));
+      }
+      setDbUsersLoaded(true);
+    }).catch(() => { setDbUsersLoaded(true); });
+  }, [dbUsersLoaded]);
+
+  async function handleInviteUser() {
     if (!inviteForm.name || !inviteForm.email) return;
     setInviteSaving(true);
-    setTimeout(() => {
-      const newUser: LocalUser = {
-        id: crypto.randomUUID(),
-        name: inviteForm.name,
-        email: inviteForm.email,
-        role: inviteForm.role,
-        workspaces: 0,
-        lastActive: 'Just now',
-        status: 'Active',
-        initials: inviteForm.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
-      };
-      const updated = [...userList, newUser];
-      setUserList(updated);
-      localStorage.setItem('admin_users', JSON.stringify(updated));
-      setInviteSuccess(`Invite sent to ${inviteForm.email}`);
-      setInviteForm({ name: '', email: '', role: 'Analyst' });
-      setInviteSaving(false);
-      setTimeout(() => { setShowInvite(false); setInviteSuccess(''); }, 1500);
-    }, 800);
+    const newUser: LocalUser = {
+      id: crypto.randomUUID(),
+      name: inviteForm.name,
+      email: inviteForm.email,
+      role: inviteForm.role,
+      workspaces: 0,
+      lastActive: 'Just now',
+      status: 'Active',
+      initials: inviteForm.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
+    };
+    // Try persisting to DB, fall back gracefully
+    upsertUser({
+      id: newUser.id, name: newUser.name, email: newUser.email,
+      role: newUser.role, workspaces: 0, status: 'Active', initials: newUser.initials,
+    }).catch(() => {});
+    const updated = [...userList, newUser];
+    setUserList(updated);
+    try { localStorage.setItem('admin_users', JSON.stringify(updated)); } catch { /* ignore */ }
+    setInviteSuccess(`Invite sent to ${inviteForm.email}`);
+    setInviteForm({ name: '', email: '', role: 'Analyst' });
+    setInviteSaving(false);
+    setTimeout(() => { setShowInvite(false); setInviteSuccess(''); }, 1500);
   }
 
   function handleToggleUserStatus(userId: string) {
     const updated = userList.map(u => u.id === userId ? { ...u, status: (u.status === 'Active' ? 'Inactive' : 'Active') as 'Active' | 'Inactive' } : u);
     setUserList(updated);
-    localStorage.setItem('admin_users', JSON.stringify(updated));
+    try { localStorage.setItem('admin_users', JSON.stringify(updated)); } catch { /* ignore */ }
+    const target = updated.find(u => u.id === userId);
+    if (target) {
+      updateUser(userId, { status: target.status }).catch(() => {});
+    }
   }
 
   function toggleUserSelection(userId: string) {

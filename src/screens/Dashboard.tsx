@@ -12,12 +12,18 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts';
 import {
-  automationRunsData, documentsByTypeData,
-  portfolioKPIs, ragStatusData, deliveryTrendData, boardDecisions,
-  type PortfolioKPI, type BoardDecision,
+  documentsByTypeData, deliveryTrendData, boardDecisions,
+  type BoardDecision,
 } from '../data/mockData';
-import { getActivities, getMilestones, getWorkspaceFinancials } from '../lib/db';
-import type { ActivityRow, MilestoneRow, WorkspaceFinancialRow } from '../lib/db';
+import {
+  getActivities, getMilestones, getWorkspaceFinancials,
+  getWorkspaces, getTasks, getRisks, getWorkspaceRagStatuses,
+  getApprovals, updateApproval, upsertApproval,
+} from '../lib/db';
+import type {
+  ActivityRow, MilestoneRow, WorkspaceFinancialRow,
+  WorkspaceRow, TaskRow, RiskRow, WorkspaceRagStatusRow,
+} from '../lib/db';
 import { useLayout } from '../hooks/useLayout';
 
 type Period = 'today' | 'week' | 'month';
@@ -125,32 +131,88 @@ export default function Dashboard() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [activityFilter, setActivityFilter] = useState<string>('All');
-  const [completedDecisions, setCompletedDecisions] = useState<Set<string>>(new Set());
+  const [completedDecisions, setCompletedDecisions] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('dashboard_completed_decisions');
+      if (saved) return new Set(JSON.parse(saved) as string[]);
+    } catch { /* ignore */ }
+    return new Set();
+  });
 
   // Live Supabase data
   const [activities, setActivities] = useState<ActivityRow[]>([]);
   const [milestones, setMilestones] = useState<MilestoneRow[]>([]);
   const [workspaceFinancials, setWorkspaceFinancials] = useState<WorkspaceFinancialRow[]>([]);
+  const [workspaces, setWorkspaces] = useState<WorkspaceRow[]>([]);
+  const [tasks, setTasks] = useState<TaskRow[]>([]);
+  const [risks, setRisks] = useState<RiskRow[]>([]);
+  const [ragStatuses, setRagStatuses] = useState<WorkspaceRagStatusRow[]>([]);
 
   useEffect(() => {
     getActivities(30).then(setActivities).catch(() => {});
     getMilestones().then(setMilestones).catch(() => {});
     getWorkspaceFinancials().then(setWorkspaceFinancials).catch(() => {});
+    getWorkspaces().then(setWorkspaces).catch(() => {});
+    getTasks().then(setTasks).catch(() => {});
+    getRisks().then(setRisks).catch(() => {});
+    getWorkspaceRagStatuses().then(setRagStatuses).catch(() => {});
+    // Load approvals from DB, falling back to localStorage
+    getApprovals().then(rows => {
+      if (rows.length > 0) {
+        setApprovals(rows.map(r => ({
+          id: parseInt(r.id.replace('apr-', '')) || Math.random(),
+          title: r.title,
+          requester: r.requester,
+          type: r.type,
+          urgency: r.urgency,
+          status: r.status,
+        })));
+      }
+    }).catch(() => {});
   }, []);
 
-  const handleApprove = (id: number) => setApprovals(prev => {
-    const next = prev.map(a => a.id === id ? { ...a, status: 'approved' as const } : a);
-    try { localStorage.setItem('dashboard_approvals', JSON.stringify(next)); } catch { /* ignore */ }
-    return next;
-  });
-  const handleReject = (id: number) => setApprovals(prev => {
-    const next = prev.map(a => a.id === id ? { ...a, status: 'rejected' as const } : a);
-    try { localStorage.setItem('dashboard_approvals', JSON.stringify(next)); } catch { /* ignore */ }
-    return next;
-  });
+  const handleApprove = (id: number) => {
+    setApprovals(prev => {
+      const next = prev.map(a => a.id === id ? { ...a, status: 'approved' as const } : a);
+      try { localStorage.setItem('dashboard_approvals', JSON.stringify(next)); } catch { /* ignore */ }
+      const target = next.find(a => a.id === id);
+      if (target) {
+        updateApproval(`apr-${id}`, { status: 'approved' }).catch(() => {
+          // If update fails (row may not exist), try upsert
+          upsertApproval({
+            id: `apr-${id}`, title: target.title, requester: target.requester,
+            type: target.type, urgency: target.urgency as 'High' | 'Medium' | 'Low',
+            status: 'approved',
+          }).catch(() => {});
+        });
+      }
+      return next;
+    });
+  };
+  const handleReject = (id: number) => {
+    setApprovals(prev => {
+      const next = prev.map(a => a.id === id ? { ...a, status: 'rejected' as const } : a);
+      try { localStorage.setItem('dashboard_approvals', JSON.stringify(next)); } catch { /* ignore */ }
+      const target = next.find(a => a.id === id);
+      if (target) {
+        updateApproval(`apr-${id}`, { status: 'rejected' }).catch(() => {
+          upsertApproval({
+            id: `apr-${id}`, title: target.title, requester: target.requester,
+            type: target.type, urgency: target.urgency as 'High' | 'Medium' | 'Low',
+            status: 'rejected',
+          }).catch(() => {});
+        });
+      }
+      return next;
+    });
+  };
   const dismissRec = (id: number) => setRecommendations(prev => prev.filter(r => r.id !== id));
   const handleRefresh = () => { setRefreshing(true); setTimeout(() => setRefreshing(false), 1200); };
-  const markDecisionComplete = (id: string) => setCompletedDecisions(prev => new Set([...prev, id]));
+  const markDecisionComplete = (id: string) => setCompletedDecisions(prev => {
+    const next = new Set([...prev, id]);
+    try { localStorage.setItem('dashboard_completed_decisions', JSON.stringify([...next])); } catch { /* ignore */ }
+    return next;
+  });
 
   const activityTypes = ['All', 'Document', 'Meeting', 'Automation', 'Task'];
   const filteredActivities = activityFilter === 'All' ? activities : activities.filter(a => a.type === activityFilter.toLowerCase());
@@ -176,30 +238,95 @@ export default function Dashboard() {
   const totalSpent = workspaceFinancials.reduce((s, w) => s + w.spent, 0);
   const totalVariance = workspaceFinancials.reduce((s, w) => s + w.variance, 0);
 
+  // Dynamic computed values from Supabase
+  const activeWorkspaces = workspaces.filter(w => w.status === 'Active');
+  const openTasks = tasks.filter(t => t.status !== 'Completed');
+  const overdueTasks = tasks.filter(t => t.status === 'Overdue');
+  const completedTaskCount = tasks.filter(t => t.status === 'Completed').length;
+  const openRisks = risks.filter(r => r.status === 'Open');
+  const criticalRisks = openRisks.filter(r => r.severity === 'Critical' || r.severity === 'High');
+  const overBudgetWs = workspaceFinancials.filter(w => w.variance > 0);
+  const now30d = new Date(); now30d.setDate(now30d.getDate() + 30);
+  const milestonesIn30d = milestones.filter(m => {
+    if (m.status === 'Completed') return false;
+    const due = new Date(m.due_date);
+    return !isNaN(due.getTime()) && due <= now30d;
+  });
+  const milestonesAtRisk = milestonesIn30d.filter(m => m.status === 'At Risk' || m.status === 'Delayed');
+
+  // Workspace health data joined from Supabase (with fallback)
+  const workspaceHealthData = activeWorkspaces.slice(0, 4).map(ws => {
+    const rag = ragStatuses.find(r => r.workspace_id === ws.id);
+    const fin = workspaceFinancials.find(f => f.workspace_id === ws.id);
+    return {
+      workspace: ws.name,
+      workspace_id: ws.id,
+      rag: rag?.rag ?? 'Green' as 'Green' | 'Amber' | 'Red',
+      lastUpdated: rag?.last_updated ?? ws.last_activity,
+      progress: ws.progress,
+      contractValue: fin?.contract_value,
+    };
+  });
+
+  // Computed portfolio KPIs from real data (fall back to static when no Supabase data)
+  const hasLiveData = workspaces.length > 0;
+  const computedKPIs = [
+    {
+      label: 'Active Engagements', color: '#00D4FF', icon: 'portfolio', trendUp: true,
+      value: hasLiveData ? String(activeWorkspaces.length) : '8',
+      subValue: hasLiveData ? `${workspaces.length} total workspaces` : '8 active workspaces',
+      trend: '+12%',
+    },
+    {
+      label: 'Pipeline Revenue', color: '#10B981', icon: 'revenue', trendUp: true,
+      value: totalContract > 0 ? fmtSAR(totalContract) : 'SAR 23.4M',
+      subValue: totalContract > 0 ? `${workspaceFinancials.length} tracked` : '8 active engagements',
+      trend: '+8%',
+    },
+    {
+      label: 'Open Risk Items', color: '#EF4444', icon: 'risk', trendUp: false,
+      value: hasLiveData ? String(criticalRisks.length) : '6',
+      subValue: hasLiveData ? `${openRisks.length} total open risks` : '2 critical unmitigated',
+      trend: criticalRisks.length > 5 ? '+3' : '-2',
+    },
+    {
+      label: 'Milestones Due (30d)', color: '#F59E0B', icon: 'milestone', trendUp: false,
+      value: hasLiveData ? String(milestonesIn30d.length) : '6',
+      subValue: hasLiveData
+        ? `${milestonesIn30d.length - milestonesAtRisk.length} on track · ${milestonesAtRisk.length} at risk`
+        : '4 on track · 2 at risk',
+      trend: `${milestonesAtRisk.length} at risk`,
+    },
+    {
+      label: 'On-Time Delivery Rate', color: '#8B5CF6', icon: 'delivery', trendUp: true,
+      value: '87%', subValue: 'vs 82% last quarter', trend: '+5pp',
+    },
+    {
+      label: 'Tasks Completed', color: '#EC4899', icon: 'satisfaction', trendUp: true,
+      value: hasLiveData ? String(completedTaskCount) : '38',
+      subValue: hasLiveData ? `${openTasks.length} still open` : 'NPS +62 across 6 clients',
+      trend: '+8',
+    },
+  ];
+
+  // Build workspace name lookup from real data, fallback to hardcoded for known IDs
   const wsNames: Record<string, string> = {
-    'ws-001': 'NCA Digital Transf.',
-    'ws-002': 'ADNOC Supply Chain',
-    'ws-003': 'Banking Core',
-    'ws-004': 'MOCI Procurement',
-    'ws-005': 'Smart City PMO',
-    'ws-006': 'Healthcare Digital',
-    'ws-007': 'NCBE Regulatory',
-    'ws-008': 'Ministry Digital',
+    'ws-001': 'NCA Digital Transf.', 'ws-002': 'ADNOC Supply Chain',
+    'ws-003': 'Banking Core', 'ws-004': 'MOCI Procurement',
+    'ws-005': 'Smart City PMO', 'ws-006': 'Healthcare Digital',
+    'ws-007': 'NCBE Regulatory', 'ws-008': 'Ministry Digital',
+    ...Object.fromEntries(workspaces.map(w => [w.id, w.name.length > 22 ? w.name.slice(0, 20) + '…' : w.name])),
   };
 
     // ── sparkline data per KPI ────────────────────────────────────────
   const kpiSparks: Record<string, number[]> = {
-    'Active Engagements': [6, 6, 7, 7, 8, 8, 8],
-    'Pipeline Revenue':   [18, 22, 20, 25, 28, 30, 32],
-    'Open Risk Items':    [9, 11, 8, 10, 7, 9, 6],
-    'Milestones Due':     [4, 5, 3, 6, 4, 5, 7],
-    'Delivery Score':     [78, 80, 79, 83, 85, 82, 88],
-    'Tasks Completed':    [22, 27, 25, 30, 28, 34, 38],
+    'Active Engagements':    [6, 6, 7, 7, 8, 8, hasLiveData ? activeWorkspaces.length : 8],
+    'Pipeline Revenue':      [18, 22, 20, 25, 28, 30, totalContract > 0 ? Math.round(totalContract / 1_000_000) : 32],
+    'Open Risk Items':       [9, 11, 8, 10, 7, 9, hasLiveData ? criticalRisks.length : 6],
+    'Milestones Due (30d)':  [4, 5, 3, 6, 4, 5, hasLiveData ? milestonesIn30d.length : 7],
+    'On-Time Delivery Rate': [78, 80, 79, 83, 85, 82, 88],
+    'Tasks Completed':       [22, 27, 25, 30, 28, 34, hasLiveData ? completedTaskCount : 38],
   };
-
-  // Suppress unused import warnings for data we keep but may not render
-  void automationRunsData;
-  void documentsByTypeData;
 
   return (
     <div style={{ padding: p, display: 'flex', flexDirection: 'column', gap, background: '#080C18', minHeight: '100%' }}>
@@ -251,9 +378,9 @@ export default function Dashboard() {
             </h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', flexWrap: 'wrap' }}>
               {[
-                { icon: <Users size={11} />, label: '8 active clients', color: '#64748B' },
-                { icon: <DollarSign size={11} />, label: `${fmtSAR(totalContract)} portfolio`, color: '#00D4FF' },
-                { icon: <Layers size={11} />, label: '32 open tasks', color: '#64748B' },
+                { icon: <Users size={11} />, label: `${hasLiveData ? activeWorkspaces.length : 8} active clients`, color: '#64748B' },
+                { icon: <DollarSign size={11} />, label: `${fmtSAR(totalContract || 23400000)} portfolio`, color: '#00D4FF' },
+                { icon: <Layers size={11} />, label: `${hasLiveData ? openTasks.length : 32} open tasks`, color: '#64748B' },
               ].map((item, i) => (
                 <span key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem', color: item.color, fontWeight: item.color === '#00D4FF' ? 700 : 500 }}>
                   {item.icon}{item.label}
@@ -333,7 +460,7 @@ export default function Dashboard() {
 
       {/* ── Portfolio KPI Row ─────────────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${kpiCols}, 1fr)`, gap: isMobile ? '0.625rem' : '0.875rem' }}>
-        {portfolioKPIs.map((kpi: PortfolioKPI) => {
+        {computedKPIs.map((kpi) => {
           const trendColor = kpi.trendUp ? '#10B981' : '#EF4444';
           const trendBg = kpi.trendUp ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)';
           return (
@@ -503,15 +630,14 @@ export default function Dashboard() {
             </button>
           </div>
           <div style={{ padding: '0.5rem 0' }}>
-            {ragStatusData.slice(0, 4).map((row, i) => {
-              const pct = [78, 45, 92, 28][i] ?? 50;
+            {workspaceHealthData.map((row, i) => {
               const barColor = row.rag === 'Green' ? '#10B981' : row.rag === 'Amber' ? '#F59E0B' : '#EF4444';
               const glowColor = row.rag === 'Green' ? 'rgba(16,185,129,0.35)' : row.rag === 'Amber' ? 'rgba(245,158,11,0.35)' : 'rgba(239,68,68,0.35)';
-              const contractValue = workspaceFinancials[i]?.contract_value;
+              const pct = row.progress ?? 50;
               return (
-                <div key={row.workspace} style={{
+                <div key={row.workspace_id || row.workspace} style={{
                   padding: '1rem 1.5rem', cursor: 'pointer',
-                  borderBottom: i < 3 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                  borderBottom: i < workspaceHealthData.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
                   transition: 'background 0.15s',
                 }}
                   onClick={() => navigate('/workspaces')}
@@ -534,12 +660,17 @@ export default function Dashboard() {
                     }} />
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.68rem', color: '#475569' }}>Due: {row.lastUpdated}</span>
-                    {contractValue && <span style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 600 }}>{fmtSAR(contractValue)}</span>}
+                    <span style={{ fontSize: '0.68rem', color: '#475569' }}>Updated: {row.lastUpdated}</span>
+                    {row.contractValue != null && <span style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 600 }}>{fmtSAR(row.contractValue)}</span>}
                   </div>
                 </div>
               );
             })}
+            {workspaceHealthData.length === 0 && (
+              <div style={{ padding: '1.5rem', textAlign: 'center', color: '#334155', fontSize: '0.78rem' }}>
+                No active workspaces yet
+              </div>
+            )}
           </div>
         </div>
 
@@ -658,13 +789,12 @@ export default function Dashboard() {
             </div>
           </div>
           <div style={{ padding: '1rem 1.5rem', display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? '220px' : '280px'}, 1fr))`, gap: '1rem' }}>
-            {ragStatusData.slice(0, 4).map((row, i) => {
-              const pct = [78, 45, 92, 28][i] ?? 50;
+            {workspaceHealthData.map((row) => {
               const barColor = row.rag === 'Green' ? '#10B981' : row.rag === 'Amber' ? '#F59E0B' : '#EF4444';
               const glowColor = row.rag === 'Green' ? 'rgba(16,185,129,0.35)' : row.rag === 'Amber' ? 'rgba(245,158,11,0.35)' : 'rgba(239,68,68,0.35)';
-              const contractValue = workspaceFinancials[i]?.contract_value;
+              const pct = row.progress ?? 50;
               return (
-                <div key={row.workspace} style={{
+                <div key={row.workspace_id || row.workspace} style={{
                   padding: '1rem', borderRadius: '10px', cursor: 'pointer',
                   background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
                   transition: 'all 0.15s',
@@ -689,12 +819,17 @@ export default function Dashboard() {
                     }} />
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.68rem', color: '#475569' }}>Due: {row.lastUpdated}</span>
-                    {contractValue && <span style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 600 }}>{fmtSAR(contractValue)}</span>}
+                    <span style={{ fontSize: '0.68rem', color: '#475569' }}>Updated: {row.lastUpdated}</span>
+                    {row.contractValue != null && <span style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 600 }}>{fmtSAR(row.contractValue)}</span>}
                   </div>
                 </div>
               );
             })}
+            {workspaceHealthData.length === 0 && (
+              <div style={{ padding: '2rem', textAlign: 'center', color: '#334155', fontSize: '0.78rem', gridColumn: '1 / -1' }}>
+                No active workspaces to display
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -839,8 +974,18 @@ export default function Dashboard() {
             <AlertTriangle size={15} />
           </div>
           <div>
-            <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#F1F5F9' }}>12 overdue tasks across 4 workspaces</span>
-            {!isMobile && <span style={{ fontSize: '0.8rem', color: '#64748B', marginLeft: '0.75rem' }}>3 high-priority items may impact milestones</span>}
+            <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#F1F5F9' }}>
+              {hasLiveData
+                ? `${overdueTasks.length} overdue task${overdueTasks.length !== 1 ? 's' : ''} across ${new Set(overdueTasks.map(t => t.workspace_id)).size} workspace${new Set(overdueTasks.map(t => t.workspace_id)).size !== 1 ? 's' : ''}`
+                : '12 overdue tasks across 4 workspaces'
+              }
+            </span>
+            {!isMobile && <span style={{ fontSize: '0.8rem', color: '#64748B', marginLeft: '0.75rem' }}>
+              {hasLiveData
+                ? `${criticalRisks.length} critical risk${criticalRisks.length !== 1 ? 's' : ''} may impact milestones`
+                : '3 high-priority items may impact milestones'
+              }
+            </span>}
           </div>
         </div>
         <button className="btn-ghost" style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }} onClick={() => navigate('/tasks')}>
@@ -1216,9 +1361,10 @@ export default function Dashboard() {
               <div>
                 <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B', display: 'block', marginBottom: '0.375rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Workspace</label>
                 <select style={{ width: '100%', padding: '0.625rem 0.75rem', background: '#080C18', border: '1px solid rgba(255,255,255,0.09)', borderRadius: '8px', color: '#F1F5F9', fontSize: '0.82rem', fontFamily: 'inherit', outline: 'none' }}>
-                  <option>NCA Digital Transformation</option>
-                  <option>Banking Core Transformation</option>
-                  <option>Smart City PMO</option>
+                  {workspaces.length > 0
+                    ? workspaces.filter(w => w.status === 'Active').map(w => <option key={w.id} value={w.id}>{w.name}</option>)
+                    : [<option key="nca">NCA Digital Transformation</option>, <option key="bank">Banking Core Transformation</option>, <option key="sc">Smart City PMO</option>]
+                  }
                 </select>
               </div>
               <div>
