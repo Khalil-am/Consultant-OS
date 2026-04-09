@@ -4,16 +4,26 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
 // ── Hoisted mocks ────────────────────────────────────────────
-const { mockGetActivities, mockGetMilestones, mockGetWorkspaceFinancials } = vi.hoisted(() => ({
+const { mockGetActivities, mockGetMilestones, mockGetWorkspaceFinancials, mockGetBoardDecisions, mockGetRagStatusWithWorkspaces, mockGetApprovals, mockUpdateApproval, mockUpsertApproval } = vi.hoisted(() => ({
   mockGetActivities: vi.fn(),
   mockGetMilestones: vi.fn(),
   mockGetWorkspaceFinancials: vi.fn(),
+  mockGetBoardDecisions: vi.fn(),
+  mockGetRagStatusWithWorkspaces: vi.fn(),
+  mockGetApprovals: vi.fn(),
+  mockUpdateApproval: vi.fn(),
+  mockUpsertApproval: vi.fn(),
 }));
 
 vi.mock('../lib/db', () => ({
   getActivities: mockGetActivities,
   getMilestones: mockGetMilestones,
   getWorkspaceFinancials: mockGetWorkspaceFinancials,
+  getBoardDecisions: mockGetBoardDecisions,
+  getRagStatusWithWorkspaces: mockGetRagStatusWithWorkspaces,
+  getApprovals: mockGetApprovals,
+  updateApproval: mockUpdateApproval,
+  upsertApproval: mockUpsertApproval,
 }));
 
 vi.mock('../hooks/useLayout', () => ({
@@ -32,22 +42,6 @@ vi.mock('recharts', () => ({
   Cell: () => <div />,
 }));
 
-vi.mock('../data/mockData', () => ({
-  automationRunsData: [],
-  documentsByTypeData: [],
-  portfolioKPIs: [
-    { id: 'kpi-1', label: 'Active Engagements', value: '8', unit: '', trend: '+1', trendDir: 'up', trendUp: true, icon: 'briefcase', color: '#0EA5E9', subValue: '2 new this month' },
-    { id: 'kpi-2', label: 'Pipeline Revenue', value: 'SAR 32M', unit: '', trend: '+6%', trendDir: 'up', trendUp: true, icon: 'revenue', color: '#10B981', subValue: 'YTD recognized' },
-  ],
-  ragStatusData: [
-    { workspace: 'NCA', rag: 'Green', lastUpdated: '2026-03-15' },
-    { workspace: 'MOCI', rag: 'Amber', lastUpdated: '2026-03-14' },
-  ],
-  deliveryTrendData: [],
-  boardDecisions: [
-    { id: 'bd-1', project: 'MOCI', title: 'Approve vendor shortlist', dueDate: '2026-03-20', priority: 'High', status: 'Open' },
-  ],
-}));
 
 import Dashboard from '../screens/Dashboard';
 
@@ -76,6 +70,11 @@ beforeEach(() => {
   mockGetActivities.mockResolvedValue([]);
   mockGetMilestones.mockResolvedValue([]);
   mockGetWorkspaceFinancials.mockResolvedValue([]);
+  mockGetBoardDecisions.mockResolvedValue([]);
+  mockGetRagStatusWithWorkspaces.mockResolvedValue([]);
+  mockGetApprovals.mockResolvedValue([]);
+  mockUpdateApproval.mockResolvedValue({});
+  mockUpsertApproval.mockResolvedValue({});
 });
 
 // ────────────────────────────────────────────────────────────
@@ -85,10 +84,10 @@ describe('Dashboard – Render', () => {
     expect(await screen.findByText(/live · board overview/i)).toBeInTheDocument();
   });
 
-  it('renders KPI cards from mockData', async () => {
+  it('renders KPI cards from live data', async () => {
     renderDashboard();
-    expect(await screen.findByText('Active Engagements')).toBeInTheDocument();
-    expect(screen.getByText('Pipeline Revenue')).toBeInTheDocument();
+    expect(await screen.findByText('Total Portfolio Value')).toBeInTheDocument();
+    expect(screen.getByText('Revenue Recognized')).toBeInTheDocument();
   });
 
   it('renders quick actions section', async () => {
@@ -240,12 +239,18 @@ describe('Dashboard – Board Decisions', () => {
     expect(screen.getByText('Board Decisions')).toBeInTheDocument();
   });
 
-  it('shows a pending decision from mockData', async () => {
+  it('shows a pending decision from Supabase', async () => {
+    mockGetBoardDecisions.mockResolvedValue([
+      { id: 'bd-1', title: 'Approve vendor shortlist', committee: 'Procurement', date: '2026-03-20', due_date: '2026-03-25', status: 'In Progress', owner: 'AM', workspace_id: 'ws-1', priority: 'High', created_at: '', updated_at: '' },
+    ]);
     renderDashboard();
     expect(await screen.findByText('Approve vendor shortlist')).toBeInTheDocument();
   });
 
   it('removes decision on Done button click', async () => {
+    mockGetBoardDecisions.mockResolvedValue([
+      { id: 'bd-1', title: 'Approve vendor shortlist', committee: 'Procurement', date: '2026-03-20', due_date: '2026-03-25', status: 'In Progress', owner: 'AM', workspace_id: 'ws-1', priority: 'High', created_at: '', updated_at: '' },
+    ]);
     renderDashboard();
     await screen.findByText('Approve vendor shortlist');
     // The Done button in board decisions
