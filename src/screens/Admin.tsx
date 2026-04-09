@@ -8,7 +8,7 @@ import {
   CheckCircle, ChevronLeft, ChevronRight, Download, Filter,
   Lock, Key, AlertTriangle, Info, Code2,
 } from 'lucide-react';
-import { users } from '../data/mockData';
+import { getTeamMembers, createTeamMember, updateTeamMember } from '../lib/db';
 import { fetchBATrafficBoard } from '../lib/trello';
 
 const adminSections = [
@@ -67,13 +67,28 @@ void Code2;
 export default function Admin() {
   const { width, isMobile, isTablet } = useLayout();
   const [activeSection, setActiveSection] = useState('users');
-  const [userList, setUserList] = useState<LocalUser[]>(() => {
-    try { return JSON.parse(localStorage.getItem('admin_users') ?? 'null') ?? users; } catch { return users; }
-  });
+  const [userList, setUserList] = useState<LocalUser[]>([]);
+
+  // Load team members from Supabase on mount
+  useEffect(() => {
+    getTeamMembers().then(data => {
+      setUserList(data.map(m => ({
+        id: m.id,
+        name: m.name,
+        email: m.email,
+        role: m.role,
+        workspaces: m.workspaces_count,
+        lastActive: m.last_active,
+        status: m.status,
+        initials: m.initials,
+      })));
+    }).catch(() => {});
+  }, []);
   const [showInvite, setShowInvite] = useState(false);
   const [inviteForm, setInviteForm] = useState({ name: '', email: '', role: 'Analyst' });
   const [inviteSaving, setInviteSaving] = useState(false);
   const [inviteSuccess, setInviteSuccess] = useState('');
+  const [inviteError, setInviteError] = useState('');
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [roleFilter, setRoleFilter] = useState<string>('All');
   const [currentPage, setCurrentPage] = useState(1);
@@ -99,31 +114,46 @@ export default function Admin() {
   function handleInviteUser() {
     if (!inviteForm.name || !inviteForm.email) return;
     setInviteSaving(true);
-    setTimeout(() => {
+    setInviteError('');
+    const newId = crypto.randomUUID();
+    const initials = inviteForm.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+    createTeamMember({
+      id: newId,
+      name: inviteForm.name,
+      email: inviteForm.email,
+      role: inviteForm.role as 'Admin' | 'Consultant' | 'Manager' | 'Viewer' | 'Analyst',
+      workspaces_count: 0,
+      last_active: 'Just now',
+      status: 'Active',
+      initials,
+    }).then(saved => {
       const newUser: LocalUser = {
-        id: crypto.randomUUID(),
-        name: inviteForm.name,
-        email: inviteForm.email,
-        role: inviteForm.role,
-        workspaces: 0,
-        lastActive: 'Just now',
-        status: 'Active',
-        initials: inviteForm.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
+        id: saved.id,
+        name: saved.name,
+        email: saved.email,
+        role: saved.role,
+        workspaces: saved.workspaces_count,
+        lastActive: saved.last_active,
+        status: saved.status,
+        initials: saved.initials,
       };
-      const updated = [...userList, newUser];
-      setUserList(updated);
-      localStorage.setItem('admin_users', JSON.stringify(updated));
+      setUserList(prev => [...prev, newUser]);
       setInviteSuccess(`Invite sent to ${inviteForm.email}`);
       setInviteForm({ name: '', email: '', role: 'Analyst' });
       setInviteSaving(false);
       setTimeout(() => { setShowInvite(false); setInviteSuccess(''); }, 1500);
-    }, 800);
+    }).catch((e: unknown) => {
+      setInviteSaving(false);
+      setInviteError(e instanceof Error ? e.message : 'Failed to send invite. Please try again.');
+    });
   }
 
   function handleToggleUserStatus(userId: string) {
-    const updated = userList.map(u => u.id === userId ? { ...u, status: (u.status === 'Active' ? 'Inactive' : 'Active') as 'Active' | 'Inactive' } : u);
-    setUserList(updated);
-    localStorage.setItem('admin_users', JSON.stringify(updated));
+    const target = userList.find(u => u.id === userId);
+    if (!target) return;
+    const newStatus: 'Active' | 'Inactive' = target.status === 'Active' ? 'Inactive' : 'Active';
+    setUserList(prev => prev.map(u => u.id === userId ? { ...u, status: newStatus } : u));
+    updateTeamMember(userId, { status: newStatus }).catch(() => {});
   }
 
   function toggleUserSelection(userId: string) {
@@ -859,7 +889,7 @@ export default function Admin() {
           onClick={e => e.stopPropagation()}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
             <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Invite User</h2>
-            <button onClick={() => setShowInvite(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px', display: 'flex' }}><X size={16} /></button>
+            <button onClick={() => { setShowInvite(false); setInviteError(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px', display: 'flex' }}><X size={16} /></button>
           </div>
           {inviteSuccess ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1rem', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: '8px', color: '#34D399', fontSize: '0.85rem' }}>
@@ -867,6 +897,11 @@ export default function Admin() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {inviteError && (
+                <div style={{ padding: '0.625rem 0.875rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '8px', color: '#FCA5A5', fontSize: '0.78rem' }}>
+                  {inviteError}
+                </div>
+              )}
               <div>
                 <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.375rem' }}>Full Name *</label>
                 <input className="input-field" style={{ width: '100%' }} placeholder="e.g. Sarah Ahmed" value={inviteForm.name} onChange={e => setInviteForm(f => ({ ...f, name: e.target.value }))} />
@@ -882,7 +917,7 @@ export default function Admin() {
                 </select>
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
-                <button className="btn-ghost" onClick={() => setShowInvite(false)}>Cancel</button>
+                <button className="btn-ghost" onClick={() => { setShowInvite(false); setInviteError(''); }}>Cancel</button>
                 <button className="btn-primary" onClick={handleInviteUser} disabled={inviteSaving || !inviteForm.name || !inviteForm.email}>
                   {inviteSaving ? 'Sending\u2026' : 'Send Invite'}
                 </button>

@@ -6,6 +6,7 @@ import {
 import { useLayout } from '../hooks/useLayout';
 import {
   getWorkspaces, getTasks, getRisks, getMilestones, getDocuments, getReports,
+  getChatThreads, upsertChatThread, deleteChatThread,
 } from '../lib/db';
 import type {
   WorkspaceRow, TaskRow, RiskRow, MilestoneRow, DocumentRow, ReportRow,
@@ -40,7 +41,8 @@ interface StoredThread {
 
 const THREAD_STORAGE_KEY = 'askai_threads';
 
-function loadThreads(): StoredThread[] {
+// Local storage helpers (used as fast cache / offline fallback)
+function loadThreadsLocal(): StoredThread[] {
   try {
     const raw = localStorage.getItem(THREAD_STORAGE_KEY);
     if (raw) return JSON.parse(raw) as StoredThread[];
@@ -48,8 +50,35 @@ function loadThreads(): StoredThread[] {
   return [];
 }
 
-function saveThreads(threads: StoredThread[]) {
+function saveThreadsLocal(threads: StoredThread[]) {
   try { localStorage.setItem(THREAD_STORAGE_KEY, JSON.stringify(threads.slice(0, 20))); } catch { /* ignore */ }
+}
+
+// Supabase persistence helpers
+async function saveThreadToSupabase(thread: StoredThread): Promise<void> {
+  await upsertChatThread({
+    id: thread.id,
+    title: thread.title,
+    persona_id: thread.personaId,
+    model_id: thread.modelId,
+    messages: thread.messages.map(m => ({ ...m, timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : String(m.timestamp) })),
+    time: thread.time,
+  });
+}
+
+async function loadThreadsFromSupabase(): Promise<StoredThread[]> {
+  const rows = await getChatThreads();
+  return rows.map(row => ({
+    id: row.id,
+    title: row.title,
+    time: row.time,
+    personaId: row.persona_id,
+    modelId: row.model_id,
+    messages: (row.messages as Array<{ id: string; role: 'user' | 'assistant'; content: string; timestamp: string; persona?: string; model?: string }>).map(m => ({
+      ...m,
+      timestamp: new Date(m.timestamp),
+    })),
+  }));
 }
 
 // ── Types ────────────────────────────────────────────────────
@@ -287,7 +316,7 @@ function renderMarkdown(text: string) {
 export default function AskAI() {
   const { isMobile } = useLayout();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [threads, setThreads] = useState<StoredThread[]>(() => loadThreads());
+  const [threads, setThreads] = useState<StoredThread[]>(() => loadThreadsLocal());
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState(MODELS[0]);
@@ -326,6 +355,16 @@ export default function AskAI() {
   // Pre-fetch RAG context on mount
   useEffect(() => {
     buildRAGContext().then(setRagContext);
+  }, []);
+
+  // Load threads from Supabase on mount; fall back to localStorage
+  useEffect(() => {
+    loadThreadsFromSupabase().then(supabaseThreads => {
+      if (supabaseThreads.length > 0) {
+        setThreads(supabaseThreads);
+        saveThreadsLocal(supabaseThreads);
+      }
+    }).catch(() => {/* Supabase table not available — keep localStorage data */});
   }, []);
 
   const handleSend = useCallback(async () => {
@@ -437,9 +476,11 @@ export default function AskAI() {
     setThreads(prev => {
       const filtered = prev.filter(t => t.id !== threadId);
       const updated = [thread, ...filtered];
-      saveThreads(updated);
+      saveThreadsLocal(updated);
       return updated;
     });
+    // Persist to Supabase asynchronously
+    saveThreadToSupabase(thread).catch(() => {/* Supabase not available */});
   }, [selectedThread, selectedPersona.id, selectedModel.id]);
 
   const handleLoadThread = (thread: StoredThread) => {

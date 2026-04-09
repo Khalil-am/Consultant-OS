@@ -4,11 +4,12 @@ import { useLayout } from '../hooks/useLayout';
 import {
   ArrowLeft, Upload, FileText, Download, Trash2,
   Calendar, Clock, MapPin, Users, Video,
-  CheckCircle, AlertCircle, Loader2, X, RefreshCw,
+  CheckCircle, AlertCircle, Loader2, X, RefreshCw, Sparkles,
 } from 'lucide-react';
 import { getMeeting, updateMeeting, upsertDocument, getDocuments, deleteDocument } from '../lib/db';
 import type { MeetingRow, DocumentRow } from '../lib/db';
 import { supabase } from '../lib/supabase';
+import { chatWithDocument } from '../lib/openrouter';
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -74,6 +75,10 @@ export default function MeetingDetail() {
 
   // Delete state
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // AI generation state
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -232,6 +237,78 @@ export default function MeetingDetail() {
     }
   }
 
+  // ── AI Generate Minutes ────────────────────────────────────
+  async function handleGenerateMinutes() {
+    if (!meeting) return;
+    setGenerating(true);
+    setGenerateError('');
+    try {
+      const agendaText = (meeting.agenda ?? []).length > 0
+        ? (meeting.agenda as string[]).map((item, i) => `${i + 1}. ${item}`).join('\n')
+        : 'No agenda provided';
+      const participantList = meeting.participants.join(', ') || 'Not specified';
+      const systemPrompt = `You are a professional meeting minute writer for a consulting firm. Generate formal, structured meeting minutes in markdown format.`;
+      const userMsg = `Generate professional meeting minutes for the following meeting:\n\n**Meeting Title:** ${meeting.title}\n**Date:** ${meeting.date}\n**Time:** ${meeting.time} (${meeting.duration})\n**Type:** ${meeting.type}\n**Workspace/Client:** ${meeting.workspace}\n**Location:** ${meeting.location ?? 'Virtual'}\n**Participants:** ${participantList}\n\n**Agenda:**\n${agendaText}\n\nPlease generate structured meeting minutes with:\n1. Meeting details header\n2. Attendees\n3. Agenda items with discussion notes (mark as [To be filled by attendees])\n4. Key decisions (mark as [To be confirmed])\n5. Action items table with Owner and Due Date columns\n6. Next meeting placeholder\n\nUse professional consulting language.`;
+
+      const result = await chatWithDocument([{ role: 'user', content: userMsg }], systemPrompt);
+
+      // Save as document in Supabase
+      const timestamp = Date.now();
+      const docId = `doc-gen-${timestamp}`;
+      await upsertDocument({
+        id: docId,
+        name: `${meeting.title} – AI Generated Minutes`,
+        type: 'Meeting Minutes',
+        type_color: '#10B981',
+        workspace: meeting.workspace,
+        workspace_id: meeting.workspace_id,
+        date: new Date().toISOString().slice(0, 10),
+        language: 'EN',
+        status: 'Draft',
+        size: `${Math.ceil(result.length / 1000)}KB`,
+        author: 'AI',
+        pages: 1,
+        summary: result.slice(0, 300),
+        tags: [meeting.id, 'meeting-minutes', 'ai-generated'],
+        file_url: null,
+      });
+
+      // Mark meeting minutes as generated and update counts
+      const newActionsCount = (result.match(/action item/gi) ?? []).length;
+      const newDecisionsCount = (result.match(/decision|decided|agreed/gi) ?? []).length;
+      await updateMeeting(meeting.id, {
+        minutes_generated: true,
+        actions_extracted: Math.max(meeting.actions_extracted, newActionsCount),
+        decisions_logged: Math.max(meeting.decisions_logged, newDecisionsCount),
+      });
+      setMeeting(prev => prev ? {
+        ...prev,
+        minutes_generated: true,
+        actions_extracted: Math.max(prev.actions_extracted, newActionsCount),
+        decisions_logged: Math.max(prev.decisions_logged, newDecisionsCount),
+      } : prev);
+
+      // Download as text file
+      const blob = new Blob([result], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${meeting.title.replace(/[^a-zA-Z0-9]/g, '_')}_minutes.md`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      await loadAttachments(meeting.workspace_id, meeting.id);
+      setUploadSuccess('AI minutes generated and saved successfully.');
+      setTimeout(() => setUploadSuccess(''), 5000);
+    } catch (e) {
+      setGenerateError(e instanceof Error ? e.message : 'AI generation failed. Check your OpenRouter API key.');
+    } finally {
+      setGenerating(false);
+    }
+  }
+
   // ── Drag & drop ────────────────────────────────────────────
   function onDragOver(e: React.DragEvent) {
     e.preventDefault();
@@ -348,10 +425,30 @@ export default function MeetingDetail() {
         <div className="section-card-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Upload size={14} style={{ color: '#38BDF8' }} />
-            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>Upload Meeting Minutes</span>
+            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>Meeting Minutes</span>
           </div>
-          <span style={{ fontSize: '0.7rem', color: 'var(--text-faint)' }}>PDF, DOCX, PPTX, XLSX, TXT accepted</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-faint)' }}>PDF, DOCX accepted</span>
+            <button
+              onClick={handleGenerateMinutes}
+              disabled={generating}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.375rem',
+                fontSize: '0.72rem', padding: '0.375rem 0.75rem', borderRadius: '0.5rem', cursor: generating ? 'default' : 'pointer',
+                background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.3)', color: '#A78BFA',
+                fontFamily: 'inherit', opacity: generating ? 0.7 : 1,
+              }}
+            >
+              {generating ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+              {generating ? 'Generating…' : 'Generate with AI'}
+            </button>
+          </div>
         </div>
+        {generateError && (
+          <div style={{ margin: '0 1.25rem', padding: '0.5rem 0.75rem', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '0.5rem', fontSize: '0.72rem', color: '#FCA5A5' }}>
+            {generateError}
+          </div>
+        )}
 
         <div style={{ padding: '1.25rem' }}>
           {/* Drop Zone */}

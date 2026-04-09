@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLayout } from '../hooks/useLayout';
 import {
   Search, Upload, FileText, Download,
-  ExternalLink, Sparkles, Eye, Trash2, Plus, X, Loader2,
+  ExternalLink, Sparkles, Eye, Trash2, Plus, X, Loader2, Filter,
 } from 'lucide-react';
 import {
   getDocuments, upsertDocument, deleteDocument, updateDocument,
@@ -94,6 +94,11 @@ export default function Documents() {
   // AI Summarize
   const [summarizing, setSummarizing] = useState(false);
 
+  // Advanced filter
+  const [showFilter, setShowFilter] = useState(false);
+  const [filterType, setFilterType] = useState('All');
+  const [filterLanguage, setFilterLanguage] = useState('All');
+
   async function load() {
     setLoading(true);
     try {
@@ -122,12 +127,16 @@ export default function Documents() {
   const filtered = docs.filter(doc => {
     const matchFolder = activeFolder === 'All Documents' || doc.type === activeFolder;
     const matchStatus = activeStatus === 'All' || doc.status === activeStatus;
+    const matchType = filterType === 'All' || doc.type === filterType;
+    const matchLanguage = filterLanguage === 'All' || doc.language === filterLanguage;
     const matchSearch =
       doc.name.toLowerCase().includes(search.toLowerCase()) ||
       doc.workspace.toLowerCase().includes(search.toLowerCase()) ||
       doc.author.toLowerCase().includes(search.toLowerCase());
-    return matchFolder && matchStatus && matchSearch;
+    return matchFolder && matchStatus && matchType && matchLanguage && matchSearch;
   });
+
+  const hasActiveFilters = filterType !== 'All' || filterLanguage !== 'All';
 
   const selected = docs.find(d => d.id === selectedDoc);
 
@@ -286,6 +295,59 @@ export default function Documents() {
           <button className="btn-ai" style={{ height: '34px', fontSize: '0.8rem' }} onClick={handleSummarize} disabled={!selected || summarizing}>
             <Sparkles size={13} /> {summarizing ? 'Summarizing…' : 'AI Summarize'}
           </button>
+
+          {/* Filter button */}
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowFilter(v => !v)}
+              style={{
+                height: '34px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.375rem',
+                padding: '0 0.75rem', borderRadius: '0.5rem', cursor: 'pointer', fontFamily: 'inherit',
+                background: hasActiveFilters ? 'rgba(0,212,255,0.12)' : 'rgba(255,255,255,0.04)',
+                border: hasActiveFilters ? '1px solid rgba(0,212,255,0.3)' : '1px solid rgba(255,255,255,0.08)',
+                color: hasActiveFilters ? '#00D4FF' : '#94A3B8',
+              }}
+            >
+              <Filter size={13} />
+              Filters {hasActiveFilters && <span style={{ fontSize: '0.65rem', background: 'rgba(0,212,255,0.2)', borderRadius: '9999px', padding: '0 5px', fontWeight: 700 }}>ON</span>}
+            </button>
+            {showFilter && (
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 100,
+                background: '#0C1220', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.625rem',
+                padding: '1rem', minWidth: '240px', boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+              }}>
+                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.625rem' }}>Document Type</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', marginBottom: '0.875rem' }}>
+                  {['All', ...DOC_TYPES].map(t => (
+                    <button key={t} onClick={() => setFilterType(t)} style={{
+                      fontSize: '0.68rem', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer',
+                      background: filterType === t ? 'rgba(0,212,255,0.15)' : 'rgba(255,255,255,0.04)',
+                      border: filterType === t ? '1px solid rgba(0,212,255,0.3)' : '1px solid rgba(255,255,255,0.08)',
+                      color: filterType === t ? '#00D4FF' : '#64748B', fontFamily: 'inherit',
+                    }}>{t}</button>
+                  ))}
+                </div>
+                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem' }}>Language</div>
+                <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '0.875rem' }}>
+                  {['All', 'EN', 'AR', 'Bilingual'].map(l => (
+                    <button key={l} onClick={() => setFilterLanguage(l)} style={{
+                      fontSize: '0.68rem', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer',
+                      background: filterLanguage === l ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.04)',
+                      border: filterLanguage === l ? '1px solid rgba(139,92,246,0.3)' : '1px solid rgba(255,255,255,0.08)',
+                      color: filterLanguage === l ? '#A78BFA' : '#64748B', fontFamily: 'inherit',
+                    }}>{l}</button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => { setFilterType('All'); setFilterLanguage('All'); setShowFilter(false); }}
+                  style={{ fontSize: '0.72rem', color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
+                >
+                  Clear filters
+                </button>
+              </div>
+            )}
+          </div>
 
           <div style={{ flex: 1 }} />
 

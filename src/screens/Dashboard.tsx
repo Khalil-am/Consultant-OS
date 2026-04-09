@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Briefcase, FileText, Zap, CheckSquare, Clock, AlertTriangle,
@@ -11,16 +11,21 @@ import {
   AreaChart, Area, XAxis, YAxis, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts';
-import {
-  automationRunsData, documentsByTypeData,
-  portfolioKPIs, ragStatusData, deliveryTrendData, boardDecisions,
-  type PortfolioKPI, type BoardDecision,
-} from '../data/mockData';
-import { getActivities, getMilestones, getWorkspaceFinancials } from '../lib/db';
-import type { ActivityRow, MilestoneRow, WorkspaceFinancialRow } from '../lib/db';
+import { getActivities, getMilestones, getWorkspaceFinancials, getBoardDecisions, getRagStatusWithWorkspaces, getApprovals, updateApproval, upsertApproval } from '../lib/db';
+import type { ActivityRow, MilestoneRow, WorkspaceFinancialRow, BoardDecisionRow, RagStatusWithWorkspace, ApprovalRow } from '../lib/db';
 import { useLayout } from '../hooks/useLayout';
 
 type Period = 'today' | 'week' | 'month';
+
+interface PortfolioKPI {
+  label: string;
+  value: string;
+  subValue: string;
+  trend: string;
+  trendUp: boolean;
+  color: string;
+  icon: string;
+}
 
 
 function fmtSAR(val: number): string {
@@ -29,14 +34,12 @@ function fmtSAR(val: number): string {
   return `SAR ${val.toLocaleString()}`;
 }
 
-type ApprovalStatus = 'pending' | 'approved' | 'rejected';
-interface Approval { id: number; title: string; requester: string; type: string; urgency: string; status: ApprovalStatus; }
-
-const initialApprovals: Approval[] = [
-  { id: 1, title: 'NCA BRD v2.3', requester: 'AM', type: 'Document Approval', urgency: 'High', status: 'pending' },
-  { id: 2, title: 'SC-10 Budget SAR 2.4M', requester: 'RT', type: 'Budget Approval', urgency: 'High', status: 'pending' },
-  { id: 3, title: 'MOCI Vendor Shortlist', requester: 'FH', type: 'Procurement Decision', urgency: 'Medium', status: 'pending' },
-  { id: 4, title: 'Healthcare Strategy Report', requester: 'SK', type: 'Report Sign-off', urgency: 'Low', status: 'pending' },
+// Use ApprovalRow from db for Supabase-backed approvals
+const FALLBACK_APPROVALS: ApprovalRow[] = [
+  { id: 'appr-001', title: 'NCA BRD v2.3', requester: 'AM', type: 'Document Approval', urgency: 'High', status: 'pending', workspace_id: null, notes: null, created_at: '', updated_at: '' },
+  { id: 'appr-002', title: 'SC-10 Budget SAR 2.4M', requester: 'RT', type: 'Budget Approval', urgency: 'High', status: 'pending', workspace_id: null, notes: null, created_at: '', updated_at: '' },
+  { id: 'appr-003', title: 'MOCI Vendor Shortlist', requester: 'FH', type: 'Procurement Decision', urgency: 'Medium', status: 'pending', workspace_id: null, notes: null, created_at: '', updated_at: '' },
+  { id: 'appr-004', title: 'Healthcare Strategy Report', requester: 'SK', type: 'Report Sign-off', urgency: 'Low', status: 'pending', workspace_id: null, notes: null, created_at: '', updated_at: '' },
 ];
 
 const initialRecommendations = [
@@ -113,13 +116,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { isMobile, width } = useLayout();
   const [period, setPeriod] = useState<Period>('week');
-  const [approvals, setApprovals] = useState<Approval[]>(() => {
-    try {
-      const saved = localStorage.getItem('dashboard_approvals');
-      if (saved) return JSON.parse(saved) as Approval[];
-    } catch { /* ignore */ }
-    return initialApprovals;
-  });
+  const [approvals, setApprovals] = useState<ApprovalRow[]>(FALLBACK_APPROVALS);
   const [recommendations, setRecommendations] = useState(initialRecommendations);
   const [uploadDrag, setUploadDrag] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -131,25 +128,111 @@ export default function Dashboard() {
   const [activities, setActivities] = useState<ActivityRow[]>([]);
   const [milestones, setMilestones] = useState<MilestoneRow[]>([]);
   const [workspaceFinancials, setWorkspaceFinancials] = useState<WorkspaceFinancialRow[]>([]);
+  const [boardDecisions, setBoardDecisions] = useState<BoardDecisionRow[]>([]);
+  const [ragStatusData, setRagStatusData] = useState<RagStatusWithWorkspace[]>([]);
 
   useEffect(() => {
     getActivities(30).then(setActivities).catch(() => {});
     getMilestones().then(setMilestones).catch(() => {});
     getWorkspaceFinancials().then(setWorkspaceFinancials).catch(() => {});
+    getBoardDecisions().then(setBoardDecisions).catch(() => {});
+    getRagStatusWithWorkspaces().then(setRagStatusData).catch(() => {});
+    // Load approvals from Supabase; seed defaults if table is empty
+    getApprovals().then(rows => {
+      if (rows.length > 0) {
+        setApprovals(rows);
+      } else {
+        // Seed with fallbacks into Supabase
+        Promise.all(FALLBACK_APPROVALS.map(a => upsertApproval(a))).then(seeded => {
+          if (seeded.length > 0) setApprovals(seeded);
+        }).catch(() => {});
+      }
+    }).catch(() => {/* Supabase table may not exist yet — keep fallback data */});
   }, []);
 
-  const handleApprove = (id: number) => setApprovals(prev => {
-    const next = prev.map(a => a.id === id ? { ...a, status: 'approved' as const } : a);
-    try { localStorage.setItem('dashboard_approvals', JSON.stringify(next)); } catch { /* ignore */ }
-    return next;
-  });
-  const handleReject = (id: number) => setApprovals(prev => {
-    const next = prev.map(a => a.id === id ? { ...a, status: 'rejected' as const } : a);
-    try { localStorage.setItem('dashboard_approvals', JSON.stringify(next)); } catch { /* ignore */ }
-    return next;
-  });
+  const handleApprove = (id: string) => {
+    setApprovals(prev => prev.map(a => a.id === id ? { ...a, status: 'approved' as const } : a));
+    updateApproval(id, { status: 'approved' }).catch(() => {});
+  };
+  const handleReject = (id: string) => {
+    setApprovals(prev => prev.map(a => a.id === id ? { ...a, status: 'rejected' as const } : a));
+    updateApproval(id, { status: 'rejected' }).catch(() => {});
+  };
   const dismissRec = (id: number) => setRecommendations(prev => prev.filter(r => r.id !== id));
   const handleRefresh = () => { setRefreshing(true); setTimeout(() => setRefreshing(false), 1200); };
+
+  function handleGenerateCommitteePack() {
+    const date = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+    const pendingApprovals = approvals.filter(a => a.status === 'pending');
+    const ragRows = ragStatusData.map(r =>
+      `<tr><td>${r.workspace}</td><td style="color:${r.rag==='Green'?'#10B981':r.rag==='Red'?'#EF4444':'#F59E0B'}">${r.rag}</td><td style="color:${r.budget==='Green'?'#10B981':r.budget==='Red'?'#EF4444':'#F59E0B'}">${r.budget}</td><td style="color:${r.schedule==='Green'?'#10B981':r.schedule==='Red'?'#EF4444':'#F59E0B'}">${r.schedule}</td><td style="color:${r.risk==='Green'?'#10B981':r.risk==='Red'?'#EF4444':'#F59E0B'}">${r.risk}</td></tr>`
+    ).join('');
+    const financialRows = workspaceFinancials.map(w =>
+      `<tr><td>${w.workspace_name}</td><td>${fmtSAR(w.contract_value)}</td><td>${fmtSAR(w.spent)}</td><td>${fmtSAR(w.forecast)}</td><td style="color:${w.variance>0?'#EF4444':'#10B981'}">${w.variance>0?'+':''}${fmtSAR(w.variance)}</td></tr>`
+    ).join('');
+    const milestoneRows = upcomingMilestones.map(m =>
+      `<tr><td>${m.title}</td><td>${m.due_date}</td><td style="color:${m.status==='On Track'?'#10B981':m.status==='At Risk'?'#F59E0B':m.status==='Delayed'?'#EF4444':'#94A3B8'}">${m.status}</td><td>${m.owner}</td><td>${m.completion_pct}%</td></tr>`
+    ).join('');
+    const approvalRows = pendingApprovals.map(a =>
+      `<tr><td>${a.title}</td><td>${a.requester}</td><td>${a.type}</td><td style="color:${a.urgency==='High'?'#EF4444':a.urgency==='Medium'?'#F59E0B':'#10B981'}">${a.urgency}</td></tr>`
+    ).join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Committee Pack – ${date}</title>
+<style>
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #1E293B; margin: 0; padding: 32px; background: #fff; }
+  h1 { color: #0F172A; font-size: 26px; border-bottom: 3px solid #0EA5E9; padding-bottom: 12px; }
+  h2 { color: #1E40AF; font-size: 16px; margin-top: 28px; }
+  .meta { color: #64748B; font-size: 13px; margin-bottom: 24px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+  th { background: #F1F5F9; color: #374151; padding: 8px 12px; text-align: left; border-bottom: 2px solid #E2E8F0; }
+  td { padding: 8px 12px; border-bottom: 1px solid #F1F5F9; }
+  tr:hover td { background: #F8FAFC; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 16px 0; }
+  .kpi { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; }
+  .kpi-label { font-size: 11px; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.08em; }
+  .kpi-value { font-size: 20px; font-weight: 700; color: #0F172A; margin-top: 4px; }
+  .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #E2E8F0; color: #94A3B8; font-size: 11px; }
+  @media print { body { padding: 16px; } }
+</style>
+</head>
+<body>
+<h1>Steering Committee Pack</h1>
+<div class="meta">Generated: ${date} | Consultant OS | CONFIDENTIAL</div>
+
+<h2>1. Portfolio KPI Summary</h2>
+<div class="kpi-grid">
+  <div class="kpi"><div class="kpi-label">Total Portfolio</div><div class="kpi-value">${fmtSAR(totalContract)}</div></div>
+  <div class="kpi"><div class="kpi-label">Revenue Recognized</div><div class="kpi-value">${fmtSAR(totalSpent)}</div></div>
+  <div class="kpi"><div class="kpi-label">Budget Variance</div><div class="kpi-value" style="color:${totalVariance>0?'#EF4444':'#10B981'}">${totalVariance>0?'+':''}${fmtSAR(totalVariance)}</div></div>
+</div>
+
+<h2>2. Portfolio RAG Status</h2>
+${ragStatusData.length > 0 ? `<table><thead><tr><th>Workspace</th><th>Overall RAG</th><th>Budget</th><th>Schedule</th><th>Risk</th></tr></thead><tbody>${ragRows}</tbody></table>` : '<p style="color:#94A3B8">No RAG data available.</p>'}
+
+<h2>3. Financial Overview</h2>
+${workspaceFinancials.length > 0 ? `<table><thead><tr><th>Workspace</th><th>Contract Value</th><th>Spent</th><th>Forecast</th><th>Variance</th></tr></thead><tbody>${financialRows}</tbody></table>` : '<p style="color:#94A3B8">No financial data available.</p>'}
+
+<h2>4. Upcoming Milestones</h2>
+${upcomingMilestones.length > 0 ? `<table><thead><tr><th>Milestone</th><th>Due Date</th><th>Status</th><th>Owner</th><th>Completion</th></tr></thead><tbody>${milestoneRows}</tbody></table>` : '<p style="color:#94A3B8">No upcoming milestones.</p>'}
+
+<h2>5. Pending Approvals</h2>
+${pendingApprovals.length > 0 ? `<table><thead><tr><th>Item</th><th>Requester</th><th>Type</th><th>Urgency</th></tr></thead><tbody>${approvalRows}</tbody></table>` : '<p style="color:#94A3B8">No pending approvals.</p>'}
+
+<div class="footer">Consultant OS · Generated ${date} · This document is confidential and intended for committee members only.</div>
+</body></html>`;
+
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Committee_Pack_${date.replace(/\s/g, '_')}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
   const markDecisionComplete = (id: string) => setCompletedDecisions(prev => new Set([...prev, id]));
 
   const activityTypes = ['All', 'Document', 'Meeting', 'Automation', 'Task'];
@@ -176,6 +259,46 @@ export default function Dashboard() {
   const totalSpent = workspaceFinancials.reduce((s, w) => s + w.spent, 0);
   const totalVariance = workspaceFinancials.reduce((s, w) => s + w.variance, 0);
 
+  // Portfolio KPIs computed from live data
+  const portfolioKPIs = useMemo((): PortfolioKPI[] => {
+    const contract = workspaceFinancials.reduce((s, w) => s + w.contract_value, 0);
+    const spent = workspaceFinancials.reduce((s, w) => s + w.spent, 0);
+    const atRiskVariance = workspaceFinancials.filter(w => w.variance > 0).reduce((s, w) => s + w.variance, 0);
+    const atRiskCount = workspaceFinancials.filter(w => w.variance > 0).length;
+    const now = new Date();
+    const in30 = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const msDue = milestones.filter(m => { const d = new Date(m.due_date); return d >= now && d <= in30; });
+    const msAtRisk = msDue.filter(m => m.status === 'At Risk' || m.status === 'Delayed').length;
+    const msOnTrack = msDue.filter(m => m.status === 'On Track' || m.status === 'Upcoming').length;
+    const completedMs = milestones.filter(m => m.status === 'Completed').length;
+    const totalMs = milestones.length;
+    const onTimeRate = totalMs > 0 ? Math.round((completedMs / totalMs) * 100) : 0;
+    return [
+      { label: 'Total Portfolio Value', value: fmtSAR(contract), subValue: `${workspaceFinancials.length} active engagements`, trend: '', trendUp: true, color: '#00D4FF', icon: 'portfolio' },
+      { label: 'Revenue Recognized', value: fmtSAR(spent), subValue: contract > 0 ? `${Math.round((spent / contract) * 100)}% of portfolio` : '—', trend: '', trendUp: true, color: '#10B981', icon: 'revenue' },
+      { label: 'Budget at Risk', value: fmtSAR(atRiskVariance), subValue: `${atRiskCount} engagement${atRiskCount !== 1 ? 's' : ''} over forecast`, trend: atRiskCount > 0 ? `+${atRiskCount}` : '0', trendUp: atRiskCount === 0, color: '#EF4444', icon: 'risk' },
+      { label: 'Milestones Due (30d)', value: String(msDue.length), subValue: `${msOnTrack} on track · ${msAtRisk} at risk`, trend: msAtRisk > 0 ? `${msAtRisk} at risk` : 'All clear', trendUp: msAtRisk === 0, color: '#F59E0B', icon: 'milestone' },
+      { label: 'On-Time Delivery Rate', value: `${onTimeRate}%`, subValue: `${completedMs} of ${totalMs} milestones`, trend: onTimeRate >= 80 ? '+' : '', trendUp: onTimeRate >= 80, color: '#8B5CF6', icon: 'delivery' },
+      { label: 'Client Satisfaction', value: '—', subValue: 'Connect NPS data', trend: '—', trendUp: true, color: '#EC4899', icon: 'satisfaction' },
+    ];
+  }, [workspaceFinancials, milestones]);
+
+  // Delivery trend computed from milestones grouped by month
+  const deliveryTrendData = useMemo(() => {
+    const monthMap: Record<string, { onTime: number; delayed: number; atRisk: number; value: number }> = {};
+    milestones.forEach(ms => {
+      const d = new Date(ms.due_date);
+      if (isNaN(d.getTime())) return;
+      const key = d.toLocaleString('en-US', { month: 'short' });
+      if (!monthMap[key]) monthMap[key] = { onTime: 0, delayed: 0, atRisk: 0, value: 0 };
+      if (ms.status === 'Completed' || ms.status === 'On Track') monthMap[key].onTime++;
+      else if (ms.status === 'Delayed') monthMap[key].delayed++;
+      else if (ms.status === 'At Risk') monthMap[key].atRisk++;
+      monthMap[key].value += ms.value / 1_000_000;
+    });
+    return Object.entries(monthMap).map(([month, d]) => ({ month, ...d }));
+  }, [milestones]);
+
   const wsNames: Record<string, string> = {
     'ws-001': 'NCA Digital Transf.',
     'ws-002': 'ADNOC Supply Chain',
@@ -196,10 +319,6 @@ export default function Dashboard() {
     'Delivery Score':     [78, 80, 79, 83, 85, 82, 88],
     'Tasks Completed':    [22, 27, 25, 30, 28, 34, 38],
   };
-
-  // Suppress unused import warnings for data we keep but may not render
-  void automationRunsData;
-  void documentsByTypeData;
 
   return (
     <div style={{ padding: p, display: 'flex', flexDirection: 'column', gap, background: '#080C18', minHeight: '100%' }}>
@@ -592,7 +711,7 @@ export default function Dashboard() {
               <span style={{ fontSize: '0.825rem', fontWeight: 700, color: '#F1F5F9' }}>Board Decisions</span>
             </div>
             <div>
-              {activeBoardDecisions.slice(0, 3).map((bd: BoardDecision, i) => {
+              {activeBoardDecisions.slice(0, 3).map((bd: BoardDecisionRow, i) => {
                 const sc = bd.status === 'In Progress' ? '#0EA5E9' : bd.status === 'Pending Implementation' ? '#F59E0B' : bd.status === 'Closed' ? '#10B981' : '#EF4444';
                 const statusLabel = bd.status === 'In Progress' ? 'Pending' : bd.status === 'Closed' ? 'Approved' : bd.status === 'Pending Implementation' ? 'Approved' : 'Rejected';
                 return (
@@ -907,7 +1026,7 @@ export default function Dashboard() {
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#F1F5F9', marginBottom: '3px' }}>{rec.title}</div>
                     <div style={{ fontSize: '0.7rem', color: '#64748B', marginBottom: '0.625rem', lineHeight: 1.5 }}>{rec.detail}</div>
-                    <button onClick={() => navigate(rec.path)} style={{
+                    <button onClick={() => rec.id === 1 ? handleGenerateCommitteePack() : navigate(rec.path)} style={{
                       fontSize: '0.7rem', color: '#A78BFA', background: 'transparent',
                       border: 'none', cursor: 'pointer', padding: 0,
                       display: 'flex', alignItems: 'center', gap: '3px', fontFamily: 'inherit',

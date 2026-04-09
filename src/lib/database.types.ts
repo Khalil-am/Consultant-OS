@@ -281,3 +281,31 @@ export interface RagStatusWithWorkspace {
   risk: 'Green' | 'Amber' | 'Red';
   lastUpdated: string;
 }
+
+// ── Approvals ─────────────────────────────────────────────────
+export interface ApprovalRow {
+  id: string;
+  title: string;
+  requester: string;
+  type: string;
+  urgency: 'High' | 'Medium' | 'Low';
+  status: 'pending' | 'approved' | 'rejected';
+  workspace_id: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export type ApprovalInsert = Omit<ApprovalRow, 'created_at' | 'updated_at'>;
+
+// ── Chat Threads ──────────────────────────────────────────────
+export interface ChatThreadRow {
+  id: string;
+  title: string;
+  persona_id: string;
+  model_id: string;
+  messages: Array<{ id: string; role: 'user' | 'assistant'; content: string; timestamp: string; persona?: string; model?: string }>;
+  time: string;
+  created_at: string;
+  updated_at: string;
+}
+export type ChatThreadInsert = Omit<ChatThreadRow, 'created_at' | 'updated_at'>;

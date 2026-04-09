@@ -16,6 +16,8 @@ import type {
   BoardDecisionRow, BoardDecisionInsert,
   TeamMemberRow, TeamMemberInsert, TeamMemberUpdate,
   RagStatusWithWorkspace,
+  ApprovalRow, ApprovalInsert,
+  ChatThreadRow, ChatThreadInsert,
 } from './database.types';
 
 export type {
@@ -23,6 +25,7 @@ export type {
   DocumentRow, MeetingRow, TaskRow, RiskRow, ReportRow, ReportInsert, ActivityRow,
   AutomationRow, AutomationRunRow, AutomationRunSectionRow,
   BoardDecisionRow, TeamMemberRow, RagStatusWithWorkspace,
+  ApprovalRow, ChatThreadRow,
 };
 
 // ── Workspaces ──────────────────────────────────────────────
@@ -380,5 +383,42 @@ export async function updateTeamMember(id: string, update: TeamMemberUpdate): Pr
 
 export async function deleteTeamMember(id: string): Promise<void> {
   const { error } = await supabase.from('team_members').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ── Approvals ─────────────────────────────────────────────────
+export async function getApprovals(): Promise<ApprovalRow[]> {
+  const { data, error } = await supabase.from('approvals').select('*').order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as ApprovalRow[];
+}
+
+export async function upsertApproval(approval: ApprovalInsert): Promise<ApprovalRow> {
+  const { data, error } = await supabase.from('approvals').upsert(approval as Record<string, unknown>).select().single();
+  if (error) throw error;
+  return data as ApprovalRow;
+}
+
+export async function updateApproval(id: string, update: Partial<ApprovalInsert>): Promise<ApprovalRow> {
+  const { data, error } = await supabase.from('approvals').update(update as Record<string, unknown>).eq('id', id).select().single();
+  if (error) throw error;
+  return data as ApprovalRow;
+}
+
+// ── Chat Threads ──────────────────────────────────────────────
+export async function getChatThreads(): Promise<ChatThreadRow[]> {
+  const { data, error } = await supabase.from('chat_threads').select('*').order('updated_at', { ascending: false }).limit(20);
+  if (error) throw error;
+  return (data ?? []) as ChatThreadRow[];
+}
+
+export async function upsertChatThread(thread: ChatThreadInsert): Promise<ChatThreadRow> {
+  const { data, error } = await supabase.from('chat_threads').upsert(thread as Record<string, unknown>).select().single();
+  if (error) throw error;
+  return data as ChatThreadRow;
+}
+
+export async function deleteChatThread(id: string): Promise<void> {
+  const { error } = await supabase.from('chat_threads').delete().eq('id', id);
   if (error) throw error;
 }
