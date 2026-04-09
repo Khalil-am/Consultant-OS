@@ -205,7 +205,7 @@ export default function Automations() {
           return (
             <div
               key={auto.id}
-              onClick={() => auto.id === 'auto-001' ? navigate('/automations/brd/run') : navigate(`/automations/${auto.id}`)}
+              onClick={() => auto.id === 'auto-001' ? navigate('/automations/brd/run') : auto.id === 'auto-diwan' ? navigate('/automations/diwan/run') : navigate(`/automations/${auto.id}`)}
               style={{
                 borderRadius: '14px', cursor: 'pointer', overflow: 'hidden',
                 background: isRunning

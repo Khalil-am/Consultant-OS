@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Briefcase, Zap, FileText, Video,
-  CheckSquare, BarChart3, Sparkles, Settings, X,
+  CheckSquare, BarChart3, Sparkles, Settings, X, Trello,
 } from 'lucide-react';
 import { useLayout } from '../hooks/useLayout';
 
@@ -20,6 +20,7 @@ const navSections = [
       { label: 'Documents', icon: FileText, path: '/documents' },
       { label: 'Meetings', icon: Video, path: '/meetings' },
       { label: 'Tasks & Risks', icon: CheckSquare, path: '/tasks' },
+      { label: 'Trello Cards', icon: Trello, path: '/trello-cards' },
       { label: 'Reports', icon: BarChart3, path: '/reports' },
     ],
   },

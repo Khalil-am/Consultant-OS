@@ -10,10 +10,14 @@ export interface WorkspaceRow {
   type: 'Client' | 'Project' | 'Internal' | 'Procurement' | 'Committee';
   language: 'EN' | 'AR' | 'Bilingual';
   progress: number;
-  status: 'Active' | 'On Hold' | 'Completed';
+  status: 'Active' | 'On Hold' | 'Completed' | 'At Risk';
   docs_count: number;
   meetings_count: number;
   tasks_count: number;
+  risks_count?: number | null;
+  issues_count?: number | null;
+  start_date?: string | null;
+  end_date?: string | null;
   contributors: string[];
   last_activity: string;
   description: string;

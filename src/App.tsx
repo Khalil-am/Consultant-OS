@@ -8,19 +8,21 @@ import TopBar from './components/TopBar';
 import Dashboard from './screens/Dashboard';
 
 // Lazily loaded — code-split per route
-const Workspaces      = lazy(() => import('./screens/Workspaces'));
-const WorkspaceDetail = lazy(() => import('./screens/WorkspaceDetail'));
-const Automations     = lazy(() => import('./screens/Automations'));
-const AutomationBuilder = lazy(() => import('./screens/AutomationBuilder'));
-const Documents       = lazy(() => import('./screens/Documents'));
-const DocumentDetail  = lazy(() => import('./screens/DocumentDetail'));
-const Meetings        = lazy(() => import('./screens/Meetings'));
-const MeetingDetail   = lazy(() => import('./screens/MeetingDetail'));
-const Tasks           = lazy(() => import('./screens/Tasks'));
-const Reports         = lazy(() => import('./screens/Reports'));
-const AskAI           = lazy(() => import('./screens/AskAI'));
-const Admin           = lazy(() => import('./screens/Admin'));
-const BrdRunPage      = lazy(() => import('./screens/BrdRunPage'));
+const Workspaces          = lazy(() => import('./screens/Workspaces'));
+const WorkspaceDetail     = lazy(() => import('./screens/WorkspaceDetail'));
+const Automations         = lazy(() => import('./screens/Automations'));
+const AutomationBuilder   = lazy(() => import('./screens/AutomationBuilder'));
+const Documents           = lazy(() => import('./screens/Documents'));
+const DocumentDetail      = lazy(() => import('./screens/DocumentDetail'));
+const Meetings            = lazy(() => import('./screens/Meetings'));
+const MeetingDetail       = lazy(() => import('./screens/MeetingDetail'));
+const Tasks               = lazy(() => import('./screens/Tasks'));
+const Reports             = lazy(() => import('./screens/Reports'));
+const AskAI               = lazy(() => import('./screens/AskAI'));
+const Admin               = lazy(() => import('./screens/Admin'));
+const BrdRunPage          = lazy(() => import('./screens/BrdRunPage'));
+const BrdToUserstoriesPage = lazy(() => import('./screens/BrdToUserstoriesPage'));
+const TrelloCards         = lazy(() => import('./screens/TrelloCards'));
 
 // Minimal fallback shown during lazy load
 function PageLoader() {
@@ -77,6 +79,8 @@ function AppShell() {
               <Route path="/ask-ai" element={<AskAI />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/automations/brd/run" element={<BrdRunPage />} />
+              <Route path="/automations/diwan/run" element={<BrdToUserstoriesPage />} />
+              <Route path="/trello-cards" element={<TrelloCards />} />
             </Routes>
           </Suspense>
         </main>

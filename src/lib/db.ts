@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { workspaces as mockWorkspaces } from '../data/mockData';
 import type {
   WorkspaceRow, WorkspaceInsert,
   WorkspaceFinancialRow, WorkspaceFinancialInsert,
@@ -12,6 +13,38 @@ import type {
   ActivityRow, ActivityInsert,
 } from './database.types';
 
+// Detect if Supabase is configured
+const isSupabaseConfigured = !!(
+  import.meta.env.VITE_SUPABASE_URL &&
+  import.meta.env.VITE_SUPABASE_ANON_KEY &&
+  !import.meta.env.VITE_SUPABASE_ANON_KEY.includes('PASTE_FULL')
+);
+
+// Convert mock workspace to WorkspaceRow shape
+const mockWorkspaceRows: WorkspaceRow[] = mockWorkspaces.map(w => ({
+  id: w.id,
+  name: w.name,
+  client: w.client,
+  sector: w.sector,
+  sector_color: w.sectorColor,
+  type: w.type,
+  language: w.language,
+  progress: w.progress,
+  status: w.status as WorkspaceRow['status'],
+  docs_count: w.docsCount,
+  meetings_count: w.meetingsCount,
+  tasks_count: w.tasksCount,
+  risks_count: Math.floor(w.tasksCount * 0.3),
+  issues_count: Math.floor(w.tasksCount * 0.15),
+  contributors: w.contributors,
+  last_activity: w.lastActivity,
+  description: w.description,
+  start_date: null,
+  end_date: null,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+}));
+
 export type {
   WorkspaceRow, WorkspaceFinancialRow, WorkspaceRagStatusRow, MilestoneRow,
   DocumentRow, MeetingRow, TaskRow, RiskRow, ReportRow, ReportInsert, ActivityRow,
@@ -19,6 +52,7 @@ export type {
 
 // ── Workspaces ──────────────────────────────────────────────
 export async function getWorkspaces(): Promise<WorkspaceRow[]> {
+  if (!isSupabaseConfigured) return mockWorkspaceRows;
   const { data, error } = await supabase.from('workspaces').select('*').order('updated_at', { ascending: false });
   if (error) throw error;
   return (data ?? []) as WorkspaceRow[];
@@ -44,6 +78,7 @@ export async function updateWorkspace(id: string, update: Partial<WorkspaceInser
 
 // ── Workspace Financials ─────────────────────────────────────
 export async function getWorkspaceFinancials(): Promise<WorkspaceFinancialRow[]> {
+  if (!isSupabaseConfigured) return [];
   const { data, error } = await supabase.from('workspace_financials').select('*');
   if (error) throw error;
   return (data ?? []) as WorkspaceFinancialRow[];
@@ -63,6 +98,7 @@ export async function upsertWorkspaceFinancial(fin: WorkspaceFinancialInsert): P
 
 // ── Workspace RAG Status ──────────────────────────────────────
 export async function getWorkspaceRagStatuses(): Promise<WorkspaceRagStatusRow[]> {
+  if (!isSupabaseConfigured) return [];
   const { data, error } = await supabase.from('workspace_rag_status').select('*');
   if (error) throw error;
   return (data ?? []) as WorkspaceRagStatusRow[];
