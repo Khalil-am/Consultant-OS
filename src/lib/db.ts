@@ -1,5 +1,4 @@
 import { supabase } from './supabase';
-import { workspaces as mockWorkspaces } from '../data/mockData';
 import type {
   WorkspaceRow, WorkspaceInsert,
   WorkspaceFinancialRow, WorkspaceFinancialInsert,
@@ -11,48 +10,23 @@ import type {
   RiskRow, RiskInsert,
   ReportRow, ReportInsert,
   ActivityRow, ActivityInsert,
+  AutomationRow, AutomationInsert, AutomationUpdate,
+  AutomationRunRow, AutomationRunInsert, AutomationRunUpdate,
+  AutomationRunSectionRow, AutomationRunSectionInsert,
+  BoardDecisionRow, BoardDecisionInsert,
+  TeamMemberRow, TeamMemberInsert, TeamMemberUpdate,
+  RagStatusWithWorkspace,
 } from './database.types';
-
-// Detect if Supabase is configured
-const isSupabaseConfigured = !!(
-  import.meta.env.VITE_SUPABASE_URL &&
-  import.meta.env.VITE_SUPABASE_ANON_KEY &&
-  !import.meta.env.VITE_SUPABASE_ANON_KEY.includes('PASTE_FULL')
-);
-
-// Convert mock workspace to WorkspaceRow shape
-const mockWorkspaceRows: WorkspaceRow[] = mockWorkspaces.map(w => ({
-  id: w.id,
-  name: w.name,
-  client: w.client,
-  sector: w.sector,
-  sector_color: w.sectorColor,
-  type: w.type,
-  language: w.language,
-  progress: w.progress,
-  status: w.status as WorkspaceRow['status'],
-  docs_count: w.docsCount,
-  meetings_count: w.meetingsCount,
-  tasks_count: w.tasksCount,
-  risks_count: Math.floor(w.tasksCount * 0.3),
-  issues_count: Math.floor(w.tasksCount * 0.15),
-  contributors: w.contributors,
-  last_activity: w.lastActivity,
-  description: w.description,
-  start_date: null,
-  end_date: null,
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-}));
 
 export type {
   WorkspaceRow, WorkspaceFinancialRow, WorkspaceRagStatusRow, MilestoneRow,
   DocumentRow, MeetingRow, TaskRow, RiskRow, ReportRow, ReportInsert, ActivityRow,
+  AutomationRow, AutomationRunRow, AutomationRunSectionRow,
+  BoardDecisionRow, TeamMemberRow, RagStatusWithWorkspace,
 };
 
 // ── Workspaces ──────────────────────────────────────────────
 export async function getWorkspaces(): Promise<WorkspaceRow[]> {
-  if (!isSupabaseConfigured) return mockWorkspaceRows;
   const { data, error } = await supabase.from('workspaces').select('*').order('updated_at', { ascending: false });
   if (error) throw error;
   return (data ?? []) as WorkspaceRow[];
@@ -78,7 +52,6 @@ export async function updateWorkspace(id: string, update: Partial<WorkspaceInser
 
 // ── Workspace Financials ─────────────────────────────────────
 export async function getWorkspaceFinancials(): Promise<WorkspaceFinancialRow[]> {
-  if (!isSupabaseConfigured) return [];
   const { data, error } = await supabase.from('workspace_financials').select('*');
   if (error) throw error;
   return (data ?? []) as WorkspaceFinancialRow[];
@@ -98,10 +71,34 @@ export async function upsertWorkspaceFinancial(fin: WorkspaceFinancialInsert): P
 
 // ── Workspace RAG Status ──────────────────────────────────────
 export async function getWorkspaceRagStatuses(): Promise<WorkspaceRagStatusRow[]> {
-  if (!isSupabaseConfigured) return [];
   const { data, error } = await supabase.from('workspace_rag_status').select('*');
   if (error) throw error;
   return (data ?? []) as WorkspaceRagStatusRow[];
+}
+
+// Fetch RAG statuses joined with workspace name for Dashboard display
+export async function getRagStatusWithWorkspaces(): Promise<RagStatusWithWorkspace[]> {
+  const { data, error } = await supabase
+    .from('workspace_rag_status')
+    .select('workspace_id, rag, budget, schedule, risk, last_updated, workspaces(name)');
+  if (error) throw error;
+  return ((data ?? []) as unknown as Array<{
+    workspace_id: string;
+    rag: 'Green' | 'Amber' | 'Red';
+    budget: 'Green' | 'Amber' | 'Red';
+    schedule: 'Green' | 'Amber' | 'Red';
+    risk: 'Green' | 'Amber' | 'Red';
+    last_updated: string;
+    workspaces: { name: string } | null;
+  }>).map(row => ({
+    workspace_id: row.workspace_id,
+    workspace: row.workspaces?.name ?? row.workspace_id,
+    rag: row.rag,
+    budget: row.budget,
+    schedule: row.schedule,
+    risk: row.risk,
+    lastUpdated: row.last_updated,
+  }));
 }
 
 export async function getWorkspaceRagStatus(workspaceId: string): Promise<WorkspaceRagStatusRow | null> {
@@ -280,5 +277,108 @@ export async function getActivities(limit = 20): Promise<ActivityRow[]> {
 
 export async function insertActivity(activity: ActivityInsert): Promise<void> {
   const { error } = await supabase.from('activities').insert(activity as Record<string, unknown>);
+  if (error) throw error;
+}
+
+// ── Automations ──────────────────────────────────────────────
+export async function getAutomations(): Promise<AutomationRow[]> {
+  const { data, error } = await supabase.from('automations').select('*').order('name', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as AutomationRow[];
+}
+
+export async function getAutomation(id: string): Promise<AutomationRow | null> {
+  const { data, error } = await supabase.from('automations').select('*').eq('id', id).single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data as AutomationRow | null;
+}
+
+export async function upsertAutomation(automation: AutomationInsert): Promise<AutomationRow> {
+  const { data, error } = await supabase.from('automations').upsert(automation as Record<string, unknown>).select().single();
+  if (error) throw error;
+  return data as AutomationRow;
+}
+
+export async function updateAutomation(id: string, update: AutomationUpdate): Promise<AutomationRow> {
+  const { data, error } = await supabase.from('automations').update(update as Record<string, unknown>).eq('id', id).select().single();
+  if (error) throw error;
+  return data as AutomationRow;
+}
+
+export async function deleteAutomation(id: string): Promise<void> {
+  const { error } = await supabase.from('automations').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ── Automation Runs ──────────────────────────────────────────
+export async function createAutomationRun(run: AutomationRunInsert): Promise<AutomationRunRow> {
+  const { data, error } = await supabase.from('automation_runs').insert(run as Record<string, unknown>).select().single();
+  if (error) throw error;
+  return data as AutomationRunRow;
+}
+
+export async function updateAutomationRun(id: string, update: AutomationRunUpdate): Promise<AutomationRunRow> {
+  const { data, error } = await supabase.from('automation_runs').update(update as Record<string, unknown>).eq('id', id).select().single();
+  if (error) throw error;
+  return data as AutomationRunRow;
+}
+
+export async function getAutomationRuns(automationId: string): Promise<AutomationRunRow[]> {
+  const { data, error } = await supabase
+    .from('automation_runs')
+    .select('*')
+    .eq('automation_type', automationId)
+    .order('created_at', { ascending: false })
+    .limit(20);
+  if (error) throw error;
+  return (data ?? []) as AutomationRunRow[];
+}
+
+export async function createAutomationRunSection(section: AutomationRunSectionInsert): Promise<AutomationRunSectionRow> {
+  const { data, error } = await supabase.from('automation_run_sections').insert(section as Record<string, unknown>).select().single();
+  if (error) throw error;
+  return data as AutomationRunSectionRow;
+}
+
+// ── Board Decisions ──────────────────────────────────────────
+export async function getBoardDecisions(): Promise<BoardDecisionRow[]> {
+  const { data, error } = await supabase.from('board_decisions').select('*').order('date', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as BoardDecisionRow[];
+}
+
+export async function upsertBoardDecision(decision: BoardDecisionInsert): Promise<BoardDecisionRow> {
+  const { data, error } = await supabase.from('board_decisions').upsert(decision as Record<string, unknown>).select().single();
+  if (error) throw error;
+  return data as BoardDecisionRow;
+}
+
+export async function updateBoardDecision(id: string, update: Partial<BoardDecisionInsert>): Promise<BoardDecisionRow> {
+  const { data, error } = await supabase.from('board_decisions').update(update as Record<string, unknown>).eq('id', id).select().single();
+  if (error) throw error;
+  return data as BoardDecisionRow;
+}
+
+// ── Team Members ─────────────────────────────────────────────
+export async function getTeamMembers(): Promise<TeamMemberRow[]> {
+  const { data, error } = await supabase.from('team_members').select('*').order('name', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as TeamMemberRow[];
+}
+
+export async function createTeamMember(member: TeamMemberInsert): Promise<TeamMemberRow> {
+  const { data, error } = await supabase.from('team_members').insert(member as Record<string, unknown>).select().single();
+  if (error) throw error;
+  return data as TeamMemberRow;
+}
+
+export async function updateTeamMember(id: string, update: TeamMemberUpdate): Promise<TeamMemberRow> {
+  const { data, error } = await supabase.from('team_members').update(update as Record<string, unknown>).eq('id', id).select().single();
+  if (error) throw error;
+  return data as TeamMemberRow;
+}
+
+export async function deleteTeamMember(id: string): Promise<void> {
+  const { error } = await supabase.from('team_members').delete().eq('id', id);
   if (error) throw error;
 }

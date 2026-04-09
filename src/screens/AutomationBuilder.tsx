@@ -1,12 +1,18 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Save, Play, ChevronDown, ChevronRight, Check,
-  Bell, List, Code, Settings, Database, FileOutput, MessageSquare,
-  Filter, Cpu, Upload, AlertCircle
+  Code, Filter, Cpu, Upload, AlertCircle, Loader2,
 } from 'lucide-react';
-import { automations } from '../data/mockData';
+import {
+  getAutomation, getWorkspaces, upsertDocument,
+  createAutomationRun, updateAutomationRun, getAutomationRuns,
+  createAutomationRunSection,
+} from '../lib/db';
+import type { AutomationRow, WorkspaceRow, AutomationRunRow } from '../lib/db';
 import { chatWithDocument } from '../lib/openrouter';
+import { v4 as uuidv4 } from 'uuid';
+import { supabase } from '../lib/supabase';
 
 interface FlowNode {
   id: string;
@@ -19,27 +25,19 @@ interface FlowNode {
 }
 
 const flowNodes: FlowNode[] = [
-  { id: 'n1', label: 'Trigger', type: 'trigger', icon: <Play size={14} />, color: '#10B981', status: 'done', description: 'Document uploaded or manual run' },
-  { id: 'n2', label: 'Read File', type: 'input', icon: <Upload size={14} />, color: '#0EA5E9', status: 'done', description: 'Parse PDF/Word document' },
-  { id: 'n3', label: 'Extract Text', type: 'process', icon: <FileOutput size={14} />, color: '#0EA5E9', status: 'done', description: 'OCR and text extraction' },
-  { id: 'n4', label: 'Classify', type: 'process', icon: <Filter size={14} />, color: '#8B5CF6', status: 'active', description: 'Detect document type & structure' },
-  { id: 'n5', label: 'LLM Generate', type: 'ai', icon: <Cpu size={14} />, color: '#8B5CF6', status: 'idle', description: 'GPT-4o generation with template' },
-  { id: 'n6', label: 'Validate', type: 'process', icon: <Check size={14} />, color: '#F59E0B', status: 'idle', description: 'Schema & quality validation' },
-  { id: 'n7', label: 'Create Doc', type: 'output', icon: <Database size={14} />, color: '#10B981', status: 'idle', description: 'Generate Word/PDF output' },
-  { id: 'n8', label: 'Notify', type: 'notify', icon: <Bell size={14} />, color: '#F59E0B', status: 'idle', description: 'Email/Slack notification' },
+  { id: 'n1', label: 'Trigger',      type: 'trigger', icon: <Play size={14} />,       color: '#10B981', status: 'done',   description: 'Document uploaded or manual run' },
+  { id: 'n2', label: 'Read File',    type: 'input',   icon: <Upload size={14} />,      color: '#0EA5E9', status: 'done',   description: 'Parse PDF/Word document' },
+  { id: 'n3', label: 'Extract Text', type: 'process', icon: <ChevronRight size={14} />,color: '#0EA5E9', status: 'done',   description: 'OCR and text extraction' },
+  { id: 'n4', label: 'Classify',     type: 'process', icon: <Filter size={14} />,      color: '#8B5CF6', status: 'active', description: 'Detect document type & structure' },
+  { id: 'n5', label: 'LLM Generate', type: 'ai',      icon: <Cpu size={14} />,         color: '#8B5CF6', status: 'idle',   description: 'GPT-4o generation with template' },
+  { id: 'n6', label: 'Validate',     type: 'process', icon: <Check size={14} />,       color: '#F59E0B', status: 'idle',   description: 'Schema & quality validation' },
+  { id: 'n7', label: 'Create Doc',   type: 'output',  icon: <Save size={14} />,        color: '#10B981', status: 'idle',   description: 'Generate Word/PDF output' },
+  { id: 'n8', label: 'Notify',       type: 'notify',  icon: <AlertCircle size={14} />, color: '#F59E0B', status: 'idle',   description: 'Email/Slack notification' },
 ];
 
 const rightPanelTabs = ['Prompt', 'Schema', 'Destinations', 'Notifications', 'Logs'];
 
-const recentLogs = [
-  { time: '2h ago', status: 'Success', input: 'NCA_Requirements_v2.docx', output: 'BRD_NCA_EA_v2.3.docx', duration: '42s' },
-  { time: '1d ago', status: 'Success', input: 'ADNOC_Scope.pdf', output: 'BRD_ADNOC_SC.docx', duration: '38s' },
-  { time: '2d ago', status: 'Warning', input: 'Healthcare_Req.xlsx', output: 'BRD_partial.docx', duration: '61s' },
-  { time: '3d ago', status: 'Success', input: 'MOCI_Requirements.docx', output: 'BRD_MOCI_v1.docx', duration: '45s' },
-  { time: '5d ago', status: 'Error', input: 'corrupt_file.pdf', output: 'N/A', duration: '12s' },
-];
-
-const promptTemplate = `You are a senior business analyst specializing in government digital transformation projects.
+const DEFAULT_PROMPT = `You are a senior business analyst specializing in government digital transformation projects.
 
 Given the input requirements document, generate a comprehensive Business Requirements Document (BRD) with the following structure:
 
@@ -63,68 +61,273 @@ Guidelines:
 Input document:
 {{input_document}}`;
 
+function timeAgo(iso: string | null): string {
+  if (!iso) return 'N/A';
+  const diff = Date.now() - new Date(iso).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+function runDuration(run: AutomationRunRow): string {
+  if (!run.started_at || !run.completed_at) return '—';
+  const s = Math.round((new Date(run.completed_at).getTime() - new Date(run.started_at).getTime()) / 1000);
+  return `${s}s`;
+}
+
+function runStatusLabel(run: AutomationRunRow): { label: string; color: string; bg: string } {
+  if (run.status === 'completed') return { label: 'Success', color: '#34D399', bg: 'rgba(16,185,129,0.15)' };
+  if (run.status === 'failed')    return { label: 'Error',   color: '#FCA5A5', bg: 'rgba(239,68,68,0.15)' };
+  return { label: 'Running', color: '#FCD34D', bg: 'rgba(245,158,11,0.15)' };
+}
+
+function parseRunInput(optionsJson: string): string {
+  try { return (JSON.parse(optionsJson) as { input?: string }).input?.slice(0, 60) ?? '—'; }
+  catch { return '—'; }
+}
+
 export default function AutomationBuilder() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('Prompt');
+
+  const [activeTab, setActiveTab]       = useState('Prompt');
   const [selectedNode, setSelectedNode] = useState<string>('n4');
-  const [running, setRunning] = useState(false);
-  const [runOutput, setRunOutput] = useState('');
-  const [runError, setRunError] = useState('');
+  const [running, setRunning]           = useState(false);
+  const [runOutput, setRunOutput]       = useState('');
+  const [runError, setRunError]         = useState('');
   const fileInputRef = useRef<HTMLTextAreaElement>(null);
 
-  const auto = automations.find(a => a.id === id) ?? automations[0];
-  const storageKey = `ab_cfg_${id ?? auto?.id ?? 'default'}`;
-  const [savedAt, setSavedAt] = useState<string | null>(() => {
-    try { return JSON.parse(localStorage.getItem(storageKey) ?? 'null')?.savedAt ?? null; } catch { return null; }
+  const [auto, setAuto]               = useState<AutomationRow | null>(null);
+  const [workspaces, setWorkspaces]   = useState<WorkspaceRow[]>([]);
+  const [selectedWsIds, setSelectedWsIds] = useState<Set<string>>(new Set());
+  const [editablePrompt, setEditablePrompt] = useState(DEFAULT_PROMPT);
+  const [isEditingPrompt, setIsEditingPrompt] = useState(false);
+  const [savedAt, setSavedAt]         = useState<string | null>(null);
+  const [savingConfig, setSavingConfig] = useState(false);
+  const [runsFromDb, setRunsFromDb]   = useState<AutomationRunRow[]>([]);
+  const [toast, setToast]             = useState<{ msg: string; ok: boolean } | null>(null);
+
+  // Destination toggles
+  const [destToggles, setDestToggles] = useState({
+    saveToWorkspace: true,
+    exportWord: true,
+    exportPdf: true,
+    sharePoint: false,
+    jira: false,
   });
 
-  if (!auto) {
-    return <div style={{ padding: '2rem', color: 'var(--text-muted)', fontSize: '0.875rem' }}>Automation not found.</div>;
+  // Notification toggles
+  const [notifToggles, setNotifToggles] = useState({
+    emailSuccess: true,
+    emailError: true,
+    slack: false,
+    teams: true,
+    inApp: true,
+  });
+  const [slackWebhookUrl, setSlackWebhookUrl] = useState('');
+
+  useEffect(() => {
+    if (!id) return;
+    getAutomation(id).then(setAuto).catch(() => {});
+    getAutomationRuns(id).then(setRunsFromDb).catch(() => {});
+
+    // Load custom prompt template from Supabase
+    supabase.from('prompt_templates').select('system_prompt').eq('id', `custom_${id}`).single()
+      .then(({ data }) => { if (data?.system_prompt) setEditablePrompt(data.system_prompt as string); })
+      .catch(() => {});
+  }, [id]);
+
+  useEffect(() => {
+    getWorkspaces().then(ws => {
+      setWorkspaces(ws);
+      setSelectedWsIds(new Set(ws.slice(0, 3).map(w => w.id)));
+    }).catch(() => {});
+  }, []);
+
+  function showToast(msg: string, ok: boolean) {
+    setToast({ msg, ok });
+    setTimeout(() => setToast(null), 3500);
   }
 
-  function handleSave() {
-    const cfg = { savedAt: new Date().toLocaleTimeString(), automationId: id ?? auto.id };
-    localStorage.setItem(storageKey, JSON.stringify(cfg));
-    setSavedAt(cfg.savedAt);
+  async function handleSave() {
+    if (!auto) return;
+    setSavingConfig(true);
+    try {
+      await supabase.from('prompt_templates').upsert({
+        id: `custom_${id ?? auto.id}`,
+        name: `${auto.name} (Custom)`,
+        automation_type: id ?? auto.id,
+        version: 'v1',
+        system_prompt: editablePrompt,
+        user_prompt_template: 'Input: {{input_document}}',
+        active: true,
+      });
+      const time = new Date().toLocaleTimeString();
+      setSavedAt(time);
+      setIsEditingPrompt(false);
+      showToast('Configuration saved to Supabase', true);
+    } catch {
+      showToast('Save failed – check Supabase connection', false);
+    } finally {
+      setSavingConfig(false);
+    }
   }
 
   const handleRun = async () => {
+    if (running || !auto) return;
     setRunning(true);
     setRunOutput('');
     setRunError('');
     setActiveTab('Logs');
+
+    const runId    = uuidv4();
+    const nowIso   = new Date().toISOString();
+    const inputText = fileInputRef.current?.value?.trim() || `Sample requirements document for ${auto.name}`;
+
+    // Create run record in Supabase (best-effort)
+    let runCreated = false;
     try {
-      const inputText = fileInputRef.current?.value?.trim() || `Sample requirements document for ${auto.name}`;
-      const filledPrompt = promptTemplate.replace('{{input_document}}', inputText);
+      await createAutomationRun({
+        id: runId,
+        workspace_id: null,
+        user_id: 'system',
+        automation_type: id ?? auto.id,
+        prompt_template_id: null,
+        status: 'running',
+        options_json: JSON.stringify({ automation_id: id ?? auto.id, input: inputText.slice(0, 500) }),
+        error_message: null,
+        started_at: nowIso,
+        completed_at: null,
+      });
+      runCreated = true;
+    } catch { /* non-fatal */ }
+
+    try {
+      const filledPrompt = editablePrompt.replace('{{input_document}}', inputText);
       const result = await chatWithDocument(
         [{ role: 'user', content: filledPrompt }],
-        `You are a senior consulting AI assistant specializing in ${auto.category}.`
+        `You are a senior consulting AI assistant specializing in ${auto.category}.`,
       );
       setRunOutput(result);
+
+      const completedIso = new Date().toISOString();
+
+      // Persist run result
+      if (runCreated) {
+        try {
+          await updateAutomationRun(runId, { status: 'completed', completed_at: completedIso });
+          await createAutomationRunSection({
+            run_id: runId,
+            section_name: 'full_output',
+            section_index: 0,
+            status: 'draft',
+            content: result,
+            confidence: 0.85,
+            validation_notes: '{}',
+          });
+          if (id) getAutomationRuns(id).then(setRunsFromDb).catch(() => {});
+        } catch { /* non-fatal */ }
+      }
+
+      // ── Output Destinations ─────────────────────────────────
+      if (destToggles.saveToWorkspace) {
+        const wsId = [...selectedWsIds][0];
+        const ws   = workspaces.find(w => w.id === wsId);
+        if (ws) {
+          try {
+            await upsertDocument({
+              id: uuidv4(),
+              name: `${auto.name} – ${new Date().toLocaleDateString('en-GB')}`,
+              type: 'BRD',
+              type_color: '#0EA5E9',
+              workspace: ws.name,
+              workspace_id: ws.id,
+              date: new Date().toISOString().split('T')[0],
+              language: 'EN',
+              status: 'Draft',
+              size: `${Math.max(1, Math.ceil(result.length / 1024))}KB`,
+              author: 'Automation',
+              pages: Math.max(1, Math.ceil(result.split('\n').length / 40)),
+              summary: result.slice(0, 200),
+              tags: [auto.category, 'Automation', 'BRD'],
+              file_url: null,
+            });
+            showToast('Document saved to workspace', true);
+          } catch { showToast('Save to workspace failed', false); }
+        }
+      }
+
+      if (destToggles.exportWord) {
+        const blob = new Blob([result], { type: 'text/plain' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = `${auto.name.replace(/\s+/g, '_')}_BRD_${Date.now()}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
+      if (destToggles.exportPdf) {
+        const win = window.open('', '_blank');
+        if (win) {
+          win.document.write(
+            `<html><head><title>${auto.name} – BRD</title>` +
+            `<style>body{font-family:Georgia,serif;max-width:800px;margin:2rem auto;line-height:1.7;color:#111}` +
+            `pre{white-space:pre-wrap;font-family:inherit}</style></head>` +
+            `<body><pre>${result}</pre></body></html>`,
+          );
+          win.document.close();
+          win.print();
+        }
+      }
+
+      // ── Notifications ───────────────────────────────────────
+      if (notifToggles.slack && slackWebhookUrl.startsWith('https://')) {
+        fetch(slackWebhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: `✅ *${auto.name}* completed successfully in Consultant OS.` }),
+        }).catch(() => {});
+      }
+
+      if (notifToggles.inApp) showToast(`${auto.name} completed`, true);
+
     } catch (e) {
-      setRunError(e instanceof Error ? e.message : 'Run failed');
+      const errMsg = e instanceof Error ? e.message : 'Run failed';
+      setRunError(errMsg);
+      if (runCreated) {
+        updateAutomationRun(runId, { status: 'failed', error_message: errMsg }).catch(() => {});
+        if (id) getAutomationRuns(id).then(setRunsFromDb).catch(() => {});
+      }
+      showToast('Run failed', false);
     } finally {
       setRunning(false);
     }
   };
 
   const getNodeBg = (node: FlowNode) => {
-    if (node.id === selectedNode) return `${node.color}20`;
-    if (node.status === 'done') return 'rgba(16,185,129,0.08)';
-    if (node.status === 'active') return `${node.color}12`;
+    if (node.id === selectedNode)    return `${node.color}20`;
+    if (node.status === 'done')      return 'rgba(16,185,129,0.08)';
+    if (node.status === 'active')    return `${node.color}12`;
     return 'rgba(255,255,255,0.03)';
   };
 
   const getNodeBorder = (node: FlowNode) => {
-    if (node.id === selectedNode) return `${node.color}60`;
-    if (node.status === 'done') return 'rgba(16,185,129,0.3)';
-    if (node.status === 'active') return `${node.color}50`;
+    if (node.id === selectedNode)  return `${node.color}60`;
+    if (node.status === 'done')    return 'rgba(16,185,129,0.3)';
+    if (node.status === 'active')  return `${node.color}50`;
     return 'rgba(255,255,255,0.08)';
   };
 
+  if (!auto) {
+    return <div style={{ padding: '2rem', color: 'var(--text-muted)', fontSize: '0.875rem' }}>Automation not found.</div>;
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 60px)', overflow: 'hidden' }}>
+
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -141,50 +344,61 @@ export default function AutomationBuilder() {
           <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.08)' }} />
           <div>
             <h2 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#F1F5F9', margin: 0 }}>{auto.name}</h2>
-            <p style={{ fontSize: '0.7rem', color: '#475569', margin: 0 }}>{auto.category} · {auto.runCount} runs</p>
+            <p style={{ fontSize: '0.7rem', color: '#475569', margin: 0 }}>{auto.category} · {auto.run_count} runs</p>
           </div>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           <span className="status-active" style={{ fontSize: '0.72rem' }}>Active</span>
-          <button className="btn-ghost" style={{ height: '32px', fontSize: '0.78rem' }} onClick={handleSave} title={savedAt ? `Last saved ${savedAt}` : 'Save configuration'}>
-            <Save size={13} /> {savedAt ? `Saved ${savedAt}` : 'Save'}
+          <button
+            className="btn-ghost"
+            style={{ height: '32px', fontSize: '0.78rem' }}
+            onClick={handleSave}
+            disabled={savingConfig}
+            title={savedAt ? `Last saved ${savedAt}` : 'Save configuration to Supabase'}
+          >
+            {savingConfig ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={13} />}
+            {savedAt ? `Saved ${savedAt}` : 'Save'}
           </button>
           <button
             className="btn-primary"
             style={{ height: '32px', fontSize: '0.78rem' }}
             onClick={handleRun}
+            disabled={running}
           >
-            <Play size={13} /> {running ? 'Running...' : 'Run Now'}
+            {running
+              ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Running…</>
+              : <><Play size={13} /> Run Now</>
+            }
           </button>
         </div>
       </div>
 
       {/* Three Panel Layout */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        {/* Left Panel – Config */}
+
+        {/* ── Left Panel – Config ── */}
         <div style={{
           width: '280px', minWidth: '280px', borderRight: '1px solid rgba(255,255,255,0.05)',
           display: 'flex', flexDirection: 'column', overflowY: 'auto', background: '#0C1220',
         }}>
           <div style={{ padding: '1rem' }}>
+            {/* Trigger */}
             <div style={{ marginBottom: '1.25rem' }}>
               <div style={{ fontSize: '0.7rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.625rem' }}>Trigger</div>
-              <div style={{
-                padding: '0.75rem', borderRadius: '0.5rem', background: 'rgba(16,185,129,0.08)',
-                border: '1px solid rgba(16,185,129,0.2)', cursor: 'pointer',
-              }}>
+              <div style={{ padding: '0.75rem', borderRadius: '0.5rem', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', cursor: 'pointer' }}>
                 <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#34D399', marginBottom: '0.375rem' }}>Document Upload</div>
                 <div style={{ fontSize: '0.72rem', color: '#475569' }}>Fires when a new document is uploaded to workspace</div>
               </div>
             </div>
 
+            {/* Input Settings */}
             <div style={{ marginBottom: '1.25rem' }}>
               <div style={{ fontSize: '0.7rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.625rem' }}>Input Settings</div>
               {[
                 { label: 'Accepted Formats', value: 'PDF, DOCX, TXT' },
-                { label: 'Max File Size', value: '50 MB' },
+                { label: 'Max File Size',    value: '50 MB' },
                 { label: 'Language Detection', value: 'Auto (EN/AR)' },
-                { label: 'OCR Engine', value: 'Azure Form Recognizer' },
+                { label: 'OCR Engine',       value: 'Azure Form Recognizer' },
               ].map(field => (
                 <div key={field.label} style={{ marginBottom: '0.625rem' }}>
                   <div style={{ fontSize: '0.68rem', color: '#475569', marginBottom: '3px' }}>{field.label}</div>
@@ -200,61 +414,63 @@ export default function AutomationBuilder() {
               ))}
             </div>
 
+            {/* Workspace Scope – real workspaces from Supabase */}
             <div>
               <div style={{ fontSize: '0.7rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.625rem' }}>Workspace Scope</div>
-              {['NCA Digital Transformation', 'ADNOC Supply Chain', 'MOCI Procurement', 'Healthcare Digital'].map((ws, i) => (
-                <div key={i} style={{
-                  display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.375rem 0',
-                  borderBottom: '1px solid rgba(255,255,255,0.04)',
-                }}>
-                  <div style={{
-                    width: '14px', height: '14px', borderRadius: '3px',
-                    background: i < 3 ? 'rgba(0,212,255,0.2)' : 'rgba(255,255,255,0.05)',
-                    border: `1px solid ${i < 3 ? 'rgba(0,212,255,0.4)' : 'rgba(255,255,255,0.1)'}`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    {i < 3 && <Check size={9} style={{ color: '#00D4FF' }} />}
-                  </div>
-                  <span style={{ fontSize: '0.75rem', color: i < 3 ? '#94A3B8' : '#475569' }}>{ws}</span>
-                </div>
-              ))}
+              {workspaces.length === 0
+                ? <div style={{ fontSize: '0.72rem', color: '#334155' }}>Loading workspaces…</div>
+                : workspaces.map(ws => {
+                  const checked = selectedWsIds.has(ws.id);
+                  return (
+                    <div
+                      key={ws.id}
+                      onClick={() => setSelectedWsIds(prev => {
+                        const next = new Set(prev);
+                        checked ? next.delete(ws.id) : next.add(ws.id);
+                        return next;
+                      })}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.375rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer' }}
+                    >
+                      <div style={{
+                        width: '14px', height: '14px', borderRadius: '3px',
+                        background: checked ? 'rgba(0,212,255,0.2)' : 'rgba(255,255,255,0.05)',
+                        border: `1px solid ${checked ? 'rgba(0,212,255,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                      }}>
+                        {checked && <Check size={9} style={{ color: '#00D4FF' }} />}
+                      </div>
+                      <span style={{ fontSize: '0.75rem', color: checked ? '#94A3B8' : '#475569' }}>{ws.name}</span>
+                    </div>
+                  );
+                })
+              }
             </div>
           </div>
         </div>
 
-        {/* Center Canvas */}
+        {/* ── Center Canvas ── */}
         <div style={{ flex: 1, overflow: 'auto', background: '#080C18', padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          {/* Flow nodes */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0, minWidth: '280px' }}>
             {flowNodes.map((node, i) => (
               <div key={node.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                {/* Node */}
                 <div
                   onClick={() => setSelectedNode(node.id)}
                   style={{
-                    padding: '0.875rem 1.25rem',
-                    borderRadius: '0.75rem',
+                    padding: '0.875rem 1.25rem', borderRadius: '0.75rem',
                     background: getNodeBg(node),
                     border: `1px solid ${getNodeBorder(node)}`,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    minWidth: '240px',
+                    cursor: 'pointer', transition: 'all 0.2s', minWidth: '240px',
                     boxShadow: node.id === selectedNode ? `0 0 16px ${node.color}20` : 'none',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <div style={{
-                      width: '32px', height: '32px', borderRadius: '8px',
-                      background: `${node.color}18`, color: node.color,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                    }}>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: `${node.color}18`, color: node.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       {node.icon}
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#F1F5F9' }}>{node.label}</div>
                       <div style={{ fontSize: '0.7rem', color: '#475569' }}>{node.description}</div>
                     </div>
-                    {/* Status indicator */}
                     <div style={{
                       width: '8px', height: '8px', borderRadius: '9999px', flexShrink: 0,
                       background: node.status === 'done' ? '#10B981' : node.status === 'active' ? node.color : node.status === 'error' ? '#EF4444' : 'rgba(255,255,255,0.15)',
@@ -262,8 +478,6 @@ export default function AutomationBuilder() {
                     }} />
                   </div>
                 </div>
-
-                {/* Connector arrow */}
                 {i < flowNodes.length - 1 && (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '4px 0' }}>
                     <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.1)' }} />
@@ -273,7 +487,6 @@ export default function AutomationBuilder() {
               </div>
             ))}
           </div>
-
           {/* Legend */}
           <div style={{ display: 'flex', gap: '1.5rem', marginTop: '2rem', opacity: 0.7 }}>
             {[
@@ -290,9 +503,9 @@ export default function AutomationBuilder() {
           </div>
         </div>
 
-        {/* Right Panel */}
+        {/* ── Right Panel ── */}
         <div style={{
-          width: '320px', minWidth: '320px', borderLeft: '1px solid rgba(255,255,255,0.05)',
+          width: '340px', minWidth: '340px', borderLeft: '1px solid rgba(255,255,255,0.05)',
           display: 'flex', flexDirection: 'column', overflowY: 'auto', background: '#0C1220',
         }}>
           {/* Tab Bar */}
@@ -310,30 +523,50 @@ export default function AutomationBuilder() {
           </div>
 
           <div style={{ padding: '1rem', flex: 1 }}>
-            {/* Prompt Template */}
+
+            {/* ── PROMPT TAB ── */}
             {activeTab === 'Prompt' && (
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.625rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.625rem', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#94A3B8' }}>System Prompt</span>
-                  <button className="btn-ghost" style={{ padding: '0.125rem 0.5rem', fontSize: '0.68rem' }}>
-                    <Code size={11} /> Format
+                  <button
+                    className="btn-ghost"
+                    style={{ padding: '0.125rem 0.5rem', fontSize: '0.68rem' }}
+                    onClick={() => setIsEditingPrompt(e => !e)}
+                  >
+                    <Code size={11} /> {isEditingPrompt ? 'Preview' : 'Edit'}
                   </button>
                 </div>
-                <div style={{
-                  background: '#060C1A', border: '1px solid rgba(255,255,255,0.08)',
-                  borderRadius: '0.5rem', padding: '0.875rem', fontSize: '0.72rem',
-                  fontFamily: 'ui-monospace, monospace', color: '#94A3B8',
-                  lineHeight: 1.6, whiteSpace: 'pre-wrap', overflow: 'auto',
-                  maxHeight: '400px',
-                }}>
-                  {promptTemplate}
-                </div>
-                {/* Input document for Run Now */}
+
+                {isEditingPrompt ? (
+                  <textarea
+                    value={editablePrompt}
+                    onChange={e => setEditablePrompt(e.target.value)}
+                    style={{
+                      width: '100%', minHeight: '300px', padding: '0.875rem',
+                      background: '#060C1A', border: '1px solid rgba(0,212,255,0.3)',
+                      borderRadius: '0.5rem', fontSize: '0.72rem',
+                      fontFamily: 'ui-monospace, monospace', color: '#94A3B8',
+                      lineHeight: 1.6, resize: 'vertical', boxSizing: 'border-box',
+                    }}
+                  />
+                ) : (
+                  <div style={{
+                    background: '#060C1A', border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: '0.5rem', padding: '0.875rem', fontSize: '0.72rem',
+                    fontFamily: 'ui-monospace, monospace', color: '#94A3B8',
+                    lineHeight: 1.6, whiteSpace: 'pre-wrap', overflow: 'auto', maxHeight: '300px',
+                  }}>
+                    {editablePrompt}
+                  </div>
+                )}
+
+                {/* Input for Run Now */}
                 <div style={{ marginTop: '0.875rem' }}>
-                  <div style={{ fontSize: '0.7rem', color: '#475569', marginBottom: '0.375rem' }}>Input (paste document text or requirements to test)</div>
+                  <div style={{ fontSize: '0.7rem', color: '#475569', marginBottom: '0.375rem' }}>Input (paste document text to test)</div>
                   <textarea
                     ref={fileInputRef}
-                    placeholder="Paste requirements text here to test the automation with real AI output…"
+                    placeholder="Paste requirements text here to test the automation…"
                     style={{
                       width: '100%', minHeight: '80px', padding: '0.625rem 0.75rem',
                       background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
@@ -365,7 +598,7 @@ export default function AutomationBuilder() {
               </div>
             )}
 
-            {/* Schema */}
+            {/* ── SCHEMA TAB ── */}
             {activeTab === 'Schema' && (
               <div>
                 <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#94A3B8', marginBottom: '0.625rem' }}>Output Schema</div>
@@ -379,19 +612,10 @@ export default function AutomationBuilder() {
   "version": "string",
   "workspace": "string",
   "sections": [
-    {
-      "id": "string",
-      "title": "string",
-      "content": "string"
-    }
+    { "id": "string", "title": "string", "content": "string" }
   ],
   "requirements": [
-    {
-      "id": "string",
-      "priority": "Must|Should|Nice",
-      "text": "string",
-      "category": "FR|NFR"
-    }
+    { "id": "string", "priority": "Must|Should|Nice", "text": "string", "category": "FR|NFR" }
   ],
   "metadata": {
     "generatedAt": "datetime",
@@ -403,126 +627,194 @@ export default function AutomationBuilder() {
               </div>
             )}
 
-            {/* Destinations */}
+            {/* ── DESTINATIONS TAB ── */}
             {activeTab === 'Destinations' && (
               <div>
                 <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#94A3B8', marginBottom: '0.875rem' }}>Output Destinations</div>
-                {[
-                  { label: 'Save to Workspace', detail: 'Documents library', checked: true, color: '#0EA5E9' },
-                  { label: 'Export as Word', detail: 'Microsoft Word .docx', checked: true, color: '#0EA5E9' },
-                  { label: 'Export as PDF', detail: 'PDF with Consultant OS branding', checked: true, color: '#8B5CF6' },
-                  { label: 'Sync to SharePoint', detail: 'NCA Programme folder', checked: false, color: '#F59E0B' },
-                  { label: 'Push to Jira', detail: 'Create requirements tickets', checked: false, color: '#10B981' },
-                ].map((dest, i) => (
-                  <div key={i} style={{
-                    display: 'flex', alignItems: 'center', gap: '0.75rem',
-                    padding: '0.625rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)',
-                  }}>
-                    <div style={{
-                      width: '16px', height: '16px', borderRadius: '4px',
-                      background: dest.checked ? `${dest.color}20` : 'rgba(255,255,255,0.04)',
-                      border: `1px solid ${dest.checked ? dest.color + '50' : 'rgba(255,255,255,0.1)'}`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                    }}>
-                      {dest.checked && <Check size={10} style={{ color: dest.color }} />}
+                {([
+                  { key: 'saveToWorkspace', label: 'Save to Workspace',  detail: 'Creates a Document in Supabase Documents library', color: '#0EA5E9', comingSoon: false },
+                  { key: 'exportWord',      label: 'Export as Word',      detail: 'Download output as .txt (Word-compatible)',         color: '#0EA5E9', comingSoon: false },
+                  { key: 'exportPdf',       label: 'Export as PDF',       detail: 'Open browser print dialog (Save as PDF)',           color: '#8B5CF6', comingSoon: false },
+                  { key: 'sharePoint',      label: 'Sync to SharePoint',  detail: 'NCA Programme folder',                              color: '#F59E0B', comingSoon: true },
+                  { key: 'jira',            label: 'Push to Jira',        detail: 'Create requirements tickets',                       color: '#10B981', comingSoon: true },
+                ] as const).map(dest => {
+                  const checked = destToggles[dest.key];
+                  return (
+                    <div
+                      key={dest.key}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.625rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: dest.comingSoon ? 'default' : 'pointer' }}
+                      onClick={() => {
+                        if (dest.comingSoon) return;
+                        setDestToggles(p => ({ ...p, [dest.key]: !p[dest.key] }));
+                      }}
+                    >
+                      <div style={{
+                        width: '16px', height: '16px', borderRadius: '4px', flexShrink: 0,
+                        background: checked && !dest.comingSoon ? `${dest.color}20` : 'rgba(255,255,255,0.04)',
+                        border: `1px solid ${checked && !dest.comingSoon ? dest.color + '50' : 'rgba(255,255,255,0.1)'}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        {checked && !dest.comingSoon && <Check size={10} style={{ color: dest.color }} />}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 500, color: dest.comingSoon ? '#334155' : (checked ? '#F1F5F9' : '#475569') }}>
+                            {dest.label}
+                          </span>
+                          {dest.comingSoon && (
+                            <span style={{ fontSize: '0.6rem', padding: '1px 5px', borderRadius: '4px', background: 'rgba(245,158,11,0.1)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}>
+                              Soon
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: '0.68rem', color: '#334155' }}>{dest.detail}</div>
+                      </div>
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 500, color: dest.checked ? '#F1F5F9' : '#475569' }}>{dest.label}</div>
-                      <div style={{ fontSize: '0.68rem', color: '#334155' }}>{dest.detail}</div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
-            {/* Notifications */}
+            {/* ── NOTIFICATIONS TAB ── */}
             {activeTab === 'Notifications' && (
               <div>
                 <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#94A3B8', marginBottom: '0.875rem' }}>Notification Rules</div>
-                {[
-                  { label: 'Email on Success', detail: 'Send to assigned consultant', enabled: true },
-                  { label: 'Email on Error', detail: 'Alert to workspace admin', enabled: true },
-                  { label: 'Slack Notification', detail: '#automation-runs channel', enabled: false },
-                  { label: 'Teams Message', detail: 'Project team channel', enabled: true },
-                  { label: 'In-App Alert', detail: 'Show in notification centre', enabled: true },
-                ].map((notif, i) => (
-                  <div key={i} style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '0.625rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)',
-                  }}>
-                    <div>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#94A3B8' }}>{notif.label}</div>
-                      <div style={{ fontSize: '0.68rem', color: '#334155' }}>{notif.detail}</div>
+                {([
+                  { key: 'emailSuccess', label: 'Email on Success', detail: 'Send to assigned consultant' },
+                  { key: 'emailError',   label: 'Email on Error',   detail: 'Alert to workspace admin' },
+                  { key: 'slack',        label: 'Slack Notification', detail: 'Post to Slack webhook URL' },
+                  { key: 'teams',        label: 'Teams Message',    detail: 'Project team channel' },
+                  { key: 'inApp',        label: 'In-App Alert',     detail: 'Show toast notification' },
+                ] as const).map(notif => {
+                  const enabled = notifToggles[notif.key];
+                  return (
+                    <div key={notif.key}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.625rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <div>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#94A3B8' }}>{notif.label}</div>
+                          <div style={{ fontSize: '0.68rem', color: '#334155' }}>{notif.detail}</div>
+                        </div>
+                        <div
+                          onClick={() => setNotifToggles(p => ({ ...p, [notif.key]: !p[notif.key] }))}
+                          style={{
+                            width: '32px', height: '18px', borderRadius: '9999px', cursor: 'pointer',
+                            background: enabled ? 'rgba(0,212,255,0.3)' : 'rgba(255,255,255,0.08)',
+                            border: `1px solid ${enabled ? 'rgba(0,212,255,0.5)' : 'rgba(255,255,255,0.12)'}`,
+                            position: 'relative', transition: 'all 0.2s', flexShrink: 0,
+                          }}
+                        >
+                          <div style={{
+                            position: 'absolute', width: '12px', height: '12px', borderRadius: '9999px',
+                            background: enabled ? '#00D4FF' : '#475569',
+                            top: '2px', left: enabled ? '17px' : '2px', transition: 'left 0.2s',
+                          }} />
+                        </div>
+                      </div>
+                      {/* Slack webhook URL input */}
+                      {notif.key === 'slack' && enabled && (
+                        <div style={{ padding: '0.5rem 0 0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                          <div style={{ fontSize: '0.68rem', color: '#475569', marginBottom: '0.25rem' }}>Webhook URL</div>
+                          <input
+                            type="url"
+                            placeholder="https://hooks.slack.com/services/…"
+                            value={slackWebhookUrl}
+                            onChange={e => setSlackWebhookUrl(e.target.value)}
+                            style={{
+                              width: '100%', padding: '0.375rem 0.625rem', borderRadius: '6px',
+                              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+                              color: '#94A3B8', fontSize: '0.72rem', fontFamily: 'inherit', boxSizing: 'border-box',
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
-                    <div style={{
-                      width: '32px', height: '18px', borderRadius: '9999px',
-                      background: notif.enabled ? 'rgba(0,212,255,0.3)' : 'rgba(255,255,255,0.08)',
-                      border: `1px solid ${notif.enabled ? 'rgba(0,212,255,0.5)' : 'rgba(255,255,255,0.12)'}`,
-                      cursor: 'pointer', position: 'relative',
-                    }}>
-                      <div style={{
-                        position: 'absolute',
-                        width: '12px', height: '12px', borderRadius: '9999px',
-                        background: notif.enabled ? '#00D4FF' : '#475569',
-                        top: '2px',
-                        left: notif.enabled ? '17px' : '2px',
-                        transition: 'left 0.2s',
-                      }} />
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
-            {/* Logs */}
+            {/* ── LOGS TAB ── */}
             {activeTab === 'Logs' && (
               <div>
                 {/* Live run output */}
                 {(running || runOutput || runError) && (
                   <div style={{ marginBottom: '1rem', padding: '0.875rem', borderRadius: '0.5rem', background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)' }}>
                     <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#A78BFA', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                      {running ? <AlertCircle size={11} /> : <Check size={11} />}
-                      {running ? 'Running…' : runError ? 'Run Failed' : 'Run Complete'}
+                      {running
+                        ? <><Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> Running…</>
+                        : runError
+                          ? <><AlertCircle size={11} /> Run Failed</>
+                          : <><Check size={11} /> Run Complete – saved to Supabase</>
+                      }
                     </div>
                     {runError && <div style={{ fontSize: '0.75rem', color: '#FCA5A5' }}>{runError}</div>}
                     {runOutput && (
-                      <pre style={{ margin: 0, fontSize: '0.72rem', color: '#CBD5E1', lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: '300px', overflowY: 'auto', fontFamily: 'inherit' }}>{runOutput}</pre>
+                      <pre style={{ margin: 0, fontSize: '0.72rem', color: '#CBD5E1', lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: '300px', overflowY: 'auto', fontFamily: 'inherit' }}>
+                        {runOutput}
+                      </pre>
                     )}
                   </div>
                 )}
-                <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#94A3B8', marginBottom: '0.875rem' }}>Recent Runs</div>
-                {recentLogs.map((log, i) => (
-                  <div key={i} style={{
-                    padding: '0.75rem',
-                    borderRadius: '0.5rem',
-                    background: 'rgba(255,255,255,0.03)',
-                    border: '1px solid rgba(255,255,255,0.05)',
-                    marginBottom: '0.5rem',
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.375rem' }}>
-                      <span style={{
-                        fontSize: '0.7rem', padding: '1px 6px', borderRadius: '3px',
-                        background: log.status === 'Success' ? 'rgba(16,185,129,0.15)' : log.status === 'Warning' ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)',
-                        color: log.status === 'Success' ? '#34D399' : log.status === 'Warning' ? '#FCD34D' : '#FCA5A5',
-                      }}>
-                        {log.status}
-                      </span>
-                      <span style={{ fontSize: '0.7rem', color: '#334155' }}>{log.time}</span>
-                    </div>
-                    <div style={{ fontSize: '0.72rem', color: '#475569', marginBottom: '2px' }}>
-                      <span style={{ color: '#94A3B8' }}>In:</span> {log.input}
-                    </div>
-                    <div style={{ fontSize: '0.72rem', color: '#475569' }}>
-                      <span style={{ color: '#94A3B8' }}>Out:</span> {log.output}
-                    </div>
-                    <div style={{ fontSize: '0.68rem', color: '#334155', marginTop: '2px' }}>Duration: {log.duration}</div>
+
+                <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#94A3B8', marginBottom: '0.875rem' }}>
+                  Run History {runsFromDb.length > 0 ? `(${runsFromDb.length})` : ''}
+                </div>
+
+                {runsFromDb.length === 0 ? (
+                  <div style={{ fontSize: '0.75rem', color: '#334155', padding: '1rem 0' }}>
+                    No runs recorded yet. Click Run Now to start.
                   </div>
-                ))}
+                ) : (
+                  runsFromDb.map(run => {
+                    const { label, color, bg } = runStatusLabel(run);
+                    return (
+                      <div key={run.id} style={{
+                        padding: '0.75rem', borderRadius: '0.5rem',
+                        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)',
+                        marginBottom: '0.5rem',
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.375rem' }}>
+                          <span style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: '3px', background: bg, color }}>{label}</span>
+                          <span style={{ fontSize: '0.7rem', color: '#334155' }}>{timeAgo(run.created_at)}</span>
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: '#475569', marginBottom: '2px' }}>
+                          <span style={{ color: '#94A3B8' }}>In:</span> {parseRunInput(run.options_json)}
+                        </div>
+                        {run.error_message && (
+                          <div style={{ fontSize: '0.72rem', color: '#FCA5A5', marginBottom: '2px' }}>
+                            <span style={{ color: '#94A3B8' }}>Error:</span> {run.error_message.slice(0, 80)}
+                          </div>
+                        )}
+                        <div style={{ fontSize: '0.68rem', color: '#334155', marginTop: '2px' }}>Duration: {runDuration(run)}</div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: '2rem', right: '2rem', zIndex: 999,
+          display: 'flex', alignItems: 'center', gap: '0.5rem',
+          padding: '0.875rem 1.25rem', borderRadius: '10px',
+          background: toast.ok ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+          border: `1px solid ${toast.ok ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
+          color: toast.ok ? '#34D399' : '#FCA5A5',
+          fontSize: '0.82rem', fontWeight: 600,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+        }}>
+          <Check size={16} /> {toast.msg}
+        </div>
+      )}
+
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 }
