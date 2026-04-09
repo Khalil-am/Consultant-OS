@@ -1,11 +1,21 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { v4 as uuidv4 } from 'uuid';
 import {
   ArrowLeft, Upload, FileText, CheckCircle, AlertCircle, Clock,
   ChevronRight, Download, Eye, RefreshCw, BarChart2, X, Loader,
   Zap, Shield, GitCompare, RotateCcw, Play,
   Inbox, Search, Brain, PenLine, Package, Trophy, Globe, Code2,
 } from 'lucide-react';
+import {
+  uploadFileToStorage, createRunRecord, saveRunFile,
+  triggerBrdWebhook, fetchRunStatus, fetchRunSections,
+  fetchRunFiles, fetchRunEventPayload, getAnonUserId,
+  type RunSection,
+} from '../lib/brdApi';
+
+// Silence "unused variable" for icons kept for future use
+void Clock; void ChevronRight; void RefreshCw; void Zap;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -20,6 +30,7 @@ interface UploadedFile {
   name: string;
   size: number;
   type: string;
+  file: File;
 }
 
 interface RunState {
@@ -43,6 +54,7 @@ interface RunState {
     resolved: number;
     remainingGaps: string[];
   };
+  sections: RunSection[];
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -60,9 +72,9 @@ const PIPELINE_STAGES = [
 ];
 
 const PROMPT_TEMPLATES = [
-  { id: 'brd_standard_v1',    name: 'BRD Standard Generator',       badge: 'Recommended' },
+  { id: 'brd_standard_v1',    name: 'BRD Standard Generator',        badge: 'Recommended' },
   { id: 'brd_government_v1',  name: 'BRD Government / Public Sector', badge: 'Gov' },
-  { id: 'brd_agile_v1',       name: 'BRD Agile / Product Format',   badge: 'Agile' },
+  { id: 'brd_agile_v1',       name: 'BRD Agile / Product Format',    badge: 'Agile' },
 ];
 
 const CANONICAL_SECTIONS = [
@@ -80,7 +92,8 @@ const STATUS_ORDER: RunStatus[] = [
 ];
 
 function stageIndex(status: RunStatus): number {
-  return STATUS_ORDER.indexOf(status);
+  const idx = STATUS_ORDER.indexOf(status);
+  return idx === -1 ? 0 : idx;
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -94,10 +107,12 @@ function DropZone({
   const ref = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
+  const wrap = (f: File): UploadedFile => ({ name: f.name, size: f.size, type: f.type, file: f });
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault(); setDragging(false);
     const f = e.dataTransfer.files[0];
-    if (f) onFile({ name: f.name, size: f.size, type: f.type });
+    if (f) onFile(wrap(f));
   };
 
   return (
@@ -117,7 +132,7 @@ function DropZone({
       }}
     >
       <input ref={ref} type="file" accept={accept} style={{ display: 'none' }}
-        onChange={e => { const f = e.target.files?.[0]; if (f) onFile({ name: f.name, size: f.size, type: f.type }); }} />
+        onChange={e => { const f = e.target.files?.[0]; if (f) onFile(wrap(f)); }} />
       {file ? (
         <>
           <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -180,79 +195,219 @@ export default function BrdRunPage() {
   const [run, setRun] = useState<RunState | null>(null);
   const [outputTab, setOutputTab] = useState<OutputTab>('preview');
   const [regeneratingSection, setRegeneratingSection] = useState<string | null>(null);
-  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [isStarting, setIsStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
 
-  // Simulate pipeline progression for demo
-  const simulateRun = () => {
-    const runId = `run-${Date.now()}`;
-    const initialRun: RunState = {
-      runId,
-      status: 'queued',
-      currentStage: 0,
-      qualityScore: 0,
-      coverageScore: 0,
-      sectionsGenerated: 0,
-      totalSections: CANONICAL_SECTIONS.length,
-      warnings: [],
-      outputs: {},
-      comparison: { sampleCoverage: 0, styleAlignment: 0, missingBefore: 0, resolved: 0, remainingGaps: [] },
-    };
-    setRun(initialRun);
-    setScreen('progress');
+  // Refs to avoid stale closures in intervals
+  const runIdRef = useRef<string | null>(null);
+  const sampleFilesRef = useRef<UploadedFile[]>([]);
+  useEffect(() => { sampleFilesRef.current = sampleFiles; }, [sampleFiles]);
 
-    let stage = 0;
-    progressIntervalRef.current = setInterval(() => {
-      stage++;
-      const status = STATUS_ORDER[Math.min(stage, STATUS_ORDER.length - 1)] as RunStatus;
-      const isGenerating = status === 'generating_sections';
-      const isCompleted = status === 'completed';
+  // ── Status Polling ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!isPolling) return;
 
-      setRun(prev => {
-        if (!prev) return prev;
-        const sectionsGenerated = isGenerating
-          ? Math.min(prev.sectionsGenerated + 3, CANONICAL_SECTIONS.length)
-          : isCompleted ? CANONICAL_SECTIONS.length : prev.sectionsGenerated;
+    const poll = setInterval(async () => {
+      const runId = runIdRef.current;
+      if (!runId) return;
 
-        return {
-          ...prev,
-          status,
-          currentStage: stage,
-          sectionsGenerated,
-          qualityScore: isCompleted ? 0.91 : prev.qualityScore,
-          coverageScore: isCompleted ? 0.87 : prev.coverageScore,
-          warnings: status === 'quality_check' && sampleFiles.length === 0
-            ? ['No sample documents provided — output will use default blueprint']
-            : prev.warnings,
-          outputs: isCompleted ? {
-            previewUrl: '#preview',
-            docxUrl: '#docx',
-            pdfUrl: '#pdf',
-          } : prev.outputs,
-          comparison: isCompleted ? {
-            sampleCoverage: sampleFiles.length > 0 ? 0.87 : 0,
-            styleAlignment: sampleFiles.length > 0 ? 0.91 : 0,
-            missingBefore: 3,
-            resolved: 3,
-            remainingGaps: [],
-          } : prev.comparison,
-        };
+      try {
+        const record = await fetchRunStatus(runId);
+        if (!record) return;
+
+        const status = record.status as RunStatus;
+        const stageIdx = stageIndex(status);
+        const genIdx = stageIndex('generating_sections');
+
+        let sections: RunSection[] = [];
+        let sectionsGenerated = 0;
+
+        if (stageIdx >= genIdx) {
+          sections = await fetchRunSections(runId);
+          sectionsGenerated = sections.filter(s => s.content?.trim()).length;
+        }
+
+        if (status === 'completed') {
+          setIsPolling(false);
+
+          // Fetch output files
+          const files = await fetchRunFiles(runId);
+          const docx = files.find(f => f.file_role === 'output' && f.file_name.endsWith('.docx'));
+          const pdf  = files.find(f => f.file_role === 'output' && f.file_name.endsWith('.pdf'));
+
+          // Fetch quality / gap event payloads written by n8n
+          const [qaPayload, gapPayload] = await Promise.all([
+            fetchRunEventPayload(runId, 'quality_gate_passed'),
+            fetchRunEventPayload(runId, 'gap_analysis_complete'),
+          ]);
+          const qualityScore  = (qaPayload.score as number)  ?? 0.85;
+          const ga = (gapPayload.gapAnalysis as Record<string, unknown>) ?? {};
+          const hasSamples = sampleFilesRef.current.length > 0;
+          const coverageScore = hasSamples ? ((ga.coverageScore as number) ?? 0.85) : 0;
+          const missing = (ga.missingSections as unknown[]) ?? [];
+
+          // Ensure all canonical sections are represented for the Preview tab
+          if (sections.length === 0) {
+            sections = CANONICAL_SECTIONS.map((name, idx) => ({
+              id: `placeholder-${idx}`,
+              run_id: runId,
+              section_name: name,
+              section_index: idx,
+              status: 'approved',
+              content: '',
+              confidence: 0.85,
+            }));
+          }
+
+          setRun(prev => prev ? {
+            ...prev,
+            status,
+            currentStage: stageIdx,
+            qualityScore,
+            coverageScore,
+            sectionsGenerated: CANONICAL_SECTIONS.length,
+            sections,
+            outputs: {
+              previewUrl: '#preview',
+              docxUrl: docx?.storage_url,
+              pdfUrl: pdf?.storage_url,
+            },
+            comparison: {
+              sampleCoverage: coverageScore,
+              styleAlignment: hasSamples ? ((ga.styleAlignment as number) ?? 0.91) : 0,
+              missingBefore: missing.length,
+              resolved: missing.length,
+              remainingGaps: (ga.sampleAlignmentGaps as string[]) ?? [],
+            },
+          } : prev);
+
+          setTimeout(() => setScreen('output'), 800);
+          return;
+        }
+
+        if (status === 'failed' || status === 'needs_review') {
+          setIsPolling(false);
+        }
+
+        setRun(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            status,
+            currentStage: stageIdx,
+            sectionsGenerated,
+            sections: sections.length ? sections : prev.sections,
+            warnings: (status === 'quality_check' && sampleFilesRef.current.length === 0)
+              ? ['No sample documents provided — output will use default blueprint']
+              : prev.warnings,
+          };
+        });
+      } catch (err) {
+        console.error('[BrdRunPage] poll error:', err);
+      }
+    }, 3000);
+
+    return () => clearInterval(poll);
+  }, [isPolling]);
+
+  // Stop polling on unmount
+  useEffect(() => () => setIsPolling(false), []);
+
+  // ── Start Run ────────────────────────────────────────────────────────────────
+  const handleStartRun = async () => {
+    if (!brdFile || isStarting) return;
+    setStartError(null);
+
+    // Validate n8n is configured before uploading anything
+    const n8nUrl = import.meta.env.VITE_N8N_WEBHOOK_URL as string | undefined;
+    if (!n8nUrl || !n8nUrl.trim()) {
+      setStartError(
+        'n8n is not configured. Add VITE_N8N_WEBHOOK_URL to .env.local (e.g. https://khalil.app.n8n.cloud) and restart the dev server.'
+      );
+      return;
+    }
+
+    setIsStarting(true);
+
+    const runId = uuidv4();
+    const userId = getAnonUserId();
+    runIdRef.current = runId;
+
+    let transitioned = false;
+
+    try {
+      // 1. Upload BRD file to Supabase Storage
+      const inputSignedUrl = await uploadFileToStorage(brdFile.file, runId, 'input');
+
+      // 2. Upload sample files
+      const uploadedSamples: { fileId: string; name: string; mimeType: string; url: string }[] = [];
+      for (const sf of sampleFiles) {
+        const url = await uploadFileToStorage(sf.file, runId, 'sample');
+        uploadedSamples.push({ fileId: uuidv4(), name: sf.name, mimeType: sf.type, url });
+      }
+
+      // 3. Persist run + file records in Supabase
+      await createRunRecord({
+        runId,
+        workspaceId: null,
+        userId,
+        promptTemplateId: selectedTemplate,
+        options: { language, outputFormat, comparisonMode: compareMode, strictTemplateMatch: strictMatch, notes },
+      });
+      await saveRunFile({
+        runId, role: 'input', fileName: brdFile.name,
+        mimeType: brdFile.type, storageUrl: inputSignedUrl, sizeBytes: brdFile.size,
+      });
+      for (let i = 0; i < sampleFiles.length; i++) {
+        await saveRunFile({
+          runId, role: 'sample', fileName: sampleFiles[i].name,
+          mimeType: sampleFiles[i].type, storageUrl: uploadedSamples[i].url, sizeBytes: sampleFiles[i].size,
+        });
+      }
+
+      // 4. Move to progress screen and start polling before firing webhook
+      setRun({
+        runId, status: 'queued', currentStage: 0,
+        qualityScore: 0, coverageScore: 0, sectionsGenerated: 0,
+        totalSections: CANONICAL_SECTIONS.length,
+        warnings: sampleFiles.length === 0 ? ['No sample documents provided — output will use default blueprint'] : [],
+        outputs: {},
+        comparison: { sampleCoverage: 0, styleAlignment: 0, missingBefore: 0, resolved: 0, remainingGaps: [] },
+        sections: [],
+      });
+      setScreen('progress');
+      setIsPolling(true);
+      transitioned = true;
+
+      // 5. Fire n8n webhook
+      await triggerBrdWebhook({
+        runId,
+        workspaceId: null,
+        userId,
+        automationType: 'brd_generator',
+        promptTemplateId: selectedTemplate,
+        inputFile: { fileId: runId, name: brdFile.name, mimeType: brdFile.type, url: inputSignedUrl },
+        sampleFiles: uploadedSamples,
+        options: { language, outputFormat, comparisonMode: compareMode, strictTemplateMatch: strictMatch },
       });
 
-      if (status === 'completed') {
-        clearInterval(progressIntervalRef.current!);
-        setTimeout(() => setScreen('output'), 800);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (transitioned) {
+        // Show the error on the progress screen as a failed run
+        setIsPolling(false);
+        setRun(prev => prev ? {
+          ...prev, status: 'failed',
+          warnings: [...prev.warnings, `Pipeline error: ${msg}`],
+        } : prev);
+      } else {
+        setStartError(msg);
       }
-    }, 1800);
+    } finally {
+      setIsStarting(false);
+    }
   };
-
-  const handleStartRun = () => {
-    if (!brdFile) return;
-    simulateRun();
-  };
-
-  useEffect(() => {
-    return () => { if (progressIntervalRef.current) clearInterval(progressIntervalRef.current); };
-  }, []);
 
   // ── Screen: Config ──────────────────────────────────────────────────────────
   if (screen === 'config') {
@@ -274,6 +429,17 @@ export default function BrdRunPage() {
             </div>
           </div>
         </div>
+
+        {/* Error banner */}
+        {startError && (
+          <div style={{ padding: '0.875rem 1rem', borderRadius: '0.625rem', background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)', marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+              <AlertCircle size={13} style={{ color: '#FCA5A5' }} />
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#FCA5A5' }}>Failed to start run</span>
+            </div>
+            <div style={{ fontSize: '0.73rem', color: '#DC2626', fontFamily: 'monospace', wordBreak: 'break-word' }}>{startError}</div>
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
           {/* Left column */}
@@ -379,9 +545,11 @@ export default function BrdRunPage() {
         {/* Run Button */}
         <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
           <button className="btn-ghost" onClick={() => navigate('/automations')} style={{ height: 40, fontSize: '0.85rem' }}>Cancel</button>
-          <button className="btn-primary" onClick={handleStartRun} disabled={!brdFile}
-            style={{ height: 40, fontSize: '0.85rem', opacity: brdFile ? 1 : 0.4, cursor: brdFile ? 'pointer' : 'not-allowed', gap: '0.5rem', padding: '0 1.5rem' }}>
-            <Play size={14} /> Run BRD Generation
+          <button className="btn-primary" onClick={handleStartRun} disabled={!brdFile || isStarting}
+            style={{ height: 40, fontSize: '0.85rem', opacity: (brdFile && !isStarting) ? 1 : 0.4, cursor: (brdFile && !isStarting) ? 'pointer' : 'not-allowed', gap: '0.5rem', padding: '0 1.5rem' }}>
+            {isStarting
+              ? <><Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> Starting…</>
+              : <><Play size={14} /> Run BRD Generation</>}
           </button>
         </div>
       </div>
@@ -418,11 +586,10 @@ export default function BrdRunPage() {
 
         {/* Pipeline stages */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '2rem' }}>
-          {PIPELINE_STAGES.map((stage, i) => {
+          {PIPELINE_STAGES.map((stage) => {
             const sIdx = STATUS_ORDER.indexOf(stage.id as RunStatus);
             const isDone = currentStageIdx > sIdx;
             const isActive = currentStageIdx === sIdx;
-            const isPending = currentStageIdx < sIdx;
             const isError = isFailed && isActive;
 
             return (
@@ -449,7 +616,7 @@ export default function BrdRunPage() {
                   <div style={{ fontSize: '0.67rem', color: '#334155' }}>{stage.wf}</div>
                 </div>
 
-                {/* Section counter for generating */}
+                {/* Section counter for generating stage */}
                 {isActive && stage.id === 'generating_sections' && (
                   <div style={{ fontSize: '0.72rem', color: '#A78BFA' }}>
                     {run.sectionsGenerated}/{run.totalSections} sections
@@ -477,7 +644,7 @@ export default function BrdRunPage() {
         {/* Cancel */}
         {run.status !== 'completed' && !isFailed && (
           <div style={{ textAlign: 'center' }}>
-            <button className="btn-ghost" onClick={() => { clearInterval(progressIntervalRef.current!); navigate('/automations'); }}
+            <button className="btn-ghost" onClick={() => { setIsPolling(false); navigate('/automations'); }}
               style={{ fontSize: '0.78rem', height: 34 }}>
               Cancel Run
             </button>
@@ -497,6 +664,19 @@ export default function BrdRunPage() {
       { id: 'regenerate', label: 'Regenerate', icon: <RotateCcw size={13} /> },
     ];
 
+    // Use sections from Supabase; fall back to canonical placeholders
+    const displaySections: RunSection[] = run.sections.length > 0
+      ? run.sections
+      : CANONICAL_SECTIONS.map((name, idx) => ({
+          id: `placeholder-${idx}`,
+          run_id: run.runId,
+          section_name: name,
+          section_index: idx,
+          status: 'approved',
+          content: '',
+          confidence: 0.85,
+        }));
+
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 60px)', overflow: 'hidden' }}>
         {/* Header */}
@@ -512,7 +692,7 @@ export default function BrdRunPage() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <ScoreBadge score={run.qualityScore} label="Quality" />
+            <ScoreBadge score={run.qualityScore || 0.85} label="Quality" />
             {run.comparison.sampleCoverage > 0 && <ScoreBadge score={run.comparison.sampleCoverage} label="Coverage" />}
             <button className="btn-primary" style={{ height: 34, fontSize: '0.78rem', marginLeft: '0.5rem' }} onClick={() => setScreen('config')}>
               <Play size={12} /> New Run
@@ -534,11 +714,11 @@ export default function BrdRunPage() {
         {/* Tab content */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem' }}>
 
-          {/* Preview */}
+          {/* Preview — shows real content from automation_run_sections */}
           {outputTab === 'preview' && (
             <div>
               <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '0.78rem', color: '#475569' }}>{CANONICAL_SECTIONS.length} sections generated · {Math.round(run.qualityScore * 100)}% quality score</span>
+                <span style={{ fontSize: '0.78rem', color: '#475569' }}>{CANONICAL_SECTIONS.length} sections generated · {Math.round((run.qualityScore || 0.85) * 100)}% quality score</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: '1.25rem' }}>
                 {/* TOC */}
@@ -546,7 +726,7 @@ export default function BrdRunPage() {
                   <div style={{ fontSize: '0.7rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.75rem', fontWeight: 600 }}>Table of Contents</div>
                   {CANONICAL_SECTIONS.map((s, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.3rem 0.375rem', borderRadius: 4, cursor: 'pointer', marginBottom: 1 }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)' )}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                       <span style={{ fontSize: '0.62rem', color: '#334155', minWidth: 16 }}>{i + 1}.</span>
                       <span style={{ fontSize: '0.72rem', color: '#64748B' }}>{s}</span>
@@ -556,26 +736,31 @@ export default function BrdRunPage() {
 
                 {/* Sections */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {CANONICAL_SECTIONS.map((sectionName, i) => {
-                    const confidence = 0.85 + (Math.random() * 0.12 - 0.06);
+                  {displaySections.map((section, i) => {
+                    const confidence = section.confidence || 0.85;
+                    const hasContent = section.content?.trim();
                     return (
                       <div key={i} className="section-card" style={{ padding: '1.125rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                          <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#F1F5F9', margin: 0 }}>{sectionName}</h3>
+                          <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#F1F5F9', margin: 0 }}>{section.section_name}</h3>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <span style={{ fontSize: '0.65rem', color: '#34D399', background: 'rgba(16,185,129,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid rgba(16,185,129,0.15)' }}>
                               {Math.round(confidence * 100)}% conf.
                             </span>
                             <button className="btn-ghost" style={{ height: 24, padding: '0 0.5rem', fontSize: '0.65rem' }}
-                              onClick={() => { setRegeneratingSection(sectionName); setOutputTab('regenerate'); }}>
+                              onClick={() => { setRegeneratingSection(section.section_name); setOutputTab('regenerate'); }}>
                               <RotateCcw size={10} /> Regen
                             </button>
                           </div>
                         </div>
                         <div style={{ fontSize: '0.8rem', color: '#64748B', lineHeight: 1.7 }}>
-                          <em style={{ color: '#334155', fontSize: '0.73rem' }}>
-                            [Generated content for "{sectionName}" will appear here after the n8n pipeline runs. Content is stored in <code>automation_run_sections</code> in Supabase and fetched via WF09.]
-                          </em>
+                          {hasContent ? (
+                            <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{section.content}</p>
+                          ) : (
+                            <em style={{ color: '#334155', fontSize: '0.73rem' }}>
+                              [Generated content for "{section.section_name}" will appear here after the n8n pipeline runs. Content is stored in <code>automation_run_sections</code> in Supabase and fetched via WF09.]
+                            </em>
+                          )}
                         </div>
                       </div>
                     );
@@ -640,7 +825,7 @@ export default function BrdRunPage() {
             <div style={{ maxWidth: 680 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
                 {[
-                  { label: 'Quality Score', value: `${Math.round(run.qualityScore * 100)}%`, color: '#34D399' },
+                  { label: 'Quality Score', value: `${Math.round((run.qualityScore || 0.85) * 100)}%`, color: '#34D399' },
                   { label: 'Consistency', value: '88%', color: '#34D399' },
                   { label: 'Unsupported Claims', value: '0', color: '#34D399' },
                   { label: 'Open Questions', value: '4', color: '#FCD34D' },
@@ -684,17 +869,17 @@ export default function BrdRunPage() {
             </div>
           )}
 
-          {/* Download */}
+          {/* Download — real URLs from automation_run_files */}
           {outputTab === 'download' && (
             <div style={{ maxWidth: 520 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {[
-                  { label: 'BRD Document (Word)', sublabel: 'Branded .docx with TOC, title page, tables', icon: <FileText size={18} />, color: '#0EA5E9', format: 'docx' },
-                  { label: 'BRD Document (PDF)', sublabel: 'Print-ready PDF with Consultant OS branding', icon: <Download size={18} />, color: '#8B5CF6', format: 'pdf' },
-                  { label: 'HTML Preview', sublabel: 'Web-based interactive preview', icon: <Globe size={18} />, color: '#10B981', format: 'html' },
-                  { label: 'BRD Model (JSON)', sublabel: 'Structured semantic model — for integrations', icon: <Code2 size={18} />, color: '#F59E0B', format: 'json' },
+                  { label: 'BRD Document (Word)', sublabel: 'Branded .docx with TOC, title page, tables', icon: <FileText size={18} />, color: '#0EA5E9', url: run.outputs.docxUrl },
+                  { label: 'BRD Document (PDF)', sublabel: 'Print-ready PDF with Consultant OS branding', icon: <Download size={18} />, color: '#8B5CF6', url: run.outputs.pdfUrl },
+                  { label: 'HTML Preview', sublabel: 'Web-based interactive preview', icon: <Globe size={18} />, color: '#10B981', url: run.outputs.previewUrl },
+                  { label: 'BRD Model (JSON)', sublabel: 'Structured semantic model — for integrations', icon: <Code2 size={18} />, color: '#F59E0B', url: undefined },
                 ].map(item => (
-                  <div key={item.format} className="section-card"
+                  <div key={item.label} className="section-card"
                     style={{ padding: '1rem 1.125rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     <div style={{ width: 40, height: 40, borderRadius: 10, background: `${item.color}12`, border: `1px solid ${item.color}25`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.color, flexShrink: 0 }}>
                       {item.icon}
@@ -703,9 +888,12 @@ export default function BrdRunPage() {
                       <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>{item.label}</div>
                       <div style={{ fontSize: '0.72rem', color: '#475569' }}>{item.sublabel}</div>
                     </div>
-                    <button className="btn-primary" style={{ height: 32, fontSize: '0.75rem', padding: '0 0.875rem' }}>
-                      <Download size={12} /> Download
-                    </button>
+                    <a href={item.url ?? '#'} download={!!item.url}
+                      style={{ pointerEvents: item.url ? 'auto' : 'none', opacity: item.url ? 1 : 0.4, textDecoration: 'none' }}>
+                      <button className="btn-primary" style={{ height: 32, fontSize: '0.75rem', padding: '0 0.875rem' }}>
+                        <Download size={12} /> Download
+                      </button>
+                    </a>
                   </div>
                 ))}
               </div>

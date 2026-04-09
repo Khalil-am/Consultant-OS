@@ -3,22 +3,26 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 // ── Hoisted mocks ────────────────────────────────────────────
-const { mockGetActivities, mockGetWorkspaces } = vi.hoisted(() => ({
+const { mockGetActivities, mockGetWorkspaces, mockGetTeamMembers, mockCreateTeamMember, mockUpdateTeamMember } = vi.hoisted(() => ({
   mockGetActivities: vi.fn(),
   mockGetWorkspaces: vi.fn(),
+  mockGetTeamMembers: vi.fn(),
+  mockCreateTeamMember: vi.fn(),
+  mockUpdateTeamMember: vi.fn(),
 }));
 
 vi.mock('../lib/db', () => ({
   getActivities: mockGetActivities,
   getWorkspaces: mockGetWorkspaces,
+  getTeamMembers: mockGetTeamMembers,
+  createTeamMember: mockCreateTeamMember,
+  updateTeamMember: mockUpdateTeamMember,
 }));
 
-vi.mock('../data/mockData', () => ({
-  users: [
-    { id: 'u1', name: 'Ahmed Khalil', email: 'ahmed@firm.com', role: 'Admin', workspaces: 8, lastActive: '2h ago', status: 'Active', initials: 'AK' },
-    { id: 'u2', name: 'Rania Taleb', email: 'rania@firm.com', role: 'Manager', workspaces: 4, lastActive: '1d ago', status: 'Active', initials: 'RT' },
-  ],
-}));
+const mockMembers = [
+  { id: 'u1', name: 'Ahmed Khalil', email: 'ahmed@firm.com', role: 'Admin', workspaces_count: 8, last_active: '2h ago', status: 'Active', initials: 'AK', created_at: '', updated_at: '' },
+  { id: 'u2', name: 'Rania Taleb', email: 'rania@firm.com', role: 'Manager', workspaces_count: 4, last_active: '1d ago', status: 'Active', initials: 'RT', created_at: '', updated_at: '' },
+];
 
 vi.mock('../hooks/useLayout', () => ({
   useLayout: () => ({ width: 1200, isMobile: false, isTablet: false }),
@@ -37,11 +41,14 @@ beforeEach(() => {
   mockGetWorkspaces.mockResolvedValue([
     { id: 'ws-1', name: 'MOCI', type: 'Procurement', status: 'Active', progress: 65, language: 'AR', sector: 'Government', contributors: ['AM'] },
   ]);
+  mockGetTeamMembers.mockResolvedValue(mockMembers);
+  mockCreateTeamMember.mockImplementation(async (member: typeof mockMembers[0]) => ({ ...member, created_at: '', updated_at: '' }));
+  mockUpdateTeamMember.mockResolvedValue({});
 });
 
 // ────────────────────────────────────────────────────────────
 describe('Admin – Users table', () => {
-  it('renders user table with mock users', async () => {
+  it('renders user table with Supabase users', async () => {
     renderAdmin();
     expect(await screen.findByText('Ahmed Khalil')).toBeInTheDocument();
     expect(screen.getByText('Rania Taleb')).toBeInTheDocument();
@@ -65,13 +72,10 @@ describe('Admin – Users table', () => {
     expect(screen.getByText('rania@firm.com')).toBeInTheDocument();
   });
 
-  it('loads users from localStorage when available', async () => {
-    const stored = [
-      { id: 'u99', name: 'Stored User', email: 'stored@test.com', role: 'Analyst', workspaces: 1, lastActive: 'Just now', status: 'Active', initials: 'SU' },
-    ];
-    localStorage.setItem('admin_users', JSON.stringify(stored));
+  it('loads users from Supabase on mount', async () => {
     renderAdmin();
-    expect(await screen.findByText('Stored User')).toBeInTheDocument();
+    await waitFor(() => expect(mockGetTeamMembers).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText('Ahmed Khalil')).toBeInTheDocument();
   });
 
   it('shows Invite User button', async () => {

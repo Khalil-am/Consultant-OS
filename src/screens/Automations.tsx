@@ -6,7 +6,8 @@ import {
   ArrowRight, Loader2, ClipboardList, Video, Monitor, Building2,
   BarChart2, Brain,
 } from 'lucide-react';
-import { automations as initialAutomations } from '../data/mockData';
+import { getAutomations, updateAutomation } from '../lib/db';
+import type { AutomationRow } from '../lib/db';
 
 const categories = ['All', 'BA & Requirements', 'Meetings', 'Product', 'Procurement', 'PMO', 'Reporting', 'Knowledge', 'Productivity'];
 
@@ -40,14 +41,26 @@ export default function Automations() {
   const { width, isMobile } = useLayout();
   const [activeCategory, setActiveCategory] = useState('All');
   const [search, setSearch] = useState('');
-  const [automations, setAutomations] = useState(initialAutomations);
+  const [automations, setAutomations] = useState<AutomationRow[]>([]);
   const [starred, setStarred] = useState<Set<string>>(() => {
     try {
       const saved = localStorage.getItem('automation_starred');
       if (saved) return new Set(JSON.parse(saved) as string[]);
     } catch { /* ignore */ }
-    return new Set(initialAutomations.filter(a => a.starred).map(a => a.id));
+    return new Set<string>();
   });
+
+  // Load automations from Supabase on mount
+  useEffect(() => {
+    getAutomations().then(data => {
+      setAutomations(data);
+      // Seed starred from DB if localStorage is empty
+      const saved = localStorage.getItem('automation_starred');
+      if (!saved) {
+        setStarred(new Set(data.filter(a => a.starred).map(a => a.id)));
+      }
+    }).catch(() => {});
+  }, []);
   const [runningId, setRunningId] = useState<string | null>(null);
   const [runTimer, setRunTimer] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
@@ -66,23 +79,20 @@ export default function Automations() {
   }, [runningId]);
 
   const handleRun = useCallback((id: string) => {
-    if (runningId) return;
-    setRunningId(id);
-    setTimeout(() => {
-      setRunningId(null);
-      setAutomations(prev => prev.map(a => a.id === id ? { ...a, runCount: a.runCount + 1 } : a));
-      const name = automations.find(a => a.id === id)?.name ?? 'Automation';
-      setToast(`${name} completed successfully`);
-      setTimeout(() => setToast(null), 3000);
-    }, 3000);
-  }, [runningId, automations]);
+    // Automations with dedicated run pages navigate there directly
+    if (id === 'auto-001') { navigate('/automations/brd/run'); return; }
+    if (id === 'auto-diwan') { navigate('/automations/diwan/run'); return; }
+    // Other automations have no configured webhook yet — show a clear message
+    setToast('No webhook URL configured for this automation. Set one up in the automation settings.');
+    setTimeout(() => setToast(null), 4000);
+  }, [navigate]);
 
   // Computed stats
   const totalAutomations = automations.length;
   const activeCount = automations.filter(a => a.status === 'Active').length;
-  const totalRuns = automations.reduce((sum, a) => sum + a.runCount, 0);
+  const totalRuns = automations.reduce((sum, a) => sum + a.run_count, 0);
   const avgSuccessRate = automations.length > 0
-    ? (automations.reduce((sum, a) => sum + a.successRate, 0) / automations.length).toFixed(1)
+    ? (automations.reduce((sum, a) => sum + a.success_rate, 0) / automations.length).toFixed(1)
     : '0';
 
   const filtered = automations.filter(a => {
@@ -100,6 +110,7 @@ export default function Automations() {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
       try { localStorage.setItem('automation_starred', JSON.stringify([...next])); } catch { /* ignore */ }
+      updateAutomation(id, { starred: next.has(id) }).catch(() => {});
       return next;
     });
   };
@@ -200,7 +211,7 @@ export default function Automations() {
         {filtered.map(auto => {
           const isRunning = runningId === auto.id;
           const isStarred = starred.has(auto.id);
-          const catColor  = categoryColors[auto.category] ?? auto.categoryColor ?? '#00D4FF';
+          const catColor  = categoryColors[auto.category] ?? auto.category_color ?? '#00D4FF';
 
           return (
             <div
@@ -282,7 +293,7 @@ export default function Automations() {
                     background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
                   }}>
                     <span style={{ fontSize: '0.6rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>IN</span>
-                    <span style={{ fontSize: '0.72rem', color: '#94A3B8' }}>{auto.inputType}</span>
+                    <span style={{ fontSize: '0.72rem', color: '#94A3B8' }}>{auto.input_type}</span>
                   </div>
                   <ArrowRight size={12} style={{ color: '#334155', flexShrink: 0 }} />
                   <div style={{
@@ -291,7 +302,7 @@ export default function Automations() {
                     background: `${catColor}0E`, border: `1px solid ${catColor}20`,
                   }}>
                     <span style={{ fontSize: '0.6rem', color: catColor, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>OUT</span>
-                    <span style={{ fontSize: '0.72rem', color: '#94A3B8' }}>{auto.outputType}</span>
+                    <span style={{ fontSize: '0.72rem', color: '#94A3B8' }}>{auto.output_type}</span>
                   </div>
                 </div>
 
@@ -315,11 +326,11 @@ export default function Automations() {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', paddingTop: '0.625rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
                     <Clock size={11} style={{ color: '#334155' }} />
-                    <span style={{ fontSize: '0.72rem', color: '#475569' }}>Last run: {auto.lastRun}</span>
+                    <span style={{ fontSize: '0.72rem', color: '#475569' }}>Last run: {auto.last_run}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
                     <div style={{ width: '6px', height: '6px', borderRadius: '9999px', background: '#10B981', boxShadow: '0 0 5px rgba(16,185,129,0.6)' }} />
-                    <span style={{ fontSize: '0.72rem', color: '#34D399', fontWeight: 600 }}>{auto.successRate}%</span>
+                    <span style={{ fontSize: '0.72rem', color: '#34D399', fontWeight: 600 }}>{auto.success_rate}%</span>
                   </div>
                 </div>
 

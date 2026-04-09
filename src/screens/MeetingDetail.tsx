@@ -252,43 +252,7 @@ export default function MeetingDetail() {
 
       const result = await chatWithDocument([{ role: 'user', content: userMsg }], systemPrompt);
 
-      // Save as document in Supabase
-      const timestamp = Date.now();
-      const docId = `doc-gen-${timestamp}`;
-      await upsertDocument({
-        id: docId,
-        name: `${meeting.title} – AI Generated Minutes`,
-        type: 'Meeting Minutes',
-        type_color: '#10B981',
-        workspace: meeting.workspace,
-        workspace_id: meeting.workspace_id,
-        date: new Date().toISOString().slice(0, 10),
-        language: 'EN',
-        status: 'Draft',
-        size: `${Math.ceil(result.length / 1000)}KB`,
-        author: 'AI',
-        pages: 1,
-        summary: result.slice(0, 300),
-        tags: [meeting.id, 'meeting-minutes', 'ai-generated'],
-        file_url: null,
-      });
-
-      // Mark meeting minutes as generated and update counts
-      const newActionsCount = (result.match(/action item/gi) ?? []).length;
-      const newDecisionsCount = (result.match(/decision|decided|agreed/gi) ?? []).length;
-      await updateMeeting(meeting.id, {
-        minutes_generated: true,
-        actions_extracted: Math.max(meeting.actions_extracted, newActionsCount),
-        decisions_logged: Math.max(meeting.decisions_logged, newDecisionsCount),
-      });
-      setMeeting(prev => prev ? {
-        ...prev,
-        minutes_generated: true,
-        actions_extracted: Math.max(prev.actions_extracted, newActionsCount),
-        decisions_logged: Math.max(prev.decisions_logged, newDecisionsCount),
-      } : prev);
-
-      // Download as text file
+      // Download as .md file immediately — before any async Supabase saves
       const blob = new Blob([result], { type: 'text/markdown' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -299,11 +263,49 @@ export default function MeetingDetail() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      await loadAttachments(meeting.workspace_id, meeting.id);
-      setUploadSuccess('AI minutes generated and saved successfully.');
+      // Save as document in Supabase (best-effort — don't block download on failure)
+      const timestamp = Date.now();
+      const docId = `doc-gen-${timestamp}`;
+      const newActionsCount = (result.match(/action item/gi) ?? []).length;
+      const newDecisionsCount = (result.match(/decision|decided|agreed/gi) ?? []).length;
+      try {
+        await upsertDocument({
+          id: docId,
+          name: `${meeting.title} – AI Generated Minutes`,
+          type: 'Meeting Minutes',
+          type_color: '#10B981',
+          workspace: meeting.workspace,
+          workspace_id: meeting.workspace_id,
+          date: new Date().toISOString().slice(0, 10),
+          language: 'EN',
+          status: 'Draft',
+          size: `${Math.ceil(result.length / 1000)}KB`,
+          author: 'AI',
+          pages: 1,
+          summary: result.slice(0, 300),
+          tags: [meeting.id, 'meeting-minutes', 'ai-generated'],
+          file_url: null,
+        });
+        await updateMeeting(meeting.id, {
+          minutes_generated: true,
+          actions_extracted: Math.max(meeting.actions_extracted, newActionsCount),
+          decisions_logged: Math.max(meeting.decisions_logged, newDecisionsCount),
+        });
+        setMeeting(prev => prev ? {
+          ...prev,
+          minutes_generated: true,
+          actions_extracted: Math.max(prev.actions_extracted, newActionsCount),
+          decisions_logged: Math.max(prev.decisions_logged, newDecisionsCount),
+        } : prev);
+        await loadAttachments(meeting.workspace_id, meeting.id);
+      } catch {
+        // Supabase save failed — minutes were still downloaded successfully
+      }
+
+      setUploadSuccess('AI minutes generated and downloaded successfully.');
       setTimeout(() => setUploadSuccess(''), 5000);
     } catch (e) {
-      setGenerateError(e instanceof Error ? e.message : 'AI generation failed. Check your OpenRouter API key.');
+      setGenerateError(e instanceof Error ? e.message : 'AI generation failed.');
     } finally {
       setGenerating(false);
     }

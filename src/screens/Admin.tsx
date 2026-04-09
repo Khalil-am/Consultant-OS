@@ -32,8 +32,8 @@ const roleDisplayNames: Record<string, string> = {
   Viewer: 'Client Viewer',
 };
 
-const integrations: { name: string; category: string; status: string; logo: React.ReactNode; desc: string }[] = [
-  { name: 'Trello', category: 'Project Management', status: 'Connected', logo: <LayoutDashboard size={18} />, desc: 'BA Traffic Board — live task sync from Trello API' },
+const INTEGRATIONS_BASE: { name: string; category: string; logo: React.ReactNode; desc: string }[] = [
+  { name: 'Trello', category: 'Project Management', logo: <LayoutDashboard size={18} />, desc: 'BA Traffic Board — live task sync from Trello API' },
 ];
 
 
@@ -96,6 +96,18 @@ export default function Admin() {
   const [trelloTestResult, setTrelloTestResult] = useState<string | null>(null);
   const [trelloTesting, setTrelloTesting] = useState(false);
   const [trelloRefreshMsg, setTrelloRefreshMsg] = useState<string | null>(null);
+  const [trelloStatus, setTrelloStatus] = useState<'Checking' | 'Connected' | 'Disconnected'>('Checking');
+
+  // Check Trello connectivity on mount
+  useEffect(() => {
+    fetchBATrafficBoard()
+      .then(() => setTrelloStatus('Connected'))
+      .catch(() => setTrelloStatus('Disconnected'));
+  }, []);
+
+  const integrations = INTEGRATIONS_BASE.map(i =>
+    i.name === 'Trello' ? { ...i, status: trelloStatus } : { ...i, status: 'Connected' }
+  );
 
 
   const filteredUsers = useMemo(() => {

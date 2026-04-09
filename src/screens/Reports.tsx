@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLayout } from '../hooks/useLayout';
 import {
   Download, Calendar, Sparkles, Clock, FileText,
@@ -22,26 +22,7 @@ const reportTypeOptions = [
   'KPI Dashboard',
 ];
 
-const reportVolumeData = [
-  { month: 'Jan', count: 62 },
-  { month: 'Feb', count: 78 },
-  { month: 'Mar', count: 85 },
-  { month: 'Apr', count: 92 },
-  { month: 'May', count: 105 },
-  { month: 'Jun', count: 98 },
-  { month: 'Jul', count: 110 },
-  { month: 'Aug', count: 88 },
-  { month: 'Sep', count: 115 },
-  { month: 'Oct', count: 135 },
-  { month: 'Nov', count: 148 },
-  { month: 'Dec', count: 168 },
-];
-
-const statsData = [
-  { label: 'Total Generated', value: '1,284', trend: '\u2191 12%', trendUp: true, color: '#0EA5E9', icon: 'file' as const },
-  { label: 'Scheduled', value: '42', trend: '\u2191 5%', trendUp: true, color: '#10B981', icon: 'calendar' as const },
-  { label: 'Avg. Gen Time', value: '1.2s', trend: '\u2193 0.3s', trendUp: true, color: '#8B5CF6', icon: 'zap' as const },
-];
+const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 const boardPackChecks = [
   { label: 'Executive Summary', color: '#0EA5E9' },
@@ -87,7 +68,7 @@ function formatReportDate(dateStr: string) {
   const today = new Date();
   const d = new Date(dateStr);
   const diff = Math.floor((today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
-  if (diff === 0) return 'Today, 10:42 AM';
+  if (diff === 0) return 'Today, ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   if (diff === 1) return 'Yesterday';
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
@@ -116,6 +97,35 @@ export default function Reports() {
     getReports().then(setReports).catch(() => {});
     getWorkspaces().then(ws => setWorkspaceList(ws.map(w => ({ id: w.id, name: w.name })))).catch(() => {});
   }, []);
+
+  // Compute real stats from fetched reports
+  const statsData = useMemo(() => [
+    {
+      label: 'Total Generated',
+      value: reports.filter(r => r.status === 'Generated').length.toLocaleString(),
+      trend: '', trendUp: true, color: '#0EA5E9', icon: 'file' as const,
+    },
+    {
+      label: 'Scheduled',
+      value: reports.filter(r => r.status === 'Scheduled').length.toLocaleString(),
+      trend: '', trendUp: true, color: '#10B981', icon: 'calendar' as const,
+    },
+    {
+      label: 'Total Reports',
+      value: reports.length.toLocaleString(),
+      trend: '', trendUp: true, color: '#8B5CF6', icon: 'zap' as const,
+    },
+  ], [reports]);
+
+  // Build volume chart from real report created_at dates
+  const reportVolumeData = useMemo(() => {
+    const counts: number[] = Array(12).fill(0);
+    for (const r of reports) {
+      const month = new Date(r.created_at).getMonth();
+      if (month >= 0 && month < 12) counts[month]++;
+    }
+    return MONTH_LABELS.map((month, i) => ({ month, count: counts[i] }));
+  }, [reports]);
 
   async function handleGenerateReport() {
     setGeneratingReport(true);

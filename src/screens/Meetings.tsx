@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLayout } from '../hooks/useLayout';
 import {
@@ -80,11 +80,7 @@ function isVirtualLocation(loc: string | null | undefined): boolean {
   return lower.includes('teams') || lower.includes('zoom') || lower.includes('virtual') || lower.includes('online') || lower.includes('meet') || lower.includes('webex');
 }
 
-const aiInsights = [
-  '"3 meetings this week have overlapping participants -- consider consolidating."',
-  '"Minutes for Core Migration Sync are 2 days overdue. Draft available."',
-  '"Completion rate improved 12% this month. Keep the momentum going."',
-];
+// aiInsights is now computed from live data inside the component
 
 export default function Meetings() {
   const navigate = useNavigate();
@@ -104,6 +100,31 @@ export default function Meetings() {
     title: '', date: '', time: '09:00', duration: '1h', type: 'Review' as MeetingRow['type'],
     workspace: '', workspace_id: '', location: '', participants: '',
   });
+
+  // Compute AI insights from live meetings data
+  const aiInsights = useMemo(() => {
+    if (meetings.length === 0) return ['Loading insights from your meetings data…'];
+    const today = new Date();
+    const weekStart = new Date(today); weekStart.setDate(today.getDate() - today.getDay());
+    const thisWeek = meetings.filter(m => new Date(m.date) >= weekStart);
+    const overdue = meetings.filter(m => m.status === 'Completed' && !m.minutes_generated);
+    const completed = meetings.filter(m => m.status === 'Completed');
+    const withMinutes = completed.filter(m => m.minutes_generated);
+    const completionRate = completed.length > 0
+      ? Math.round((withMinutes.length / completed.length) * 100)
+      : 0;
+    const insights: string[] = [];
+    if (thisWeek.length > 0) {
+      insights.push(`${thisWeek.length} meeting${thisWeek.length > 1 ? 's' : ''} scheduled this week — review agendas to stay prepared.`);
+    }
+    if (overdue.length > 0) {
+      insights.push(`${overdue.length} completed meeting${overdue.length > 1 ? 's are' : ' is'} missing minutes — generate them to capture decisions.`);
+    } else {
+      insights.push('All completed meetings have minutes generated — great coverage!');
+    }
+    insights.push(`Minutes completion rate: ${completionRate}% across ${completed.length} completed meeting${completed.length !== 1 ? 's' : ''}.`);
+    return insights;
+  }, [meetings]);
 
   function openEditModal(meeting: MeetingRow, e: React.MouseEvent) {
     e.stopPropagation();

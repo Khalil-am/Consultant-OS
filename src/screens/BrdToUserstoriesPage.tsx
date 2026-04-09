@@ -1,10 +1,10 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Play, Loader, CheckCircle, AlertCircle,
   FileText, Download, Copy, Save,
 } from 'lucide-react';
-import { upsertDocument } from '../lib/db';
+import { upsertDocument, getWorkspaces } from '../lib/db';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -19,6 +19,15 @@ export default function BrdToUserstoriesPage() {
 
   // Config state
   const [inputText, setInputText] = useState('');
+  const [diwanWorkspaceId, setDiwanWorkspaceId] = useState<string | null>(null);
+
+  // Resolve Diwan workspace ID from Supabase on mount
+  useEffect(() => {
+    getWorkspaces().then(ws => {
+      const diwan = ws.find(w => w.name.toLowerCase().includes('diwan'));
+      if (diwan) setDiwanWorkspaceId(diwan.id);
+    }).catch(() => {});
+  }, []);
 
   // Run state
   const [screen, setScreen] = useState<Screen>('config');
@@ -87,7 +96,7 @@ export default function BrdToUserstoriesPage() {
           type: 'User Manual',
           type_color: '#0EA5E9',
           workspace: 'Diwan Committee System',
-          workspace_id: 'ws-001',
+          workspace_id: diwanWorkspaceId ?? '',
           date: new Date().toISOString().slice(0, 10),
           language: 'EN',
           status: 'Draft',

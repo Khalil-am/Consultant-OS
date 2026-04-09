@@ -955,7 +955,14 @@ export default function WorkspaceDetail() {
         <Modal title="Delete Workspace" onClose={() => setShowDeleteWs(false)}>
           <div style={{ fontSize: '0.875rem', color: '#94A3B8', marginBottom: '1.5rem', lineHeight: 1.6 }}>
             Are you sure you want to delete <strong style={{ color: '#F1F5F9' }}>{ws.name}</strong>?<br />
-            This will permanently remove all documents, meetings, tasks, and risks in this workspace.
+            This action is <strong style={{ color: '#FCA5A5' }}>permanent and cannot be undone</strong>. The following will also be deleted:
+            <ul style={{ marginTop: '0.75rem', paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+              <li>{data?.docs.length ?? ws.docs_count} document{(data?.docs.length ?? ws.docs_count) !== 1 ? 's' : ''}</li>
+              <li>{data?.meetings.length ?? ws.meetings_count} meeting{(data?.meetings.length ?? ws.meetings_count) !== 1 ? 's' : ''}</li>
+              <li>{data?.tasks.length ?? ws.tasks_count} task{(data?.tasks.length ?? ws.tasks_count) !== 1 ? 's' : ''}</li>
+              <li>{data?.risks.length ?? 0} risk{(data?.risks.length ?? 0) !== 1 ? 's' : ''}</li>
+              <li>{data?.milestones.length ?? 0} milestone{(data?.milestones.length ?? 0) !== 1 ? 's' : ''}</li>
+            </ul>
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
             <button className="btn-ghost" onClick={() => setShowDeleteWs(false)}>Cancel</button>
