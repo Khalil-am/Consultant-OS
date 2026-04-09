@@ -121,7 +121,7 @@ describe('Admin – Invite User modal', () => {
     expect(screen.getByRole('button', { name: /send invite/i })).not.toBeDisabled();
   });
 
-  it('adds new user and persists to localStorage (using real timers)', async () => {
+  it('adds new user via Supabase createTeamMember when invited', async () => {
     renderAdmin();
     await screen.findByText('Ahmed Khalil');
     await userEvent.click(screen.getByRole('button', { name: /invite user/i }));
@@ -129,10 +129,10 @@ describe('Admin – Invite User modal', () => {
     await userEvent.type(screen.getByPlaceholderText(/sarah@firm\.com/i), 'sara@test.com');
     await userEvent.click(screen.getByRole('button', { name: /send invite/i }));
 
-    // Wait for the 800ms setTimeout inside handleInviteUser
     await waitFor(() => {
-      const stored = JSON.parse(localStorage.getItem('admin_users') ?? '[]');
-      expect(stored.some((u: { name: string }) => u.name === 'Sara New')).toBe(true);
+      expect(mockCreateTeamMember).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Sara New', email: 'sara@test.com' }),
+      );
     }, { timeout: 3000 });
   });
 
@@ -152,7 +152,7 @@ describe('Admin – Invite User modal', () => {
 
 // ────────────────────────────────────────────────────────────
 describe('Admin – Status toggle', () => {
-  it('toggles user status from Active to Inactive and saves to localStorage', async () => {
+  it('toggles user status from Active to Inactive and calls Supabase updateTeamMember', async () => {
     renderAdmin();
     await screen.findByText('Ahmed Khalil');
 
@@ -162,13 +162,11 @@ describe('Admin – Status toggle', () => {
     fireEvent.click(suspendBtns[0]);
 
     await waitFor(() => {
-      const stored = JSON.parse(localStorage.getItem('admin_users') ?? '[]');
-      const ahmed = stored.find((u: { id: string }) => u.id === 'u1');
-      expect(ahmed?.status).toBe('Inactive');
+      expect(mockUpdateTeamMember).toHaveBeenCalledWith('u1', { status: 'Inactive' });
     });
   });
 
-  it('persists toggle changes to localStorage', async () => {
+  it('persists toggle changes via Supabase updateTeamMember', async () => {
     renderAdmin();
     await screen.findByText('Ahmed Khalil');
 
@@ -176,7 +174,7 @@ describe('Admin – Status toggle', () => {
     fireEvent.click(suspendBtns[0]);
 
     await waitFor(() => {
-      expect(localStorage.getItem('admin_users')).not.toBeNull();
+      expect(mockUpdateTeamMember).toHaveBeenCalledTimes(1);
     });
   });
 });

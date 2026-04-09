@@ -11,8 +11,8 @@ import {
   AreaChart, Area, XAxis, YAxis, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts';
-import { getActivities, getMilestones, getWorkspaceFinancials, getBoardDecisions, getRagStatusWithWorkspaces, getApprovals, updateApproval, upsertApproval } from '../lib/db';
-import type { ActivityRow, MilestoneRow, WorkspaceFinancialRow, BoardDecisionRow, RagStatusWithWorkspace, ApprovalRow } from '../lib/db';
+import { getActivities, getMilestones, getWorkspaceFinancials, getBoardDecisions, getRagStatusWithWorkspaces, getApprovals, updateApproval, upsertApproval, getDocuments } from '../lib/db';
+import type { ActivityRow, MilestoneRow, WorkspaceFinancialRow, BoardDecisionRow, RagStatusWithWorkspace, ApprovalRow, DocumentRow } from '../lib/db';
 import { useLayout } from '../hooks/useLayout';
 
 type Period = 'today' | 'week' | 'month';
@@ -130,6 +130,7 @@ export default function Dashboard() {
   const [workspaceFinancials, setWorkspaceFinancials] = useState<WorkspaceFinancialRow[]>([]);
   const [boardDecisions, setBoardDecisions] = useState<BoardDecisionRow[]>([]);
   const [ragStatusData, setRagStatusData] = useState<RagStatusWithWorkspace[]>([]);
+  const [documents, setDocuments] = useState<DocumentRow[]>([]);
 
   useEffect(() => {
     getActivities(30).then(setActivities).catch(() => {});
@@ -137,6 +138,7 @@ export default function Dashboard() {
     getWorkspaceFinancials().then(setWorkspaceFinancials).catch(() => {});
     getBoardDecisions().then(setBoardDecisions).catch(() => {});
     getRagStatusWithWorkspaces().then(setRagStatusData).catch(() => {});
+    getDocuments().then(setDocuments).catch(() => {});
     // Load approvals from Supabase; seed defaults if table is empty
     getApprovals().then(rows => {
       if (rows.length > 0) {
@@ -298,6 +300,13 @@ ${pendingApprovals.length > 0 ? `<table><thead><tr><th>Item</th><th>Requester</t
     });
     return Object.entries(monthMap).map(([month, d]) => ({ month, ...d }));
   }, [milestones]);
+
+  // Document distribution by type for pie chart
+  const documentsByTypeData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    documents.forEach(d => { counts[d.type] = (counts[d.type] ?? 0) + 1; });
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  }, [documents]);
 
   const wsNames: Record<string, string> = {
     'ws-001': 'NCA Digital Transf.',

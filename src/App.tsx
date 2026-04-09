@@ -3,6 +3,7 @@ import { HashRouter, Routes, Route } from 'react-router-dom';
 import { LayoutProvider, useLayout } from './hooks/useLayout';
 import Sidebar from './components/Sidebar';
 import TopBar from './components/TopBar';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Eagerly loaded — always needed
 import Dashboard from './screens/Dashboard';
@@ -64,24 +65,26 @@ function AppShell() {
         <TopBar />
         <main style={{ flex: 1, overflowY: 'auto', background: '#080C18' }}>
           <Suspense fallback={<PageLoader />}>
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/workspaces" element={<Workspaces />} />
-              <Route path="/workspaces/:id" element={<WorkspaceDetail />} />
-              <Route path="/automations" element={<Automations />} />
-              <Route path="/automations/:id" element={<AutomationBuilder />} />
-              <Route path="/documents" element={<Documents />} />
-              <Route path="/documents/:id" element={<DocumentDetail />} />
-              <Route path="/meetings" element={<Meetings />} />
-              <Route path="/meetings/:id" element={<MeetingDetail />} />
-              <Route path="/tasks" element={<Tasks />} />
-              <Route path="/reports" element={<Reports />} />
-              <Route path="/ask-ai" element={<AskAI />} />
-              <Route path="/admin" element={<Admin />} />
-              <Route path="/automations/brd/run" element={<BrdRunPage />} />
-              <Route path="/automations/diwan/run" element={<BrdToUserstoriesPage />} />
-              <Route path="/trello-cards" element={<TrelloCards />} />
-            </Routes>
+            <ErrorBoundary section="Page">
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/workspaces" element={<Workspaces />} />
+                <Route path="/workspaces/:id" element={<WorkspaceDetail />} />
+                <Route path="/automations" element={<Automations />} />
+                <Route path="/automations/:id" element={<AutomationBuilder />} />
+                <Route path="/documents" element={<Documents />} />
+                <Route path="/documents/:id" element={<DocumentDetail />} />
+                <Route path="/meetings" element={<Meetings />} />
+                <Route path="/meetings/:id" element={<MeetingDetail />} />
+                <Route path="/tasks" element={<Tasks />} />
+                <Route path="/reports" element={<Reports />} />
+                <Route path="/ask-ai" element={<AskAI />} />
+                <Route path="/admin" element={<Admin />} />
+                <Route path="/automations/brd/run" element={<BrdRunPage />} />
+                <Route path="/automations/diwan/run" element={<BrdToUserstoriesPage />} />
+                <Route path="/trello-cards" element={<TrelloCards />} />
+              </Routes>
+            </ErrorBoundary>
           </Suspense>
         </main>
       </div>

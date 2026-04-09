@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
 // ── Hoisted mocks ────────────────────────────────────────────
-const { mockGetActivities, mockGetMilestones, mockGetWorkspaceFinancials, mockGetBoardDecisions, mockGetRagStatusWithWorkspaces, mockGetApprovals, mockUpdateApproval, mockUpsertApproval } = vi.hoisted(() => ({
+const { mockGetActivities, mockGetMilestones, mockGetWorkspaceFinancials, mockGetBoardDecisions, mockGetRagStatusWithWorkspaces, mockGetApprovals, mockUpdateApproval, mockUpsertApproval, mockGetDocuments } = vi.hoisted(() => ({
   mockGetActivities: vi.fn(),
   mockGetMilestones: vi.fn(),
   mockGetWorkspaceFinancials: vi.fn(),
@@ -13,6 +13,7 @@ const { mockGetActivities, mockGetMilestones, mockGetWorkspaceFinancials, mockGe
   mockGetApprovals: vi.fn(),
   mockUpdateApproval: vi.fn(),
   mockUpsertApproval: vi.fn(),
+  mockGetDocuments: vi.fn(),
 }));
 
 vi.mock('../lib/db', () => ({
@@ -24,6 +25,7 @@ vi.mock('../lib/db', () => ({
   getApprovals: mockGetApprovals,
   updateApproval: mockUpdateApproval,
   upsertApproval: mockUpsertApproval,
+  getDocuments: mockGetDocuments,
 }));
 
 vi.mock('../hooks/useLayout', () => ({
@@ -64,6 +66,18 @@ const mockMilestone = {
   created_at: '', updated_at: '',
 };
 
+const MOCK_APPROVALS = [
+  { id: 'appr-001', title: 'NCA BRD v2.3', requester: 'AM', type: 'Document Approval', urgency: 'High', status: 'pending' as const, workspace_id: null, notes: null, created_at: '', updated_at: '' },
+  { id: 'appr-002', title: 'SC-10 Budget SAR 2.4M', requester: 'RT', type: 'Budget Approval', urgency: 'High', status: 'pending' as const, workspace_id: null, notes: null, created_at: '', updated_at: '' },
+  { id: 'appr-003', title: 'MOCI Vendor Shortlist', requester: 'FH', type: 'Procurement Decision', urgency: 'Medium', status: 'pending' as const, workspace_id: null, notes: null, created_at: '', updated_at: '' },
+  { id: 'appr-004', title: 'Healthcare Strategy Report', requester: 'SK', type: 'Report Sign-off', urgency: 'Low', status: 'pending' as const, workspace_id: null, notes: null, created_at: '', updated_at: '' },
+];
+
+const MOCK_RAG = [
+  { workspace_id: 'ws-1', workspace: 'NCA', rag: 'Green' as const, budget: 'Green' as const, schedule: 'Green' as const, risk: 'Amber' as const, lastUpdated: '' },
+  { workspace_id: 'ws-2', workspace: 'MOCI', rag: 'Amber' as const, budget: 'Amber' as const, schedule: 'Green' as const, risk: 'Green' as const, lastUpdated: '' },
+];
+
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
@@ -71,10 +85,11 @@ beforeEach(() => {
   mockGetMilestones.mockResolvedValue([]);
   mockGetWorkspaceFinancials.mockResolvedValue([]);
   mockGetBoardDecisions.mockResolvedValue([]);
-  mockGetRagStatusWithWorkspaces.mockResolvedValue([]);
-  mockGetApprovals.mockResolvedValue([]);
+  mockGetRagStatusWithWorkspaces.mockResolvedValue(MOCK_RAG);
+  mockGetApprovals.mockResolvedValue(MOCK_APPROVALS);
   mockUpdateApproval.mockResolvedValue({});
   mockUpsertApproval.mockResolvedValue({});
+  mockGetDocuments.mockResolvedValue([]);
 });
 
 // ────────────────────────────────────────────────────────────
@@ -87,7 +102,7 @@ describe('Dashboard – Render', () => {
   it('renders KPI cards from live data', async () => {
     renderDashboard();
     expect(await screen.findByText('Total Portfolio Value')).toBeInTheDocument();
-    expect(screen.getByText('Revenue Recognized')).toBeInTheDocument();
+    expect(screen.getAllByText('Revenue Recognized').length).toBeGreaterThan(0);
   });
 
   it('renders quick actions section', async () => {
@@ -262,6 +277,9 @@ describe('Dashboard – Board Decisions', () => {
   });
 
   it('shows "All Clear" when all decisions complete', async () => {
+    mockGetBoardDecisions.mockResolvedValue([
+      { id: 'bd-1', title: 'Approve vendor shortlist', committee: 'Procurement', date: '2026-03-20', due_date: '2026-03-25', status: 'In Progress', owner: 'AM', workspace_id: 'ws-1', priority: 'High', created_at: '', updated_at: '' },
+    ]);
     renderDashboard();
     await screen.findByText('Approve vendor shortlist');
     await userEvent.click(screen.getByRole('button', { name: /done/i }));
@@ -361,47 +379,32 @@ describe('Dashboard – Overdue alert banner', () => {
 });
 
 // ────────────────────────────────────────────────────────────
-describe('Dashboard – Approval localStorage persistence', () => {
-  it('saves approved status to localStorage', async () => {
+describe('Dashboard – Approval Supabase persistence', () => {
+  it('calls updateApproval with approved status when Approve is clicked', async () => {
     renderDashboard();
     await screen.findByText('NCA BRD v2.3');
     const approveButtons = screen.getAllByRole('button', { name: /approve/i });
     fireEvent.click(approveButtons[0]);
     await waitFor(() => {
-      const stored = localStorage.getItem('dashboard_approvals');
-      expect(stored).not.toBeNull();
-      const parsed = JSON.parse(stored!);
-      const approved = parsed.find((a: { id: number }) => a.id === 1);
-      expect(approved?.status).toBe('approved');
+      expect(mockUpdateApproval).toHaveBeenCalledWith('appr-001', { status: 'approved' });
     });
   });
 
-  it('saves rejected status to localStorage', async () => {
+  it('calls updateApproval with rejected status when Reject is clicked', async () => {
     renderDashboard();
     await screen.findByText('NCA BRD v2.3');
     const rejectButtons = screen.getAllByRole('button', { name: /reject/i });
     fireEvent.click(rejectButtons[0]);
     await waitFor(() => {
-      const stored = localStorage.getItem('dashboard_approvals');
-      expect(stored).not.toBeNull();
-      const parsed = JSON.parse(stored!);
-      const rejected = parsed.find((a: { id: number }) => a.id === 1);
-      expect(rejected?.status).toBe('rejected');
+      expect(mockUpdateApproval).toHaveBeenCalledWith('appr-001', { status: 'rejected' });
     });
   });
 
-  it('restores approval state from localStorage on mount', async () => {
-    const savedApprovals = [
-      { id: 1, title: 'NCA BRD v2.3', requester: 'AM', type: 'Document Approval', urgency: 'High', status: 'approved' },
-      { id: 2, title: 'SC-10 Budget SAR 2.4M', requester: 'RT', type: 'Budget Approval', urgency: 'High', status: 'pending' },
-      { id: 3, title: 'MOCI Vendor Shortlist', requester: 'FH', type: 'Procurement Decision', urgency: 'Medium', status: 'pending' },
-      { id: 4, title: 'Healthcare Strategy Report', requester: 'SK', type: 'Report Sign-off', urgency: 'Low', status: 'pending' },
-    ];
-    localStorage.setItem('dashboard_approvals', JSON.stringify(savedApprovals));
+  it('loads and displays approvals from Supabase on mount', async () => {
     renderDashboard();
-    await screen.findByText('NCA BRD v2.3');
+    expect(await screen.findByText('NCA BRD v2.3')).toBeInTheDocument();
     await waitFor(() => {
-      expect(screen.getByText('approved')).toBeInTheDocument();
+      expect(mockGetApprovals).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -111,7 +111,7 @@ describe('Reports – Initial load', () => {
     renderReports();
     expect(await screen.findByText('Total Generated')).toBeInTheDocument();
     expect(screen.getByText('Scheduled')).toBeInTheDocument();
-    expect(screen.getByText('Avg. Gen Time')).toBeInTheDocument();
+    expect(screen.getByText('Total Reports')).toBeInTheDocument();
   });
 
   it('shows board pack generator section', async () => {

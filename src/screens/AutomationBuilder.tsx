@@ -134,9 +134,10 @@ export default function AutomationBuilder() {
     getAutomationRuns(id).then(setRunsFromDb).catch(() => {});
 
     // Load custom prompt template from Supabase
-    supabase.from('prompt_templates').select('system_prompt').eq('id', `custom_${id}`).single()
-      .then(({ data }) => { if (data?.system_prompt) setEditablePrompt(data.system_prompt as string); })
-      .catch(() => {});
+    Promise.resolve(
+      supabase.from('prompt_templates').select('system_prompt').eq('id', `custom_${id}`).single()
+    ).then(({ data }) => { if (data?.system_prompt) setEditablePrompt(data.system_prompt as string); })
+     .catch(() => {});
   }, [id]);
 
   useEffect(() => {

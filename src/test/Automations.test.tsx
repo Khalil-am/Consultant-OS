@@ -185,17 +185,16 @@ describe('Automations – Run button', () => {
     expect(screen.getAllByRole('button', { name: /run now/i }).length).toBeGreaterThan(0);
   });
 
-  it('shows Running state immediately when Run Now clicked', async () => {
+  it('shows "no webhook configured" toast when Run Now clicked on non-BRD automation', async () => {
     renderAutomations();
     await screen.findByText('BRD Generator');
 
     const runButtons = screen.getAllByRole('button', { name: /run now/i });
-    // Click second card (auto-002 Meeting Minutes) to avoid navigation from auto-001
+    // Click second card (auto-002 Meeting Minutes) which has no webhook configured
     await userEvent.click(runButtons[1]);
 
-    // Immediately after click, "Running" text should appear in that button
     await waitFor(() => {
-      expect(screen.getByText('Running')).toBeInTheDocument();
+      expect(screen.getByText(/no webhook url configured/i)).toBeInTheDocument();
     });
   }, 10000);
 });

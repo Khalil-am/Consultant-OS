@@ -33,12 +33,16 @@ vi.mock('../lib/db', () => ({
 }));
 
 // Mock Supabase client used for prompt_templates
+const { mockSupabaseFrom } = vi.hoisted(() => ({
+  mockSupabaseFrom: vi.fn(() => ({
+    select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: null, error: null }) }) }),
+    upsert: () => Promise.resolve({ error: null }),
+  })),
+}));
+
 vi.mock('../lib/supabase', () => ({
   supabase: {
-    from: () => ({
-      select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: null, error: null }) }) }),
-      upsert: () => Promise.resolve({ error: null }),
-    }),
+    from: mockSupabaseFrom,
   },
 }));
 
@@ -156,14 +160,13 @@ describe('AutomationBuilder – Render', () => {
 // ────────────────────────────────────────────────────────────
 describe('AutomationBuilder – Save', () => {
   it('calls supabase upsert (not localStorage) when Save is clicked', async () => {
-    const { supabase } = await import('../lib/supabase');
     renderBuilder('auto-1');
     await screen.findByText('Meeting Minutes Generator');
 
     await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
 
     await waitFor(() => {
-      expect(supabase.from).toHaveBeenCalledWith('prompt_templates');
+      expect(mockSupabaseFrom).toHaveBeenCalledWith('prompt_templates');
     });
   });
 
@@ -375,11 +378,16 @@ describe('AutomationBuilder – Notifications tab', () => {
     await screen.findByText('Meeting Minutes Generator');
 
     await userEvent.click(screen.getByRole('button', { name: 'Notifications' }));
+    await screen.findByText('Slack Notification');
 
-    // Slack is initially disabled — enable it
-    const slackRow = screen.getByText('Slack Notification').closest('div')!.parentElement!;
-    const toggle = slackRow.querySelector('div[style*="cursor: pointer"]') as HTMLElement;
-    if (toggle) await userEvent.click(toggle);
+    // Find the toggle for the Slack row: it's the sibling div of the text container
+    const slackLabel = screen.getByText('Slack Notification');
+    // The row is a flex container div — traverse up to find the row then click the toggle div
+    const row = slackLabel.closest('div[style*="flex"]')!.parentElement as HTMLElement;
+    const toggleDivs = row ? Array.from(row.querySelectorAll('div')).filter(el => el.style.cursor === 'pointer') : [];
+    if (toggleDivs.length > 0) {
+      await userEvent.click(toggleDivs[toggleDivs.length - 1]);
+    }
 
     await waitFor(() => {
       expect(screen.getByPlaceholderText(/hooks\.slack\.com/i)).toBeInTheDocument();
