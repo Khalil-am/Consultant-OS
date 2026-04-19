@@ -240,9 +240,8 @@ export default function Dashboard() {
               </span>
             </div>
 
-            <h1 className="display-2xl mb-3 leading-[0.98]">
-              <span className="bg-gradient-to-br from-white to-[#B7BDCE] bg-clip-text text-transparent">Client </span>
-              <span className="serif-display text-[#D4BFFF]">Command</span>{' '}
+            <h1 className="text-[1.75rem] md:text-[2.1rem] font-semibold tracking-[-0.025em] leading-[1.05] mb-3">
+              <span className="bg-gradient-to-br from-white to-[#B7BDCE] bg-clip-text text-transparent">Client Command </span>
               <span className="gradient-text-multi">Center</span>
             </h1>
 
@@ -289,7 +288,7 @@ export default function Dashboard() {
                   <div style={{ color: stat.color }} className="opacity-80">{stat.icon}</div>
                   <div className="text-[0.62rem] font-bold tracking-[0.14em] uppercase text-[color:var(--text-muted)]">{stat.label}</div>
                 </div>
-                <div className="hero-number-lg" style={{ color: stat.color, textShadow: `0 0 32px ${stat.color}40` }}>{stat.value}</div>
+                <div className="text-[1.35rem] md:text-[1.55rem] font-bold tabular-nums tracking-[-0.025em] leading-none" style={{ color: stat.color, textShadow: `0 0 24px ${stat.color}35` }}>{stat.value}</div>
                 {stat.pct !== null && (
                   <div className="h-[3px] rounded-full bg-white/[0.06] overflow-hidden mt-1">
                     <motion.div

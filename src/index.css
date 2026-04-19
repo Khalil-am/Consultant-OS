@@ -600,8 +600,8 @@
     pointer-events: none;
   }
 
-  .hero-number    { font-size: clamp(1.8rem, 3.2vw, 2.35rem); font-weight: 700; line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
-  .hero-number-lg { font-size: clamp(2.4rem, 4.2vw, 3.25rem); font-weight: 700; line-height: 1; letter-spacing: -0.035em; font-variant-numeric: tabular-nums; }
+  .hero-number    { font-size: clamp(1.3rem, 2vw, 1.55rem);   font-weight: 700; line-height: 1.05; letter-spacing: -0.025em; font-variant-numeric: tabular-nums; }
+  .hero-number-lg { font-size: clamp(1.6rem, 2.5vw, 1.95rem);  font-weight: 700; line-height: 1.05; letter-spacing: -0.03em;  font-variant-numeric: tabular-nums; }
 
   .milestone-bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.07); overflow: hidden; margin-top: 4px; }
   .milestone-fill-green { background: linear-gradient(90deg, #34D399, #63E6BE); height: 100%; border-radius: 3px; box-shadow: 0 0 8px rgba(99,230,190,0.4); }
