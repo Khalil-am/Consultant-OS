@@ -34,24 +34,24 @@ function fileExt(name: string): string {
 }
 
 const EXT_COLOR: Record<string, { bg: string; text: string }> = {
-  PDF:  { bg: 'rgba(239,68,68,0.12)',   text: '#FCA5A5' },
-  DOCX: { bg: 'rgba(14,165,233,0.12)',  text: '#38BDF8' },
-  DOC:  { bg: 'rgba(14,165,233,0.12)',  text: '#38BDF8' },
-  XLSX: { bg: 'rgba(16,185,129,0.12)',  text: '#34D399' },
-  XLS:  { bg: 'rgba(16,185,129,0.12)',  text: '#34D399' },
-  PPTX: { bg: 'rgba(245,158,11,0.12)',  text: '#FCD34D' },
-  PPT:  { bg: 'rgba(245,158,11,0.12)',  text: '#FCD34D' },
-  TXT:  { bg: 'rgba(148,163,184,0.1)',  text: '#94A3B8' },
+  PDF:  { bg: 'rgba(255,107,107,0.12)',   text: '#FCA5A5' },
+  DOCX: { bg: 'rgba(120,119,198,0.12)',  text: '#7DD3FC' },
+  DOC:  { bg: 'rgba(120,119,198,0.12)',  text: '#7DD3FC' },
+  XLSX: { bg: 'rgba(52,211,153,0.12)',  text: '#34D399' },
+  XLS:  { bg: 'rgba(52,211,153,0.12)',  text: '#34D399' },
+  PPTX: { bg: 'rgba(245,181,68,0.12)',  text: '#FDCE78' },
+  PPT:  { bg: 'rgba(245,181,68,0.12)',  text: '#FDCE78' },
+  TXT:  { bg: 'rgba(148,163,184,0.1)',  text: '#8790A8' },
 };
 
 const TYPE_COLORS: Record<string, string> = {
-  Workshop: '#0EA5E9', Committee: '#8B5CF6', Steering: '#EF4444',
-  Review: '#10B981', Kickoff: '#00D4FF', Standup: '#475569',
+  Workshop: '#7877C6', Committee: '#A78BFA', Steering: '#FF6B6B',
+  Review: '#34D399', Kickoff: '#A78BFA', Standup: '#4E566E',
 };
 const STATUS_COLORS: Record<string, { text: string; bg: string }> = {
-  Upcoming:    { text: '#38BDF8', bg: 'rgba(14,165,233,0.1)' },
-  'In Progress': { text: '#FCD34D', bg: 'rgba(245,158,11,0.1)' },
-  Completed:   { text: '#34D399', bg: 'rgba(16,185,129,0.1)' },
+  Upcoming:    { text: '#7DD3FC', bg: 'rgba(120,119,198,0.1)' },
+  'In Progress': { text: '#FDCE78', bg: 'rgba(245,181,68,0.1)' },
+  Completed:   { text: '#34D399', bg: 'rgba(52,211,153,0.1)' },
 };
 
 // ── Main Component ────────────────────────────────────────────
@@ -151,7 +151,7 @@ export default function MeetingDetail() {
         id: docId,
         name: `${meeting.title} – Minutes`,
         type: 'Meeting Minutes',
-        type_color: '#10B981',
+        type_color: '#34D399',
         workspace: meeting.workspace,
         workspace_id: meeting.workspace_id,
         date: new Date().toISOString().slice(0, 10),
@@ -273,7 +273,7 @@ export default function MeetingDetail() {
           id: docId,
           name: `${meeting.title} – AI Generated Minutes`,
           type: 'Meeting Minutes',
-          type_color: '#10B981',
+          type_color: '#34D399',
           workspace: meeting.workspace,
           workspace_id: meeting.workspace_id,
           date: new Date().toISOString().slice(0, 10),
@@ -327,7 +327,7 @@ export default function MeetingDetail() {
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', flexDirection: 'column', gap: '0.75rem' }}>
-        <Loader2 size={24} style={{ color: '#38BDF8' }} className="animate-spin" />
+        <Loader2 size={24} style={{ color: '#7DD3FC' }} className="animate-spin" />
         <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Loading meeting…</span>
       </div>
     );
@@ -335,7 +335,7 @@ export default function MeetingDetail() {
   if (!meeting) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', flexDirection: 'column', gap: '0.75rem' }}>
-        <AlertCircle size={24} style={{ color: '#EF4444' }} />
+        <AlertCircle size={24} style={{ color: '#FF6B6B' }} />
         <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Meeting not found.</span>
         <button className="btn-ghost" style={{ fontSize: '0.78rem' }} onClick={() => navigate('/meetings')}>
           <ArrowLeft size={13} /> Back to Meetings
@@ -344,7 +344,7 @@ export default function MeetingDetail() {
     );
   }
 
-  const tc = TYPE_COLORS[meeting.type] ?? '#94A3B8';
+  const tc = TYPE_COLORS[meeting.type] ?? '#8790A8';
   const sc = STATUS_COLORS[meeting.status] ?? STATUS_COLORS.Upcoming;
 
   return (
@@ -388,7 +388,7 @@ export default function MeetingDetail() {
                 {meeting.status}
               </span>
               {meeting.minutes_generated && (
-                <span style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: '4px', background: 'rgba(16,185,129,0.1)', color: '#34D399', border: '1px solid rgba(16,185,129,0.22)', display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 600 }}>
+                <span style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: '4px', background: 'rgba(52,211,153,0.1)', color: '#34D399', border: '1px solid rgba(52,211,153,0.22)', display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 600 }}>
                   <CheckCircle size={9} /> Minutes Uploaded
                 </span>
               )}
@@ -426,7 +426,7 @@ export default function MeetingDetail() {
       <div className="section-card" style={{ overflow: 'hidden' }}>
         <div className="section-card-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Upload size={14} style={{ color: '#38BDF8' }} />
+            <Upload size={14} style={{ color: '#7DD3FC' }} />
             <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>Meeting Minutes</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -437,7 +437,7 @@ export default function MeetingDetail() {
               style={{
                 display: 'flex', alignItems: 'center', gap: '0.375rem',
                 fontSize: '0.72rem', padding: '0.375rem 0.75rem', borderRadius: '0.5rem', cursor: generating ? 'default' : 'pointer',
-                background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.3)', color: '#A78BFA',
+                background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.3)', color: '#A78BFA',
                 fontFamily: 'inherit', opacity: generating ? 0.7 : 1,
               }}
             >
@@ -447,7 +447,7 @@ export default function MeetingDetail() {
           </div>
         </div>
         {generateError && (
-          <div style={{ margin: '0 1.25rem', padding: '0.5rem 0.75rem', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '0.5rem', fontSize: '0.72rem', color: '#FCA5A5' }}>
+          <div style={{ margin: '0 1.25rem', padding: '0.5rem 0.75rem', background: 'rgba(255,107,107,0.08)', border: '1px solid rgba(255,107,107,0.2)', borderRadius: '0.5rem', fontSize: '0.72rem', color: '#FCA5A5' }}>
             {generateError}
           </div>
         )}
@@ -460,36 +460,36 @@ export default function MeetingDetail() {
             onDrop={onDrop}
             onClick={() => !uploading && fileInputRef.current?.click()}
             style={{
-              border: `2px dashed ${dragging ? '#38BDF8' : uploading ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.1)'}`,
+              border: `2px dashed ${dragging ? '#7DD3FC' : uploading ? 'rgba(167,139,250,0.4)' : 'rgba(255,255,255,0.1)'}`,
               borderRadius: 'var(--radius-lg)',
               padding: '2.5rem 1.5rem',
               textAlign: 'center',
               cursor: uploading ? 'default' : 'pointer',
               transition: 'all 0.2s',
-              background: dragging ? 'rgba(14,165,233,0.05)' : uploading ? 'rgba(139,92,246,0.04)' : 'rgba(255,255,255,0.02)',
+              background: dragging ? 'rgba(120,119,198,0.05)' : uploading ? 'rgba(167,139,250,0.04)' : 'rgba(255,255,255,0.02)',
             }}
           >
             {uploading ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.875rem' }}>
-                <Loader2 size={28} style={{ color: '#8B5CF6' }} className="animate-spin" />
+                <Loader2 size={28} style={{ color: '#A78BFA' }} className="animate-spin" />
                 <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Uploading…</div>
                 {/* Progress bar */}
                 <div style={{ width: '220px', height: '4px', background: 'rgba(255,255,255,0.07)', borderRadius: '9999px', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${uploadPct}%`, background: 'linear-gradient(90deg, #8B5CF6, #38BDF8)', borderRadius: '9999px', transition: 'width 0.2s' }} />
+                  <div style={{ height: '100%', width: `${uploadPct}%`, background: 'linear-gradient(90deg, #A78BFA, #7DD3FC)', borderRadius: '9999px', transition: 'width 0.2s' }} />
                 </div>
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-faint)' }}>{uploadPct}%</div>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: dragging ? 'rgba(14,165,233,0.12)' : 'rgba(255,255,255,0.05)', border: `1px solid ${dragging ? 'rgba(14,165,233,0.3)' : 'rgba(255,255,255,0.1)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
-                  <Upload size={20} style={{ color: dragging ? '#38BDF8' : 'var(--text-muted)' }} />
+                <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: dragging ? 'rgba(120,119,198,0.12)' : 'rgba(255,255,255,0.05)', border: `1px solid ${dragging ? 'rgba(120,119,198,0.3)' : 'rgba(255,255,255,0.1)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
+                  <Upload size={20} style={{ color: dragging ? '#7DD3FC' : 'var(--text-muted)' }} />
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: 600, color: dragging ? '#38BDF8' : 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                  <div style={{ fontSize: '0.875rem', fontWeight: 600, color: dragging ? '#7DD3FC' : 'var(--text-secondary)', marginBottom: '0.25rem' }}>
                     {dragging ? 'Drop to upload' : 'Drag & drop your minutes file here'}
                   </div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-faint)' }}>
-                    or <span style={{ color: '#38BDF8', textDecoration: 'underline' }}>click to browse</span>
+                    or <span style={{ color: '#7DD3FC', textDecoration: 'underline' }}>click to browse</span>
                   </div>
                 </div>
               </div>
@@ -506,13 +506,13 @@ export default function MeetingDetail() {
 
           {/* Feedback messages */}
           {uploadSuccess && (
-            <div style={{ marginTop: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.625rem 0.875rem', borderRadius: 'var(--radius-md)', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.22)' }} className="animate-fade-in">
+            <div style={{ marginTop: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.625rem 0.875rem', borderRadius: 'var(--radius-md)', background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.22)' }} className="animate-fade-in">
               <CheckCircle size={14} style={{ color: '#34D399', flexShrink: 0 }} />
               <span style={{ fontSize: '0.78rem', color: '#34D399', fontWeight: 500 }}>{uploadSuccess}</span>
             </div>
           )}
           {uploadError && (
-            <div style={{ marginTop: '0.875rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', padding: '0.625rem 0.875rem', borderRadius: 'var(--radius-md)', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.22)' }} className="animate-fade-in">
+            <div style={{ marginTop: '0.875rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', padding: '0.625rem 0.875rem', borderRadius: 'var(--radius-md)', background: 'rgba(255,107,107,0.08)', border: '1px solid rgba(255,107,107,0.22)' }} className="animate-fade-in">
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <AlertCircle size={14} style={{ color: '#FCA5A5', flexShrink: 0 }} />
                 <span style={{ fontSize: '0.78rem', color: '#FCA5A5' }}>{uploadError}</span>
@@ -529,10 +529,10 @@ export default function MeetingDetail() {
       <div className="section-card" style={{ overflow: 'hidden' }}>
         <div className="section-card-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <FileText size={14} style={{ color: '#10B981' }} />
+            <FileText size={14} style={{ color: '#34D399' }} />
             <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>Uploaded Minutes</span>
             {attachments.length > 0 && (
-              <span style={{ fontSize: '0.62rem', fontWeight: 700, padding: '1px 6px', borderRadius: '9999px', background: 'rgba(16,185,129,0.12)', color: '#34D399', border: '1px solid rgba(16,185,129,0.22)' }}>
+              <span style={{ fontSize: '0.62rem', fontWeight: 700, padding: '1px 6px', borderRadius: '9999px', background: 'rgba(52,211,153,0.12)', color: '#34D399', border: '1px solid rgba(52,211,153,0.22)' }}>
                 {attachments.length}
               </span>
             )}
@@ -550,7 +550,7 @@ export default function MeetingDetail() {
 
         {attLoading ? (
           <div style={{ padding: '2.5rem', textAlign: 'center' }}>
-            <Loader2 size={20} style={{ color: '#38BDF8' }} className="animate-spin" />
+            <Loader2 size={20} style={{ color: '#7DD3FC' }} className="animate-spin" />
           </div>
         ) : attachments.length === 0 ? (
           <div style={{ padding: '2.5rem', textAlign: 'center' }}>
@@ -601,18 +601,18 @@ export default function MeetingDetail() {
                   <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
                     <button
                       onClick={() => handleDownload(doc)}
-                      style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.3rem 0.625rem', borderRadius: '6px', background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.22)', color: '#38BDF8', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(14,165,233,0.18)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'rgba(14,165,233,0.1)')}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.3rem 0.625rem', borderRadius: '6px', background: 'rgba(120,119,198,0.1)', border: '1px solid rgba(120,119,198,0.22)', color: '#7DD3FC', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(120,119,198,0.18)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'rgba(120,119,198,0.1)')}
                     >
                       <Download size={11} /> Download
                     </button>
                     <button
                       onClick={() => handleDelete(doc)}
                       disabled={isDeleting}
-                      style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.3rem 0.5rem', borderRadius: '6px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#FCA5A5', fontSize: '0.72rem', cursor: isDeleting ? 'default' : 'pointer', fontFamily: 'inherit', transition: 'all 0.15s', opacity: isDeleting ? 0.5 : 1 }}
-                      onMouseEnter={e => { if (!isDeleting) (e.currentTarget.style.background = 'rgba(239,68,68,0.14)'); }}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.08)')}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.3rem 0.5rem', borderRadius: '6px', background: 'rgba(255,107,107,0.08)', border: '1px solid rgba(255,107,107,0.15)', color: '#FCA5A5', fontSize: '0.72rem', cursor: isDeleting ? 'default' : 'pointer', fontFamily: 'inherit', transition: 'all 0.15s', opacity: isDeleting ? 0.5 : 1 }}
+                      onMouseEnter={e => { if (!isDeleting) (e.currentTarget.style.background = 'rgba(255,107,107,0.14)'); }}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,107,107,0.08)')}
                     >
                       {isDeleting ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
                     </button>

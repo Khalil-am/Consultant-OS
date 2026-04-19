@@ -45,10 +45,10 @@ const DOC_TYPES = [
   'Contracts', 'Policies', 'Technical Specs', 'Reports', 'Charters', 'Other',
 ];
 const TYPE_COLORS: Record<string, string> = {
-  BRD: '#0EA5E9', FRD: '#8B5CF6', 'Meeting Minutes': '#10B981',
-  Proposals: '#F59E0B', Evaluations: '#EC4899', Contracts: '#EF4444',
+  BRD: '#7877C6', FRD: '#A78BFA', 'Meeting Minutes': '#34D399',
+  Proposals: '#F5B544', Evaluations: '#F472B6', Contracts: '#FF6B6B',
   Policies: '#14B8A6', 'Technical Specs': '#6366F1', Reports: '#F97316',
-  Charters: '#84CC16', Other: '#94A3B8',
+  Charters: '#84CC16', Other: '#8790A8',
 };
 const STATUS_OPTIONS = ['Draft', 'Under Review', 'Approved', 'Final'] as const;
 const LANG_OPTIONS = ['EN', 'AR', 'Bilingual'] as const;
@@ -169,7 +169,7 @@ export default function Documents() {
         id: crypto.randomUUID(),
         name: form.name.trim(),
         type: form.type,
-        type_color: TYPE_COLORS[form.type] ?? '#94A3B8',
+        type_color: TYPE_COLORS[form.type] ?? '#8790A8',
         workspace: ws?.name ?? '',
         workspace_id: form.workspace_id,
         date: new Date().toISOString().slice(0, 10),
@@ -247,10 +247,10 @@ export default function Documents() {
       {!isTablet && (
         <div style={{
           width: '200px', minWidth: '200px', borderRight: '1px solid rgba(255,255,255,0.05)',
-          display: 'flex', flexDirection: 'column', overflowY: 'auto', background: '#0C1220',
+          display: 'flex', flexDirection: 'column', overflowY: 'auto', background: '#0C0F1A',
           padding: '1rem 0.75rem',
         }}>
-          <div style={{ fontSize: '0.68rem', color: '#334155', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.625rem', paddingLeft: '0.25rem' }}>
+          <div style={{ fontSize: '0.68rem', color: '#4E566E', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.625rem', paddingLeft: '0.25rem' }}>
             Folders
           </div>
           {folders.map(folder => (
@@ -260,21 +260,21 @@ export default function Documents() {
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 padding: '0.5rem 0.625rem', borderRadius: '0.5rem', cursor: 'pointer',
-                background: activeFolder === folder.label ? 'rgba(0,212,255,0.08)' : 'transparent',
-                borderLeft: activeFolder === folder.label ? '2px solid #00D4FF' : '2px solid transparent',
+                background: activeFolder === folder.label ? 'rgba(120,119,198,0.08)' : 'transparent',
+                borderLeft: activeFolder === folder.label ? '2px solid #A78BFA' : '2px solid transparent',
                 transition: 'all 0.15s', marginBottom: '1px',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <FileText size={13} style={{ color: activeFolder === folder.label ? '#00D4FF' : '#475569' }} />
-                <span style={{ fontSize: '0.78rem', color: activeFolder === folder.label ? '#00D4FF' : '#475569', fontWeight: activeFolder === folder.label ? 500 : 400 }}>
+                <FileText size={13} style={{ color: activeFolder === folder.label ? '#A78BFA' : '#4E566E' }} />
+                <span style={{ fontSize: '0.78rem', color: activeFolder === folder.label ? '#A78BFA' : '#4E566E', fontWeight: activeFolder === folder.label ? 500 : 400 }}>
                   {folder.label}
                 </span>
               </div>
               {folder.label === 'All Documents' ? (
-                <span style={{ fontSize: '0.65rem', color: '#00D4FF', background: 'rgba(0,212,255,0.12)', padding: '1px 7px', borderRadius: '9999px', fontWeight: 600 }}>{folder.count}</span>
+                <span style={{ fontSize: '0.65rem', color: '#A78BFA', background: 'rgba(120,119,198,0.12)', padding: '1px 7px', borderRadius: '9999px', fontWeight: 600 }}>{folder.count}</span>
               ) : (
-                <span style={{ fontSize: '0.65rem', color: '#334155' }}>{folder.count || ''}</span>
+                <span style={{ fontSize: '0.65rem', color: '#4E566E' }}>{folder.count || ''}</span>
               )}
             </div>
           ))}
@@ -287,9 +287,9 @@ export default function Documents() {
         <div style={{
           padding: '0.875rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)',
           display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0,
-          background: '#080C18', flexWrap: 'wrap',
+          background: '#07080F', flexWrap: 'wrap',
         }}>
-          <button className="btn-primary" style={{ height: '34px', fontSize: '0.8rem', background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)', color: '#34D399' }} onClick={() => setShowUpload(true)}>
+          <button className="btn-primary" style={{ height: '34px', fontSize: '0.8rem', background: 'rgba(52,211,153,0.15)', border: '1px solid rgba(52,211,153,0.3)', color: '#34D399' }} onClick={() => setShowUpload(true)}>
             <Upload size={13} /> Upload
           </button>
           <button className="btn-ai" style={{ height: '34px', fontSize: '0.8rem' }} onClick={handleSummarize} disabled={!selected || summarizing}>
@@ -303,45 +303,45 @@ export default function Documents() {
               style={{
                 height: '34px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.375rem',
                 padding: '0 0.75rem', borderRadius: '0.5rem', cursor: 'pointer', fontFamily: 'inherit',
-                background: hasActiveFilters ? 'rgba(0,212,255,0.12)' : 'rgba(255,255,255,0.04)',
-                border: hasActiveFilters ? '1px solid rgba(0,212,255,0.3)' : '1px solid rgba(255,255,255,0.08)',
-                color: hasActiveFilters ? '#00D4FF' : '#94A3B8',
+                background: hasActiveFilters ? 'rgba(120,119,198,0.12)' : 'rgba(255,255,255,0.04)',
+                border: hasActiveFilters ? '1px solid rgba(120,119,198,0.3)' : '1px solid rgba(255,255,255,0.08)',
+                color: hasActiveFilters ? '#A78BFA' : '#8790A8',
               }}
             >
               <Filter size={13} />
-              Filters {hasActiveFilters && <span style={{ fontSize: '0.65rem', background: 'rgba(0,212,255,0.2)', borderRadius: '9999px', padding: '0 5px', fontWeight: 700 }}>ON</span>}
+              Filters {hasActiveFilters && <span style={{ fontSize: '0.65rem', background: 'rgba(120,119,198,0.2)', borderRadius: '9999px', padding: '0 5px', fontWeight: 700 }}>ON</span>}
             </button>
             {showFilter && (
               <div style={{
                 position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 100,
-                background: '#0C1220', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.625rem',
+                background: '#0C0F1A', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.625rem',
                 padding: '1rem', minWidth: '240px', boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
               }}>
-                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.625rem' }}>Document Type</div>
+                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#4E566E', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.625rem' }}>Document Type</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', marginBottom: '0.875rem' }}>
                   {['All', ...DOC_TYPES].map(t => (
                     <button key={t} onClick={() => setFilterType(t)} style={{
                       fontSize: '0.68rem', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer',
-                      background: filterType === t ? 'rgba(0,212,255,0.15)' : 'rgba(255,255,255,0.04)',
-                      border: filterType === t ? '1px solid rgba(0,212,255,0.3)' : '1px solid rgba(255,255,255,0.08)',
-                      color: filterType === t ? '#00D4FF' : '#64748B', fontFamily: 'inherit',
+                      background: filterType === t ? 'rgba(120,119,198,0.15)' : 'rgba(255,255,255,0.04)',
+                      border: filterType === t ? '1px solid rgba(120,119,198,0.3)' : '1px solid rgba(255,255,255,0.08)',
+                      color: filterType === t ? '#A78BFA' : '#8790A8', fontFamily: 'inherit',
                     }}>{t}</button>
                   ))}
                 </div>
-                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem' }}>Language</div>
+                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#4E566E', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem' }}>Language</div>
                 <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '0.875rem' }}>
                   {['All', 'EN', 'AR', 'Bilingual'].map(l => (
                     <button key={l} onClick={() => setFilterLanguage(l)} style={{
                       fontSize: '0.68rem', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer',
-                      background: filterLanguage === l ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.04)',
-                      border: filterLanguage === l ? '1px solid rgba(139,92,246,0.3)' : '1px solid rgba(255,255,255,0.08)',
-                      color: filterLanguage === l ? '#A78BFA' : '#64748B', fontFamily: 'inherit',
+                      background: filterLanguage === l ? 'rgba(167,139,250,0.15)' : 'rgba(255,255,255,0.04)',
+                      border: filterLanguage === l ? '1px solid rgba(167,139,250,0.3)' : '1px solid rgba(255,255,255,0.08)',
+                      color: filterLanguage === l ? '#A78BFA' : '#8790A8', fontFamily: 'inherit',
                     }}>{l}</button>
                   ))}
                 </div>
                 <button
                   onClick={() => { setFilterType('All'); setFilterLanguage('All'); setShowFilter(false); }}
-                  style={{ fontSize: '0.72rem', color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
+                  style={{ fontSize: '0.72rem', color: '#FF6B6B', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
                 >
                   Clear filters
                 </button>
@@ -371,19 +371,19 @@ export default function Documents() {
             height: '34px', borderRadius: '0.5rem', background: 'rgba(255,255,255,0.04)',
             border: '1px solid rgba(255,255,255,0.08)', width: isMobile ? '100%' : '200px',
           }}>
-            <Search size={13} style={{ color: '#475569' }} />
+            <Search size={13} style={{ color: '#4E566E' }} />
             <input
               type="text"
               placeholder="Filter docs..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: '0.78rem', color: '#F1F5F9', width: '100%', fontFamily: 'inherit' }}
+              style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: '0.78rem', color: '#F8FAFC', width: '100%', fontFamily: 'inherit' }}
             />
           </div>
         </div>
 
         {error && (
-          <div style={{ padding: '0.625rem 1.25rem', background: 'rgba(239,68,68,0.1)', borderBottom: '1px solid rgba(239,68,68,0.2)', fontSize: '0.78rem', color: '#FCA5A5' }}>
+          <div style={{ padding: '0.625rem 1.25rem', background: 'rgba(255,107,107,0.1)', borderBottom: '1px solid rgba(255,107,107,0.2)', fontSize: '0.78rem', color: '#FCA5A5' }}>
             {error}
           </div>
         )}
@@ -391,12 +391,12 @@ export default function Documents() {
         {/* Document List */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {loading ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px', color: '#475569', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px', color: '#4E566E', gap: '0.5rem' }}>
               <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Loading…
             </div>
           ) : (
             <table className="data-table" style={{ tableLayout: 'fixed' }}>
-              <thead style={{ position: 'sticky', top: 0, background: '#080C18', zIndex: 1 }}>
+              <thead style={{ position: 'sticky', top: 0, background: '#07080F', zIndex: 1 }}>
                 <tr>
                   <th style={{ width: '32%' }}>Document</th>
                   <th style={{ width: '16%' }}>Workspace</th>
@@ -413,7 +413,7 @@ export default function Documents() {
                     onClick={() => setSelectedDoc(selectedDoc === doc.id ? null : doc.id)}
                     style={{
                       cursor: 'pointer',
-                      background: selectedDoc === doc.id ? 'rgba(0,212,255,0.05)' : 'transparent',
+                      background: selectedDoc === doc.id ? 'rgba(120,119,198,0.05)' : 'transparent',
                     }}
                   >
                     <td>
@@ -422,15 +422,15 @@ export default function Documents() {
                           <FileText size={13} />
                         </div>
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F1F5F9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F8FAFC', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {doc.name}
                           </div>
-                          <div style={{ fontSize: '0.68rem', color: '#334155' }}>{doc.author}</div>
+                          <div style={{ fontSize: '0.68rem', color: '#4E566E' }}>{doc.author}</div>
                         </div>
                       </div>
                     </td>
                     <td>
-                      <span style={{ fontSize: '0.72rem', color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+                      <span style={{ fontSize: '0.72rem', color: '#4E566E', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
                         {doc.workspace.split(' ').slice(0, 3).join(' ')}
                       </span>
                     </td>
@@ -442,7 +442,7 @@ export default function Documents() {
                     <td style={{ fontSize: '0.72rem' }}>{doc.date}</td>
                     <td onClick={e => e.stopPropagation()}>
                       {statusChanging === doc.id ? (
-                        <Loader2 size={12} style={{ animation: 'spin 1s linear infinite', color: '#475569' }} />
+                        <Loader2 size={12} style={{ animation: 'spin 1s linear infinite', color: '#4E566E' }} />
                       ) : (
                         <span
                           onClick={() => {
@@ -453,13 +453,13 @@ export default function Documents() {
                           style={{
                             display: 'inline-flex', alignItems: 'center', gap: '6px',
                             fontSize: '0.7rem', padding: '3px 10px', borderRadius: '9999px', cursor: 'pointer', fontWeight: 500, whiteSpace: 'nowrap',
-                            background: doc.status === 'Approved' ? 'rgba(52,211,153,0.12)' : doc.status === 'Under Review' ? 'rgba(251,191,36,0.12)' : doc.status === 'Final' ? 'rgba(0,212,255,0.12)' : 'rgba(148,163,184,0.12)',
-                            color: doc.status === 'Approved' ? '#34D399' : doc.status === 'Under Review' ? '#FBBF24' : doc.status === 'Final' ? '#00D4FF' : '#94A3B8',
+                            background: doc.status === 'Approved' ? 'rgba(52,211,153,0.12)' : doc.status === 'Under Review' ? 'rgba(251,191,36,0.12)' : doc.status === 'Final' ? 'rgba(120,119,198,0.12)' : 'rgba(148,163,184,0.12)',
+                            color: doc.status === 'Approved' ? '#34D399' : doc.status === 'Under Review' ? '#FBBF24' : doc.status === 'Final' ? '#A78BFA' : '#8790A8',
                           }}
                         >
                           <span style={{
                             width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
-                            background: doc.status === 'Approved' ? '#34D399' : doc.status === 'Under Review' ? '#FBBF24' : doc.status === 'Final' ? '#00D4FF' : '#94A3B8',
+                            background: doc.status === 'Approved' ? '#34D399' : doc.status === 'Under Review' ? '#FBBF24' : doc.status === 'Final' ? '#A78BFA' : '#8790A8',
                           }} />
                           {doc.status}
                         </span>
@@ -469,14 +469,14 @@ export default function Documents() {
                       <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
                         <button
                           onClick={() => navigate(`/documents/${doc.id}`)}
-                          style={{ padding: '0.25rem', background: 'none', border: 'none', cursor: 'pointer', color: '#475569', borderRadius: '4px' }}
+                          style={{ padding: '0.25rem', background: 'none', border: 'none', cursor: 'pointer', color: '#4E566E', borderRadius: '4px' }}
                           title="Open"
                         >
                           <ExternalLink size={12} />
                         </button>
                         <button
                           onClick={() => handleDownload(doc)}
-                          style={{ padding: '0.25rem', background: 'none', border: 'none', cursor: 'pointer', color: doc.file_url ? '#00D4FF' : '#334155', borderRadius: '4px' }}
+                          style={{ padding: '0.25rem', background: 'none', border: 'none', cursor: 'pointer', color: doc.file_url ? '#A78BFA' : '#4E566E', borderRadius: '4px' }}
                           title={doc.file_url ? 'Download file' : 'No file attached'}
                         >
                           <Download size={12} />
@@ -486,13 +486,13 @@ export default function Documents() {
                             <button
                               onClick={() => handleDelete(doc.id)}
                               disabled={deleting}
-                              style={{ fontSize: '0.68rem', padding: '2px 6px', background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#FCA5A5', borderRadius: '4px', cursor: 'pointer' }}
+                              style={{ fontSize: '0.68rem', padding: '2px 6px', background: 'rgba(255,107,107,0.15)', border: '1px solid rgba(255,107,107,0.3)', color: '#FCA5A5', borderRadius: '4px', cursor: 'pointer' }}
                             >
                               {deleting ? '…' : 'Delete'}
                             </button>
                             <button
                               onClick={() => setConfirmDelete(null)}
-                              style={{ fontSize: '0.68rem', padding: '2px 6px', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: '#475569', borderRadius: '4px', cursor: 'pointer' }}
+                              style={{ fontSize: '0.68rem', padding: '2px 6px', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: '#4E566E', borderRadius: '4px', cursor: 'pointer' }}
                             >
                               Cancel
                             </button>
@@ -500,7 +500,7 @@ export default function Documents() {
                         ) : (
                           <button
                             onClick={() => setConfirmDelete(doc.id)}
-                            style={{ padding: '0.25rem', background: 'none', border: 'none', cursor: 'pointer', color: '#475569', borderRadius: '4px' }}
+                            style={{ padding: '0.25rem', background: 'none', border: 'none', cursor: 'pointer', color: '#4E566E', borderRadius: '4px' }}
                             title="Delete"
                           >
                             <Trash2 size={12} />
@@ -512,7 +512,7 @@ export default function Documents() {
                 ))}
                 {filtered.length === 0 && !loading && (
                   <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', padding: '3rem', color: '#334155' }}>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '3rem', color: '#4E566E' }}>
                       {docs.length === 0 ? 'No documents yet — upload your first document.' : 'No documents match your filters.'}
                     </td>
                   </tr>
@@ -530,7 +530,7 @@ export default function Documents() {
             ? { position: 'absolute' as const, top: 0, right: 0, bottom: 0, width: '100%', zIndex: 20 }
             : { width: '280px', minWidth: '280px' }),
           borderLeft: isTablet ? 'none' : '1px solid rgba(255,255,255,0.05)',
-          display: 'flex', flexDirection: 'column', overflowY: 'auto', background: '#0C1220',
+          display: 'flex', flexDirection: 'column', overflowY: 'auto', background: '#0C0F1A',
           padding: '1rem', animation: 'fadeIn 0.2s ease-out',
         }}>
           {isTablet && (
@@ -538,7 +538,7 @@ export default function Documents() {
               onClick={() => setSelectedDoc(null)}
               style={{
                 alignSelf: 'flex-end', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '6px', padding: '0.25rem 0.5rem', cursor: 'pointer', color: '#94A3B8',
+                borderRadius: '6px', padding: '0.25rem 0.5rem', cursor: 'pointer', color: '#8790A8',
                 fontSize: '0.75rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem',
               }}
             >
@@ -549,10 +549,10 @@ export default function Documents() {
             <div style={{ padding: '0.5rem', borderRadius: '8px', background: `${selected.type_color}15`, color: selected.type_color, display: 'inline-flex', marginBottom: '0.5rem' }}>
               <FileText size={18} />
             </div>
-            <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#F1F5F9', margin: 0, marginBottom: '0.25rem', lineHeight: 1.3 }}>
+            <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#F8FAFC', margin: 0, marginBottom: '0.25rem', lineHeight: 1.3 }}>
               {selected.name}
             </h3>
-            <p style={{ fontSize: '0.72rem', color: '#475569', margin: 0 }}>{selected.workspace}</p>
+            <p style={{ fontSize: '0.72rem', color: '#4E566E', margin: 0 }}>{selected.workspace}</p>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', marginBottom: '1rem', padding: '0.75rem', borderRadius: '0.5rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
@@ -565,8 +565,8 @@ export default function Documents() {
               { label: 'Status', value: selected.status },
             ].map(m => (
               <div key={m.label} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '0.7rem', color: '#334155' }}>{m.label}</span>
-                <span style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 500 }}>{m.value}</span>
+                <span style={{ fontSize: '0.7rem', color: '#4E566E' }}>{m.label}</span>
+                <span style={{ fontSize: '0.72rem', color: '#8790A8', fontWeight: 500 }}>{m.value}</span>
               </div>
             ))}
           </div>
@@ -574,19 +574,19 @@ export default function Documents() {
           {selected.summary && (
             <div style={{ marginBottom: '1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.5rem' }}>
-                <Sparkles size={13} style={{ color: '#8B5CF6' }} />
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8' }}>Summary</span>
+                <Sparkles size={13} style={{ color: '#A78BFA' }} />
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#8790A8' }}>Summary</span>
               </div>
-              <p style={{ fontSize: '0.75rem', color: '#475569', lineHeight: 1.5, margin: 0 }}>{selected.summary}</p>
+              <p style={{ fontSize: '0.75rem', color: '#4E566E', lineHeight: 1.5, margin: 0 }}>{selected.summary}</p>
             </div>
           )}
 
           {selected.tags?.length > 0 && (
             <div style={{ marginBottom: '1rem' }}>
-              <div style={{ fontSize: '0.72rem', color: '#334155', marginBottom: '0.375rem' }}>Tags</div>
+              <div style={{ fontSize: '0.72rem', color: '#4E566E', marginBottom: '0.375rem' }}>Tags</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.375rem' }}>
                 {selected.tags.map(tag => (
-                  <span key={tag} style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: '#94A3B8', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <span key={tag} style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: '#8790A8', border: '1px solid rgba(255,255,255,0.08)' }}>
                     {tag}
                   </span>
                 ))}
@@ -610,13 +610,13 @@ export default function Documents() {
                 <button
                   onClick={() => handleDelete(selected.id)}
                   disabled={deleting}
-                  style={{ flex: 1, fontSize: '0.78rem', padding: '0.5rem', background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#FCA5A5', borderRadius: '0.5rem', cursor: 'pointer' }}
+                  style={{ flex: 1, fontSize: '0.78rem', padding: '0.5rem', background: 'rgba(255,107,107,0.15)', border: '1px solid rgba(255,107,107,0.3)', color: '#FCA5A5', borderRadius: '0.5rem', cursor: 'pointer' }}
                 >
                   {deleting ? '…' : 'Confirm Delete'}
                 </button>
                 <button
                   onClick={() => setConfirmDelete(null)}
-                  style={{ flex: 1, fontSize: '0.78rem', padding: '0.5rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: '#475569', borderRadius: '0.5rem', cursor: 'pointer' }}
+                  style={{ flex: 1, fontSize: '0.78rem', padding: '0.5rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: '#4E566E', borderRadius: '0.5rem', cursor: 'pointer' }}
                 >
                   Cancel
                 </button>
@@ -624,7 +624,7 @@ export default function Documents() {
             ) : (
               <button
                 onClick={() => setConfirmDelete(selected.id)}
-                style={{ fontSize: '0.78rem', padding: '0.5rem', background: 'transparent', border: '1px solid rgba(239,68,68,0.2)', color: '#F87171', borderRadius: '0.5rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem' }}
+                style={{ fontSize: '0.78rem', padding: '0.5rem', background: 'transparent', border: '1px solid rgba(255,107,107,0.2)', color: '#F87171', borderRadius: '0.5rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem' }}
               >
                 <Trash2 size={13} /> Delete Document
               </button>
@@ -636,23 +636,23 @@ export default function Documents() {
       {/* Upload Modal */}
       {showUpload && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
-          <div style={{ background: '#0C1220', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.75rem', padding: '1.5rem', width: '100%', maxWidth: isMobile ? 'calc(100% - 1rem)' : '520px', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div style={{ background: '#0C0F1A', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.75rem', padding: '1.5rem', width: '100%', maxWidth: isMobile ? 'calc(100% - 1rem)' : '520px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#F1F5F9' }}>Upload Document</h2>
-              <button onClick={() => { setShowUpload(false); setUploadError(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569' }}>
+              <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#F8FAFC' }}>Upload Document</h2>
+              <button onClick={() => { setShowUpload(false); setUploadError(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4E566E' }}>
                 <X size={18} />
               </button>
             </div>
 
             {uploadError && (
-              <div style={{ marginBottom: '1rem', padding: '0.625rem 0.875rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '0.5rem', fontSize: '0.78rem', color: '#FCA5A5' }}>
+              <div style={{ marginBottom: '1rem', padding: '0.625rem 0.875rem', background: 'rgba(255,107,107,0.1)', border: '1px solid rgba(255,107,107,0.2)', borderRadius: '0.5rem', fontSize: '0.78rem', color: '#FCA5A5' }}>
                 {uploadError}
               </div>
             )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
               <label style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-                <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Document Name *</span>
+                <span style={{ fontSize: '0.75rem', color: '#8790A8' }}>Document Name *</span>
                 <input
                   className="input-field"
                   placeholder="e.g. Project Charter v1.0"
@@ -663,13 +663,13 @@ export default function Documents() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <label style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Type</span>
+                  <span style={{ fontSize: '0.75rem', color: '#8790A8' }}>Type</span>
                   <select className="input-field" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} style={{ cursor: 'pointer' }}>
                     {DOC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </label>
                 <label style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Workspace *</span>
+                  <span style={{ fontSize: '0.75rem', color: '#8790A8' }}>Workspace *</span>
                   <select className="input-field" value={form.workspace_id} onChange={e => setForm(f => ({ ...f, workspace_id: e.target.value }))} style={{ cursor: 'pointer' }}>
                     <option value="">Select workspace…</option>
                     {workspaces.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
@@ -679,13 +679,13 @@ export default function Documents() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <label style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Language</span>
+                  <span style={{ fontSize: '0.75rem', color: '#8790A8' }}>Language</span>
                   <select className="input-field" value={form.language} onChange={e => setForm(f => ({ ...f, language: e.target.value as typeof LANG_OPTIONS[number] }))} style={{ cursor: 'pointer' }}>
                     {LANG_OPTIONS.map(l => <option key={l} value={l}>{l}</option>)}
                   </select>
                 </label>
                 <label style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Status</span>
+                  <span style={{ fontSize: '0.75rem', color: '#8790A8' }}>Status</span>
                   <select className="input-field" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as typeof STATUS_OPTIONS[number] }))} style={{ cursor: 'pointer' }}>
                     {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
@@ -693,12 +693,12 @@ export default function Documents() {
               </div>
 
               <label style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-                <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Author</span>
+                <span style={{ fontSize: '0.75rem', color: '#8790A8' }}>Author</span>
                 <input className="input-field" placeholder="e.g. Ahmed Al-Mahmoud" value={form.author} onChange={e => setForm(f => ({ ...f, author: e.target.value }))} />
               </label>
 
               <label style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-                <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Summary</span>
+                <span style={{ fontSize: '0.75rem', color: '#8790A8' }}>Summary</span>
                 <textarea
                   className="input-field"
                   placeholder="Brief description of the document…"
@@ -710,16 +710,16 @@ export default function Documents() {
               </label>
 
               <label style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-                <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Tags (comma separated)</span>
+                <span style={{ fontSize: '0.75rem', color: '#8790A8' }}>Tags (comma separated)</span>
                 <input className="input-field" placeholder="e.g. BRD, Phase 1, NCA" value={form.tags} onChange={e => setForm(f => ({ ...f, tags: e.target.value }))} />
               </label>
 
               <label style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-                <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Attach File (optional)</span>
+                <span style={{ fontSize: '0.75rem', color: '#8790A8' }}>Attach File (optional)</span>
                 <input
                   ref={fileRef}
                   type="file"
-                  style={{ fontSize: '0.78rem', color: '#94A3B8', padding: '0.375rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.5rem', cursor: 'pointer' }}
+                  style={{ fontSize: '0.78rem', color: '#8790A8', padding: '0.375rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.5rem', cursor: 'pointer' }}
                 />
               </label>
             </div>
@@ -727,7 +727,7 @@ export default function Documents() {
             <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem', justifyContent: 'flex-end' }}>
               <button
                 onClick={() => { setShowUpload(false); setUploadError(''); }}
-                style={{ padding: '0.5rem 1.125rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: '#94A3B8', borderRadius: '0.5rem', cursor: 'pointer', fontSize: '0.85rem' }}
+                style={{ padding: '0.5rem 1.125rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: '#8790A8', borderRadius: '0.5rem', cursor: 'pointer', fontSize: '0.85rem' }}
               >
                 Cancel
               </button>

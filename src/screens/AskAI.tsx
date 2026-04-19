@@ -22,11 +22,11 @@ const MODELS = [
 
 // ── Personas ─────────────────────────────────────────────────
 const PERSONAS = [
-  { id: 'risk', name: 'Risk Analyst', initials: 'RA', color: '#10B981', desc: 'Specialized in project risk assessment and mitigation strategies' },
-  { id: 'data', name: 'Data Scientist', initials: 'DS', color: '#0EA5E9', desc: 'Advanced analytics and predictive modeling expert' },
-  { id: 'strategy', name: 'Strategy Advisor', initials: 'SA', color: '#8B5CF6', desc: 'Business strategy and transformation consultant' },
-  { id: 'tech', name: 'Tech Architect', initials: 'TA', color: '#00D4FF', desc: 'Enterprise architecture and system design specialist' },
-  { id: 'change', name: 'Change Manager', initials: 'CM', color: '#F59E0B', desc: 'Organizational change and adoption expert' },
+  { id: 'risk', name: 'Risk Analyst', initials: 'RA', color: '#34D399', desc: 'Specialized in project risk assessment and mitigation strategies' },
+  { id: 'data', name: 'Data Scientist', initials: 'DS', color: '#7877C6', desc: 'Advanced analytics and predictive modeling expert' },
+  { id: 'strategy', name: 'Strategy Advisor', initials: 'SA', color: '#A78BFA', desc: 'Business strategy and transformation consultant' },
+  { id: 'tech', name: 'Tech Architect', initials: 'TA', color: '#A78BFA', desc: 'Enterprise architecture and system design specialist' },
+  { id: 'change', name: 'Change Manager', initials: 'CM', color: '#F5B544', desc: 'Organizational change and adoption expert' },
 ];
 
 // ── Thread storage ────────────────────────────────────────────
@@ -275,7 +275,7 @@ function renderMarkdown(text: string) {
     let match: RegExpExecArray | null;
     while ((match = regex.exec(t)) !== null) {
       if (match.index > lastIndex) parts.push(t.slice(lastIndex, match.index));
-      parts.push(<strong key={match.index} style={{ color: '#F1F5F9' }}>{match[1]}</strong>);
+      parts.push(<strong key={match.index} style={{ color: '#F8FAFC' }}>{match[1]}</strong>);
       lastIndex = match.index + match[0].length;
     }
     if (lastIndex < t.length) parts.push(t.slice(lastIndex));
@@ -296,9 +296,9 @@ function renderMarkdown(text: string) {
     } else {
       flushList();
       if (line.startsWith('### ')) {
-        elements.push(<h4 key={i} style={{ margin: '12px 0 4px', fontSize: '0.95rem', fontWeight: 700, color: '#F1F5F9' }}>{renderInline(line.slice(4))}</h4>);
+        elements.push(<h4 key={i} style={{ margin: '12px 0 4px', fontSize: '0.95rem', fontWeight: 700, color: '#F8FAFC' }}>{renderInline(line.slice(4))}</h4>);
       } else if (line.startsWith('## ')) {
-        elements.push(<h3 key={i} style={{ margin: '14px 0 6px', fontSize: '1rem', fontWeight: 700, color: '#F1F5F9' }}>{renderInline(line.slice(3))}</h3>);
+        elements.push(<h3 key={i} style={{ margin: '14px 0 6px', fontSize: '1rem', fontWeight: 700, color: '#F8FAFC' }}>{renderInline(line.slice(3))}</h3>);
       } else if (line.trim() === '') {
         elements.push(<div key={i} style={{ height: 8 }} />);
       } else {
@@ -505,13 +505,13 @@ export default function AskAI() {
 
   // ── Render ──────────────────────────────────────────────────
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#080C18', color: '#F1F5F9', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#07080F', color: '#F8FAFC', overflow: 'hidden' }}>
 
       {/* ── Top bar ──────────────────────────────────────────── */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: isMobile ? '12px 16px' : '16px 24px', borderBottom: '1px solid rgba(255,255,255,0.07)',
-        background: '#0A0F1C', flexShrink: 0,
+        background: '#0A0C16', flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {isMobile && (
@@ -520,7 +520,7 @@ export default function AskAI() {
               style={{
                 width: 34, height: 34, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
-                color: '#94A3B8', cursor: 'pointer', flexShrink: 0,
+                color: '#8790A8', cursor: 'pointer', flexShrink: 0,
               }}
             >
               <Menu size={16} />
@@ -528,13 +528,13 @@ export default function AskAI() {
           )}
           <div style={{
             width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'linear-gradient(135deg, #10B981, #059669)',
+            background: 'linear-gradient(135deg, #34D399, #059669)',
           }}>
             <Sparkles size={18} color="#fff" />
           </div>
           <div>
-            <h1 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#F1F5F9' }}>Ask AI</h1>
-            {!isMobile && <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748B' }}>Powered by advanced AI models</p>}
+            <h1 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#F8FAFC' }}>Ask AI</h1>
+            {!isMobile && <p style={{ margin: 0, fontSize: '0.72rem', color: '#8790A8' }}>Powered by advanced AI models</p>}
           </div>
         </div>
         {!isMobile && (
@@ -545,9 +545,9 @@ export default function AskAI() {
                 onClick={() => setShowHistory(v => !v)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8,
-                  background: showHistory ? 'rgba(16,185,129,0.10)' : 'rgba(255,255,255,0.05)',
-                  border: showHistory ? '1px solid rgba(16,185,129,0.25)' : '1px solid rgba(255,255,255,0.08)',
-                  color: showHistory ? '#10B981' : '#94A3B8', fontSize: '0.8rem', cursor: 'pointer',
+                  background: showHistory ? 'rgba(52,211,153,0.10)' : 'rgba(255,255,255,0.05)',
+                  border: showHistory ? '1px solid rgba(52,211,153,0.25)' : '1px solid rgba(255,255,255,0.08)',
+                  color: showHistory ? '#34D399' : '#8790A8', fontSize: '0.8rem', cursor: 'pointer',
                 }}
               >
                 <History size={14} /> History
@@ -558,26 +558,26 @@ export default function AskAI() {
                   background: '#0F1629', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12,
                   padding: 8, minWidth: 240, boxShadow: '0 12px 40px rgba(0,0,0,0.5)', zIndex: 50,
                 }}>
-                  <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '4px 8px 8px' }}>
+                  <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#8790A8', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '4px 8px 8px' }}>
                     Recent Threads
                   </div>
                   {threads.length === 0 ? (
-                    <div style={{ fontSize: '0.75rem', color: '#475569', padding: '8px 10px' }}>No saved threads yet</div>
+                    <div style={{ fontSize: '0.75rem', color: '#4E566E', padding: '8px 10px' }}>No saved threads yet</div>
                   ) : threads.map(t => (
                     <button
                       key={t.id}
                       onClick={() => handleLoadThread(t)}
                       style={{
                         display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
-                        background: selectedThread === t.id ? 'rgba(16,185,129,0.10)' : 'transparent',
-                        border: selectedThread === t.id ? '1px solid rgba(16,185,129,0.2)' : '1px solid transparent',
+                        background: selectedThread === t.id ? 'rgba(52,211,153,0.10)' : 'transparent',
+                        border: selectedThread === t.id ? '1px solid rgba(52,211,153,0.2)' : '1px solid transparent',
                         transition: 'all 0.15s',
                       }}
                       onMouseEnter={e => { if (selectedThread !== t.id) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
                       onMouseLeave={e => { if (selectedThread !== t.id) e.currentTarget.style.background = 'transparent'; }}
                     >
-                      <div style={{ fontSize: '0.8rem', fontWeight: 500, color: selectedThread === t.id ? '#F1F5F9' : '#CBD5E1', lineHeight: 1.3 }}>{t.title}</div>
-                      <div style={{ fontSize: '0.65rem', color: '#475569', marginTop: 2 }}>{t.time}</div>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 500, color: selectedThread === t.id ? '#F8FAFC' : '#C0C6D6', lineHeight: 1.3 }}>{t.title}</div>
+                      <div style={{ fontSize: '0.65rem', color: '#4E566E', marginTop: 2 }}>{t.time}</div>
                     </button>
                   ))}
                 </div>
@@ -588,9 +588,9 @@ export default function AskAI() {
               onClick={handleShare}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8,
-                background: shareLabel === 'Copied!' ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.05)',
-                border: shareLabel === 'Copied!' ? '1px solid rgba(16,185,129,0.25)' : '1px solid rgba(255,255,255,0.08)',
-                color: shareLabel === 'Copied!' ? '#10B981' : '#94A3B8', fontSize: '0.8rem', cursor: 'pointer',
+                background: shareLabel === 'Copied!' ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.05)',
+                border: shareLabel === 'Copied!' ? '1px solid rgba(52,211,153,0.25)' : '1px solid rgba(255,255,255,0.08)',
+                color: shareLabel === 'Copied!' ? '#34D399' : '#8790A8', fontSize: '0.8rem', cursor: 'pointer',
               }}
             >
               <Share2 size={14} /> {shareLabel}
@@ -616,7 +616,7 @@ export default function AskAI() {
         {/* ── Left sidebar ───────────────────────────────────── */}
         <div style={{
           width: 240, minWidth: 240, borderRight: '1px solid rgba(255,255,255,0.07)',
-          background: '#0A0F1C', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          background: '#0A0C16', display: 'flex', flexDirection: 'column', overflow: 'hidden',
           ...(isMobile ? {
             position: 'fixed' as const, top: 0, left: 0, bottom: 0, zIndex: 50,
             transform: showSidebar ? 'translateX(0)' : 'translateX(-100%)',
@@ -632,7 +632,7 @@ export default function AskAI() {
                 style={{
                   width: 28, height: 28, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
                   background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-                  color: '#94A3B8', cursor: 'pointer',
+                  color: '#8790A8', cursor: 'pointer',
                 }}
               >
                 <X size={14} />
@@ -642,13 +642,13 @@ export default function AskAI() {
           {/* Recent Threads */}
           <div style={{ padding: '16px 14px 8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <span style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.08em', color: '#64748B', textTransform: 'uppercase' }}>Recent Threads</span>
+              <span style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.08em', color: '#8790A8', textTransform: 'uppercase' }}>Recent Threads</span>
               <button
                 onClick={handleNewThread}
                 style={{
                   width: 24, height: 24, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)',
-                  color: '#10B981', cursor: 'pointer',
+                  background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.25)',
+                  color: '#34D399', cursor: 'pointer',
                 }}
               >
                 <Plus size={13} />
@@ -656,20 +656,20 @@ export default function AskAI() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {threads.length === 0 ? (
-                <div style={{ fontSize: '0.75rem', color: '#475569', padding: '8px 10px' }}>No saved threads yet. Start chatting!</div>
+                <div style={{ fontSize: '0.75rem', color: '#4E566E', padding: '8px 10px' }}>No saved threads yet. Start chatting!</div>
               ) : threads.map(t => (
                 <button
                   key={t.id}
                   onClick={() => handleLoadThread(t)}
                   style={{
                     textAlign: 'left', padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
-                    background: selectedThread === t.id ? 'rgba(16,185,129,0.10)' : 'transparent',
-                    border: selectedThread === t.id ? '1px solid rgba(16,185,129,0.2)' : '1px solid transparent',
+                    background: selectedThread === t.id ? 'rgba(52,211,153,0.10)' : 'transparent',
+                    border: selectedThread === t.id ? '1px solid rgba(52,211,153,0.2)' : '1px solid transparent',
                     transition: 'all 0.15s',
                   }}
                 >
-                  <div style={{ fontSize: '0.8rem', fontWeight: 500, color: selectedThread === t.id ? '#F1F5F9' : '#CBD5E1', lineHeight: 1.3 }}>{t.title}</div>
-                  <div style={{ fontSize: '0.65rem', color: '#475569', marginTop: 2 }}>{t.time}</div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 500, color: selectedThread === t.id ? '#F8FAFC' : '#C0C6D6', lineHeight: 1.3 }}>{t.title}</div>
+                  <div style={{ fontSize: '0.65rem', color: '#4E566E', marginTop: 2 }}>{t.time}</div>
                 </button>
               ))}
             </div>
@@ -680,7 +680,7 @@ export default function AskAI() {
 
           {/* AI Personas */}
           <div style={{ padding: '8px 14px 14px', flex: 1, overflowY: 'auto' }}>
-            <span style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.08em', color: '#64748B', textTransform: 'uppercase', display: 'block', marginBottom: 10 }}>AI Personas</span>
+            <span style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.08em', color: '#8790A8', textTransform: 'uppercase', display: 'block', marginBottom: 10 }}>AI Personas</span>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {PERSONAS.map(p => {
                 const active = selectedPersona.id === p.id;
@@ -705,13 +705,13 @@ export default function AskAI() {
                       {active && (
                         <div style={{
                           position: 'absolute', bottom: -2, right: -2, width: 8, height: 8, borderRadius: '50%',
-                          background: '#10B981', border: '2px solid #0A0F1C',
+                          background: '#34D399', border: '2px solid #0A0C16',
                         }} />
                       )}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 600, color: active ? '#F1F5F9' : '#CBD5E1', lineHeight: 1.2 }}>{p.name}</div>
-                      <div style={{ fontSize: '0.62rem', color: '#64748B', marginTop: 3, lineHeight: 1.35 }}>{p.desc}</div>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 600, color: active ? '#F8FAFC' : '#C0C6D6', lineHeight: 1.2 }}>{p.name}</div>
+                      <div style={{ fontSize: '0.62rem', color: '#8790A8', marginTop: 3, lineHeight: 1.35 }}>{p.desc}</div>
                     </div>
                   </button>
                 );
@@ -732,16 +732,16 @@ export default function AskAI() {
               }}>
                 <div style={{
                   width: 64, height: 64, borderRadius: 18,
-                  background: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(0,212,255,0.10))',
+                  background: 'linear-gradient(135deg, rgba(52,211,153,0.15), rgba(120,119,198,0.10))',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                  <Bot size={30} color="#10B981" />
+                  <Bot size={30} color="#34D399" />
                 </div>
                 <div>
-                  <h2 style={{ margin: '0 0 6px', fontSize: '1.2rem', fontWeight: 700, color: '#F1F5F9' }}>
+                  <h2 style={{ margin: '0 0 6px', fontSize: '1.2rem', fontWeight: 700, color: '#F8FAFC' }}>
                     {selectedPersona.name} is ready
                   </h2>
-                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748B', maxWidth: 420 }}>
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#8790A8', maxWidth: 420 }}>
                     Ask anything about your projects, risks, tasks, or portfolio data.
                     I have access to your live Consultant OS data.
                   </p>
@@ -754,10 +754,10 @@ export default function AskAI() {
                       style={{
                         padding: '8px 16px', borderRadius: 20, fontSize: '0.78rem', cursor: 'pointer',
                         background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                        color: '#94A3B8', transition: 'all 0.15s',
+                        color: '#8790A8', transition: 'all 0.15s',
                       }}
-                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.08)'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.25)'; e.currentTarget.style.color = '#10B981'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#94A3B8'; }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.08)'; e.currentTarget.style.borderColor = 'rgba(52,211,153,0.25)'; e.currentTarget.style.color = '#34D399'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#8790A8'; }}
                     >
                       {q}
                     </button>
@@ -779,7 +779,7 @@ export default function AskAI() {
                 {msg.role === 'user' ? (
                   <div style={{
                     width: 32, height: 32, minWidth: 32, borderRadius: 8,
-                    background: 'rgba(139,92,246,0.18)', color: '#A78BFA',
+                    background: 'rgba(167,139,250,0.18)', color: '#A78BFA',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
                     <User size={15} />
@@ -802,23 +802,23 @@ export default function AskAI() {
                   {/* Header for AI messages */}
                   {msg.role === 'assistant' && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                      <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#CBD5E1' }}>{msg.persona}</span>
+                      <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#C0C6D6' }}>{msg.persona}</span>
                       {msg.model && (
                         <span style={{
                           fontSize: '0.6rem', fontWeight: 600, padding: '2px 7px', borderRadius: 10,
-                          background: 'rgba(16,185,129,0.12)', color: '#10B981',
+                          background: 'rgba(52,211,153,0.12)', color: '#34D399',
                         }}>
                           {msg.model}
                         </span>
                       )}
-                      <span style={{ fontSize: '0.65rem', color: '#475569' }}>{timeAgo(msg.timestamp)}</span>
+                      <span style={{ fontSize: '0.65rem', color: '#4E566E' }}>{timeAgo(msg.timestamp)}</span>
                     </div>
                   )}
 
                   <div style={{
                     padding: '12px 16px', borderRadius: 14,
-                    background: msg.role === 'user' ? 'rgba(139,92,246,0.12)' : '#0C1220',
-                    border: msg.role === 'user' ? '1px solid rgba(139,92,246,0.18)' : '1px solid rgba(255,255,255,0.06)',
+                    background: msg.role === 'user' ? 'rgba(167,139,250,0.12)' : '#0C0F1A',
+                    border: msg.role === 'user' ? '1px solid rgba(167,139,250,0.18)' : '1px solid rgba(255,255,255,0.06)',
                     fontSize: '0.85rem', lineHeight: 1.65, color: '#E2E8F0',
                   }}>
                     {msg.role === 'user' ? msg.content : renderMarkdown(msg.content)}
@@ -826,7 +826,7 @@ export default function AskAI() {
 
                   {/* Timestamp for user messages */}
                   {msg.role === 'user' && (
-                    <div style={{ textAlign: 'right', fontSize: '0.65rem', color: '#475569', marginTop: 4 }}>
+                    <div style={{ textAlign: 'right', fontSize: '0.65rem', color: '#4E566E', marginTop: 4 }}>
                       {timeAgo(msg.timestamp)}
                     </div>
                   )}
@@ -846,8 +846,8 @@ export default function AskAI() {
                   {selectedPersona.initials}
                 </div>
                 <div style={{
-                  padding: '12px 16px', borderRadius: 14, background: '#0C1220',
-                  border: '1px solid rgba(255,255,255,0.06)', fontSize: '0.85rem', color: '#94A3B8',
+                  padding: '12px 16px', borderRadius: 14, background: '#0C0F1A',
+                  border: '1px solid rgba(255,255,255,0.06)', fontSize: '0.85rem', color: '#8790A8',
                   display: 'flex', alignItems: 'center', gap: 8,
                 }}>
                   <span style={{ fontWeight: 600, color: selectedPersona.color }}>{selectedPersona.name} AI</span>
@@ -865,7 +865,7 @@ export default function AskAI() {
           <div style={{ padding: isMobile ? '0 10px 14px' : '0 32px 20px', flexShrink: 0 }}>
             <div style={{
               display: 'flex', alignItems: 'flex-end', gap: 10, padding: '10px 14px',
-              background: '#0C1220', border: '1px solid rgba(255,255,255,0.08)',
+              background: '#0C0F1A', border: '1px solid rgba(255,255,255,0.08)',
               borderRadius: 16, transition: 'border-color 0.2s',
             }}>
               <textarea
@@ -877,7 +877,7 @@ export default function AskAI() {
                 rows={1}
                 style={{
                   flex: 1, resize: 'none', background: 'transparent', border: 'none', outline: 'none',
-                  color: '#F1F5F9', fontSize: '0.88rem', lineHeight: 1.5, padding: '6px 0',
+                  color: '#F8FAFC', fontSize: '0.88rem', lineHeight: 1.5, padding: '6px 0',
                   fontFamily: 'inherit', maxHeight: 120, overflowY: 'auto',
                 }}
                 onInput={e => {
@@ -891,7 +891,7 @@ export default function AskAI() {
               <button style={{
                 width: 34, height: 34, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)',
-                color: '#64748B', cursor: 'pointer', flexShrink: 0,
+                color: '#8790A8', cursor: 'pointer', flexShrink: 0,
               }}>
                 <Mic size={15} />
               </button>
@@ -903,7 +903,7 @@ export default function AskAI() {
                   style={{
                     display: 'flex', alignItems: 'center', gap: 5, padding: '7px 10px', borderRadius: 8,
                     background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                    color: '#94A3B8', fontSize: '0.72rem', cursor: 'pointer', whiteSpace: 'nowrap',
+                    color: '#8790A8', fontSize: '0.72rem', cursor: 'pointer', whiteSpace: 'nowrap',
                   }}
                 >
                   <MessageSquare size={12} />
@@ -924,8 +924,8 @@ export default function AskAI() {
                         style={{
                           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                           width: '100%', padding: '9px 12px', borderRadius: 8, cursor: 'pointer',
-                          background: selectedModel.id === m.id ? 'rgba(16,185,129,0.10)' : 'transparent',
-                          border: 'none', color: selectedModel.id === m.id ? '#10B981' : '#CBD5E1',
+                          background: selectedModel.id === m.id ? 'rgba(52,211,153,0.10)' : 'transparent',
+                          border: 'none', color: selectedModel.id === m.id ? '#34D399' : '#C0C6D6',
                           fontSize: '0.8rem', textAlign: 'left', transition: 'background 0.1s',
                         }}
                         onMouseEnter={e => { if (selectedModel.id !== m.id) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
@@ -934,7 +934,7 @@ export default function AskAI() {
                         <span>{m.label}</span>
                         <span style={{
                           fontSize: '0.6rem', fontWeight: 600, padding: '2px 6px', borderRadius: 6,
-                          background: 'rgba(16,185,129,0.12)', color: '#10B981',
+                          background: 'rgba(52,211,153,0.12)', color: '#34D399',
                         }}>
                           {m.badge}
                         </span>
@@ -950,9 +950,9 @@ export default function AskAI() {
                 disabled={!input.trim() || isLoading}
                 style={{
                   width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: input.trim() && !isLoading ? 'linear-gradient(135deg, #00D4FF, #10B981)' : 'rgba(255,255,255,0.06)',
+                  background: input.trim() && !isLoading ? 'linear-gradient(135deg, #A78BFA, #34D399)' : 'rgba(255,255,255,0.06)',
                   border: 'none', cursor: input.trim() && !isLoading ? 'pointer' : 'not-allowed',
-                  color: input.trim() && !isLoading ? '#fff' : '#475569',
+                  color: input.trim() && !isLoading ? '#fff' : '#4E566E',
                   transition: 'all 0.2s', flexShrink: 0,
                 }}
               >
@@ -963,7 +963,7 @@ export default function AskAI() {
             {/* Bottom helper row */}
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '8px 4px 0', fontSize: '0.68rem', color: '#475569',
+              padding: '8px 4px 0', fontSize: '0.68rem', color: '#4E566E',
             }}>
               <div style={{ display: 'flex', gap: 14 }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
@@ -977,8 +977,8 @@ export default function AskAI() {
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ color: '#334155' }}>Delay</span>
-                <span style={{ color: '#334155' }}>to send</span>
+                <span style={{ color: '#4E566E' }}>Delay</span>
+                <span style={{ color: '#4E566E' }}>to send</span>
               </div>
             </div>
           </div>

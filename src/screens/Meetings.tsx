@@ -14,15 +14,15 @@ import { chatWithDocument } from '../lib/openrouter';
 const filterTabs = ['All', 'Upcoming', 'Completed', 'Needs Action'];
 
 const typeColors: Record<string, { bg: string; text: string; border: string; accent: string }> = {
-  Workshop:  { bg: 'rgba(14,165,233,0.1)',   text: '#38BDF8',  border: 'rgba(14,165,233,0.22)',  accent: '#0EA5E9' },
-  Committee: { bg: 'rgba(139,92,246,0.12)',  text: '#A78BFA',  border: 'rgba(139,92,246,0.25)',  accent: '#8B5CF6' },
-  Steering:  { bg: 'rgba(239,68,68,0.1)',    text: '#FCA5A5',  border: 'rgba(239,68,68,0.22)',   accent: '#EF4444' },
-  Review:    { bg: 'rgba(16,185,129,0.1)',   text: '#34D399',  border: 'rgba(16,185,129,0.22)',  accent: '#10B981' },
-  Kickoff:   { bg: 'rgba(0,212,255,0.1)',    text: '#00D4FF',  border: 'rgba(0,212,255,0.22)',   accent: '#00D4FF' },
-  Standup:   { bg: 'rgba(148,163,184,0.08)', text: '#94A3B8',  border: 'rgba(148,163,184,0.15)', accent: '#475569' },
+  Workshop:  { bg: 'rgba(120,119,198,0.1)',   text: '#7DD3FC',  border: 'rgba(120,119,198,0.22)',  accent: '#7877C6' },
+  Committee: { bg: 'rgba(167,139,250,0.12)',  text: '#A78BFA',  border: 'rgba(167,139,250,0.25)',  accent: '#A78BFA' },
+  Steering:  { bg: 'rgba(255,107,107,0.1)',    text: '#FCA5A5',  border: 'rgba(255,107,107,0.22)',   accent: '#FF6B6B' },
+  Review:    { bg: 'rgba(52,211,153,0.1)',   text: '#34D399',  border: 'rgba(52,211,153,0.22)',  accent: '#34D399' },
+  Kickoff:   { bg: 'rgba(120,119,198,0.1)',    text: '#A78BFA',  border: 'rgba(120,119,198,0.22)',   accent: '#A78BFA' },
+  Standup:   { bg: 'rgba(148,163,184,0.08)', text: '#8790A8',  border: 'rgba(148,163,184,0.15)', accent: '#4E566E' },
 };
 
-const avatarBgs = ['#0EA5E9', '#8B5CF6', '#10B981', '#F59E0B', '#EF4444'];
+const avatarBgs = ['#7877C6', '#A78BFA', '#34D399', '#F5B544', '#FF6B6B'];
 
 const MONTH_NAMES = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 const LONG_MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -47,9 +47,9 @@ const CURRENT_MONTH_LABEL = `${LONG_MONTH_NAMES[_today.getMonth()]} ${_today.get
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { bg: string; color: string; border: string; dot: string }> = {
-    'Upcoming':    { bg: 'rgba(14,165,233,0.1)',  color: '#38BDF8',  border: 'rgba(14,165,233,0.22)',  dot: '#38BDF8' },
-    'In Progress': { bg: 'rgba(239,68,68,0.12)',  color: '#FCA5A5',  border: 'rgba(239,68,68,0.25)',   dot: '#EF4444' },
-    'Completed':   { bg: 'rgba(16,185,129,0.1)',  color: '#34D399',  border: 'rgba(16,185,129,0.22)',  dot: '#10B981' },
+    'Upcoming':    { bg: 'rgba(120,119,198,0.1)',  color: '#7DD3FC',  border: 'rgba(120,119,198,0.22)',  dot: '#7DD3FC' },
+    'In Progress': { bg: 'rgba(255,107,107,0.12)',  color: '#FCA5A5',  border: 'rgba(255,107,107,0.25)',   dot: '#FF6B6B' },
+    'Completed':   { bg: 'rgba(52,211,153,0.1)',  color: '#34D399',  border: 'rgba(52,211,153,0.22)',  dot: '#34D399' },
   };
   const s = map[status] || map['Upcoming'];
   return (
@@ -255,7 +255,7 @@ export default function Meetings() {
         id: crypto.randomUUID(),
         name: `Follow-up: ${target.title}`,
         type: 'Meeting Minutes',
-        type_color: '#10B981',
+        type_color: '#34D399',
         workspace: target.workspace,
         workspace_id: target.workspace_id ?? '',
         date: new Date().toISOString().slice(0, 10),
@@ -327,13 +327,13 @@ export default function Meetings() {
 
         {/* Total Meetings */}
         <div className="metric-card" style={{ position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #8B5CF6, transparent)' }} />
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #A78BFA, transparent)' }} />
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
             <div>
               <div style={{ fontSize: '0.62rem', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Total Meetings</div>
-              <div className="hero-number" style={{ color: '#8B5CF6' }}>{meetings.length}</div>
+              <div className="hero-number" style={{ color: '#A78BFA' }}>{meetings.length}</div>
             </div>
-            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(139,92,246,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(139,92,246,0.25)' }}>
+            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(167,139,250,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(167,139,250,0.25)' }}>
               <Video size={14} style={{ color: '#A78BFA' }} />
             </div>
           </div>
@@ -345,14 +345,14 @@ export default function Meetings() {
 
         {/* Upcoming */}
         <div className="metric-card" style={{ position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #0EA5E9, transparent)' }} />
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #7877C6, transparent)' }} />
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
             <div>
               <div style={{ fontSize: '0.62rem', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Upcoming</div>
-              <div className="hero-number" style={{ color: '#0EA5E9' }}>{upcomingCount}</div>
+              <div className="hero-number" style={{ color: '#7877C6' }}>{upcomingCount}</div>
             </div>
-            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(14,165,233,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(14,165,233,0.25)' }}>
-              <Calendar size={14} style={{ color: '#38BDF8' }} />
+            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(120,119,198,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(120,119,198,0.25)' }}>
+              <Calendar size={14} style={{ color: '#7DD3FC' }} />
             </div>
           </div>
           <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -362,13 +362,13 @@ export default function Meetings() {
 
         {/* Completed */}
         <div className="metric-card" style={{ position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #10B981, transparent)' }} />
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #34D399, transparent)' }} />
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
             <div>
               <div style={{ fontSize: '0.62rem', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Completed</div>
-              <div className="hero-number" style={{ color: '#10B981' }}>{completedCount}</div>
+              <div className="hero-number" style={{ color: '#34D399' }}>{completedCount}</div>
             </div>
-            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(16,185,129,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(16,185,129,0.25)' }}>
+            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(52,211,153,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(52,211,153,0.25)' }}>
               <CheckCircle size={14} style={{ color: '#34D399' }} />
             </div>
           </div>
@@ -380,13 +380,13 @@ export default function Meetings() {
 
         {/* Minutes Coverage */}
         <div className="metric-card" style={{ position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #F59E0B, transparent)' }} />
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #F5B544, transparent)' }} />
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
             <div>
               <div style={{ fontSize: '0.62rem', fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Minutes Coverage</div>
-              <div className="hero-number" style={{ color: '#F59E0B' }}>{coveragePct}%</div>
+              <div className="hero-number" style={{ color: '#F5B544' }}>{coveragePct}%</div>
             </div>
-            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(245,158,11,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(245,158,11,0.25)' }}>
+            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(245,181,68,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(245,181,68,0.25)' }}>
               <FileText size={14} style={{ color: '#FBBF24' }} />
             </div>
           </div>
@@ -394,7 +394,7 @@ export default function Meetings() {
             {pendingMinutes > 0 ? `${pendingMinutes} pending generation` : 'All minutes generated'}
           </div>
           <div style={{ height: '4px', borderRadius: '9999px', background: 'rgba(255,255,255,0.06)', marginTop: '6px', overflow: 'hidden' }}>
-            <div style={{ height: '100%', borderRadius: '9999px', width: `${coveragePct}%`, background: 'linear-gradient(90deg, #F59E0B, #FCD34D)', transition: 'width 0.5s' }} />
+            <div style={{ height: '100%', borderRadius: '9999px', width: `${coveragePct}%`, background: 'linear-gradient(90deg, #F5B544, #FDCE78)', transition: 'width 0.5s' }} />
           </div>
         </div>
       </div>
@@ -525,12 +525,12 @@ export default function Meetings() {
                             style={{
                               display: 'flex', alignItems: 'center', gap: '4px',
                               fontSize: '0.65rem', fontWeight: 700, padding: '4px 10px', borderRadius: '6px',
-                              background: 'rgba(16,185,129,0.12)', color: '#34D399',
-                              border: '1px solid rgba(16,185,129,0.25)',
+                              background: 'rgba(52,211,153,0.12)', color: '#34D399',
+                              border: '1px solid rgba(52,211,153,0.25)',
                               cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
                             }}
-                            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.22)'; }}
-                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.12)'; }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(52,211,153,0.22)'; }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(52,211,153,0.12)'; }}
                           >
                             <FileText size={10} /> Summarize Minutes
                           </button>
@@ -540,13 +540,13 @@ export default function Meetings() {
                             style={{
                               display: 'flex', alignItems: 'center', gap: '4px',
                               fontSize: '0.65rem', fontWeight: 700, padding: '4px 10px', borderRadius: '6px',
-                              background: 'rgba(14,165,233,0.1)', color: '#38BDF8',
-                              border: '1px solid rgba(14,165,233,0.22)',
+                              background: 'rgba(120,119,198,0.1)', color: '#7DD3FC',
+                              border: '1px solid rgba(120,119,198,0.22)',
                               cursor: aiLoading === 'followup' ? 'wait' : 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
                               opacity: aiLoading === 'followup' ? 0.6 : 1,
                             }}
-                            onMouseEnter={e => { if (!aiLoading) (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.2)'; }}
-                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.1)'; }}
+                            onMouseEnter={e => { if (!aiLoading) (e.currentTarget as HTMLElement).style.background = 'rgba(120,119,198,0.2)'; }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(120,119,198,0.1)'; }}
                           >
                             {aiLoading === 'followup' ? <><Loader2 size={10} className="animate-spin" /> Drafting...</> : <><Upload size={10} /> Draft Follow-up</>}
                           </button>
@@ -562,12 +562,12 @@ export default function Meetings() {
                             style={{
                               display: 'flex', alignItems: 'center', gap: '4px',
                               fontSize: '0.65rem', fontWeight: 700, padding: '4px 10px', borderRadius: '6px',
-                              background: 'rgba(16,185,129,0.1)', color: '#34D399',
-                              border: '1px solid rgba(16,185,129,0.22)', cursor: 'pointer',
+                              background: 'rgba(52,211,153,0.1)', color: '#34D399',
+                              border: '1px solid rgba(52,211,153,0.22)', cursor: 'pointer',
                               fontFamily: 'inherit', transition: 'all 0.15s',
                             }}
-                            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.2)'; }}
-                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.1)'; }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(52,211,153,0.2)'; }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(52,211,153,0.1)'; }}
                           >
                             {markingComplete === meeting.id
                               ? <Loader2 size={10} className="animate-spin" />
@@ -586,11 +586,11 @@ export default function Meetings() {
                           style={{
                             display: 'flex', alignItems: 'center', gap: '3px',
                             fontSize: '0.62rem', fontWeight: 500, padding: '3px 8px', borderRadius: '5px',
-                            background: 'rgba(255,255,255,0.04)', color: '#64748B',
+                            background: 'rgba(255,255,255,0.04)', color: '#8790A8',
                             border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer', fontFamily: 'inherit',
                           }}
-                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#94A3B8'; }}
-                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#64748B'; }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#8790A8'; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#8790A8'; }}
                         >
                           <Pencil size={10} /> Edit
                         </button>
@@ -601,11 +601,11 @@ export default function Meetings() {
                           style={{
                             display: 'flex', alignItems: 'center', gap: '3px',
                             fontSize: '0.62rem', fontWeight: 500, padding: '3px 8px', borderRadius: '5px',
-                            background: 'rgba(239,68,68,0.06)', color: '#EF4444',
-                            border: '1px solid rgba(239,68,68,0.15)', cursor: 'pointer', fontFamily: 'inherit', opacity: deletingId === meeting.id ? 0.5 : 1,
+                            background: 'rgba(255,107,107,0.06)', color: '#FF6B6B',
+                            border: '1px solid rgba(255,107,107,0.15)', cursor: 'pointer', fontFamily: 'inherit', opacity: deletingId === meeting.id ? 0.5 : 1,
                           }}
-                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.12)'; }}
-                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.06)'; }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,107,107,0.12)'; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,107,107,0.06)'; }}
                         >
                           <Trash2 size={10} /> Delete
                         </button>
@@ -676,15 +676,15 @@ export default function Meetings() {
                           <div style={{
                             width: '24px', height: '24px', borderRadius: '50%',
                             display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto',
-                            background: isToday ? 'linear-gradient(135deg, #0EA5E9, #00D4FF)' : hasMeeting ? 'rgba(139,92,246,0.12)' : 'transparent',
+                            background: isToday ? 'linear-gradient(135deg, #7877C6, #A78BFA)' : hasMeeting ? 'rgba(167,139,250,0.12)' : 'transparent',
                             fontSize: '0.7rem', fontWeight: isToday ? 700 : hasMeeting ? 600 : 400,
                             color: isToday ? 'white' : hasMeeting ? '#A78BFA' : 'var(--text-muted)',
-                            boxShadow: isToday ? '0 2px 8px rgba(0,212,255,0.3)' : 'none',
+                            boxShadow: isToday ? '0 2px 8px rgba(120,119,198,0.3)' : 'none',
                           }}>
                             {date}
                           </div>
                           {hasMeeting && !isToday && (
-                            <div style={{ width: '3px', height: '3px', borderRadius: '50%', background: '#8B5CF6', margin: '2px auto 0' }} />
+                            <div style={{ width: '3px', height: '3px', borderRadius: '50%', background: '#A78BFA', margin: '2px auto 0' }} />
                           )}
                         </>
                       )}
@@ -698,7 +698,7 @@ export default function Meetings() {
           {/* Quick Actions */}
           <div className="section-card" style={{ padding: '1rem 1.125rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.875rem' }}>
-              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10B981', boxShadow: '0 0 6px rgba(16,185,129,0.5)' }} />
+              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34D399', boxShadow: '0 0 6px rgba(52,211,153,0.5)' }} />
               <span style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)' }}>Quick Actions</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -708,13 +708,13 @@ export default function Meetings() {
                 style={{
                   display: 'flex', alignItems: 'center', gap: '6px', width: '100%',
                   fontSize: '0.72rem', fontWeight: 700, padding: '8px 12px', borderRadius: '8px',
-                  background: 'rgba(16,185,129,0.1)', color: '#34D399',
-                  border: '1px solid rgba(16,185,129,0.22)',
+                  background: 'rgba(52,211,153,0.1)', color: '#34D399',
+                  border: '1px solid rgba(52,211,153,0.22)',
                   cursor: aiLoading === 'summarize' ? 'wait' : 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
                   opacity: aiLoading === 'summarize' ? 0.6 : 1,
                 }}
-                onMouseEnter={e => { if (!aiLoading) (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.2)'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.1)'; }}
+                onMouseEnter={e => { if (!aiLoading) (e.currentTarget as HTMLElement).style.background = 'rgba(52,211,153,0.2)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(52,211,153,0.1)'; }}
               >
                 {aiLoading === 'summarize' ? <><Loader2 size={13} className="animate-spin" /> Summarizing...</> : <><FileText size={13} /> Summarize Minutes</>}
               </button>
@@ -724,13 +724,13 @@ export default function Meetings() {
                 style={{
                   display: 'flex', alignItems: 'center', gap: '6px', width: '100%',
                   fontSize: '0.72rem', fontWeight: 700, padding: '8px 12px', borderRadius: '8px',
-                  background: 'rgba(14,165,233,0.1)', color: '#38BDF8',
-                  border: '1px solid rgba(14,165,233,0.22)',
+                  background: 'rgba(120,119,198,0.1)', color: '#7DD3FC',
+                  border: '1px solid rgba(120,119,198,0.22)',
                   cursor: aiLoading === 'followup' ? 'wait' : 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
                   opacity: aiLoading === 'followup' ? 0.6 : 1,
                 }}
-                onMouseEnter={e => { if (!aiLoading) (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.2)'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.1)'; }}
+                onMouseEnter={e => { if (!aiLoading) (e.currentTarget as HTMLElement).style.background = 'rgba(120,119,198,0.2)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(120,119,198,0.1)'; }}
               >
                 {aiLoading === 'followup' ? <><Loader2 size={13} className="animate-spin" /> Drafting...</> : <><Upload size={13} /> Draft Follow-up</>}
               </button>
@@ -740,13 +740,13 @@ export default function Meetings() {
                 style={{
                   display: 'flex', alignItems: 'center', gap: '6px', width: '100%',
                   fontSize: '0.72rem', fontWeight: 700, padding: '8px 12px', borderRadius: '8px',
-                  background: 'rgba(139,92,246,0.1)', color: '#A78BFA',
-                  border: '1px solid rgba(139,92,246,0.22)',
+                  background: 'rgba(167,139,250,0.1)', color: '#A78BFA',
+                  border: '1px solid rgba(167,139,250,0.22)',
                   cursor: aiLoading === 'report' ? 'wait' : 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
                   opacity: aiLoading === 'report' ? 0.6 : 1,
                 }}
-                onMouseEnter={e => { if (!aiLoading) (e.currentTarget as HTMLElement).style.background = 'rgba(139,92,246,0.2)'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(139,92,246,0.1)'; }}
+                onMouseEnter={e => { if (!aiLoading) (e.currentTarget as HTMLElement).style.background = 'rgba(167,139,250,0.2)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(167,139,250,0.1)'; }}
               >
                 {aiLoading === 'report' ? <><Loader2 size={13} className="animate-spin" /> Generating...</> : <><Sparkles size={13} /> Generate AI Report</>}
               </button>
@@ -756,7 +756,7 @@ export default function Meetings() {
           {/* AI Assistant Insights */}
           <div className="section-card" style={{ padding: '1rem 1.125rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.875rem' }}>
-              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#A78BFA', boxShadow: '0 0 6px rgba(139,92,246,0.5)' }} />
+              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#A78BFA', boxShadow: '0 0 6px rgba(167,139,250,0.5)' }} />
               <span style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)' }}>AI Assistant</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
@@ -764,7 +764,7 @@ export default function Meetings() {
                 <div key={i} style={{
                   display: 'flex', gap: '0.5rem', alignItems: 'flex-start',
                   padding: '0.625rem 0.75rem', borderRadius: '8px',
-                  background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.12)',
+                  background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.12)',
                 }}>
                   <MessageSquareQuote size={12} style={{ color: '#A78BFA', flexShrink: 0, marginTop: '2px' }} />
                   <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.45, fontStyle: 'italic' }}>
@@ -789,7 +789,7 @@ export default function Meetings() {
             borderRadius: 'var(--radius-lg)', padding: '1.75rem', width: '100%', maxWidth: '500px',
             boxShadow: '0 24px 64px rgba(0,0,0,0.6)', position: 'relative', overflow: 'hidden',
           }} onClick={e => e.stopPropagation()}>
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #8B5CF6, #0EA5E9)' }} />
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #A78BFA, #7877C6)' }} />
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <div>

@@ -24,19 +24,19 @@ type TaskStatus = 'Backlog' | 'In Progress' | 'In Review' | 'Completed' | 'Overd
 const FILTER_TABS = ['All', 'Backlog', 'In Progress', 'In Review', 'Completed', 'Overdue'] as const;
 
 const STATUS_META: Record<string, { color: string; bg: string; border: string; dot: string }> = {
-  'Backlog':     { color: '#94A3B8', bg: 'rgba(71,85,105,0.12)',   border: 'rgba(71,85,105,0.25)',   dot: '#475569' },
-  'In Progress': { color: '#38BDF8', bg: 'rgba(14,165,233,0.1)',   border: 'rgba(14,165,233,0.22)',  dot: '#0EA5E9' },
-  'In Review':   { color: '#A78BFA', bg: 'rgba(139,92,246,0.12)',  border: 'rgba(139,92,246,0.25)',  dot: '#8B5CF6' },
-  'Completed':   { color: '#34D399', bg: 'rgba(16,185,129,0.1)',   border: 'rgba(16,185,129,0.22)',  dot: '#10B981' },
-  'Overdue':     { color: '#FCA5A5', bg: 'rgba(239,68,68,0.1)',    border: 'rgba(239,68,68,0.22)',   dot: '#EF4444' },
+  'Backlog':     { color: '#8790A8', bg: 'rgba(71,85,105,0.12)',   border: 'rgba(71,85,105,0.25)',   dot: '#4E566E' },
+  'In Progress': { color: '#7DD3FC', bg: 'rgba(120,119,198,0.1)',   border: 'rgba(120,119,198,0.22)',  dot: '#7877C6' },
+  'In Review':   { color: '#A78BFA', bg: 'rgba(167,139,250,0.12)',  border: 'rgba(167,139,250,0.25)',  dot: '#A78BFA' },
+  'Completed':   { color: '#34D399', bg: 'rgba(52,211,153,0.1)',   border: 'rgba(52,211,153,0.22)',  dot: '#34D399' },
+  'Overdue':     { color: '#FCA5A5', bg: 'rgba(255,107,107,0.1)',    border: 'rgba(255,107,107,0.22)',   dot: '#FF6B6B' },
 };
 
 const PRIORITY_META: Record<string, { color: string; bg: string; border: string }> = {
-  'Highest':  { color: '#FCA5A5', bg: 'rgba(239,68,68,0.12)',  border: 'rgba(239,68,68,0.25)'  },
-  'High':     { color: '#FCA5A5', bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.22)'  },
-  'Medium':   { color: '#FCD34D', bg: 'rgba(245,158,11,0.1)',  border: 'rgba(245,158,11,0.22)' },
-  'Low':      { color: '#34D399', bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.2)'  },
-  'Lowest':   { color: '#94A3B8', bg: 'rgba(148,163,184,0.08)', border: 'rgba(148,163,184,0.15)' },
+  'Highest':  { color: '#FCA5A5', bg: 'rgba(255,107,107,0.12)',  border: 'rgba(255,107,107,0.25)'  },
+  'High':     { color: '#FCA5A5', bg: 'rgba(255,107,107,0.1)',   border: 'rgba(255,107,107,0.22)'  },
+  'Medium':   { color: '#FDCE78', bg: 'rgba(245,181,68,0.1)',  border: 'rgba(245,181,68,0.22)' },
+  'Low':      { color: '#34D399', bg: 'rgba(52,211,153,0.08)', border: 'rgba(52,211,153,0.2)'  },
+  'Lowest':   { color: '#8790A8', bg: 'rgba(148,163,184,0.08)', border: 'rgba(148,163,184,0.15)' },
 };
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -175,11 +175,11 @@ export default function Tasks() {
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '0.75rem 1rem', borderRadius: 'var(--radius-lg)',
-          background: 'linear-gradient(135deg, rgba(14,165,233,0.06) 0%, rgba(139,92,246,0.04) 100%)',
-          border: '1px solid rgba(14,165,233,0.12)', flexWrap: 'wrap', gap: '0.5rem',
+          background: 'linear-gradient(135deg, rgba(120,119,198,0.06) 0%, rgba(167,139,250,0.04) 100%)',
+          border: '1px solid rgba(120,119,198,0.12)', flexWrap: 'wrap', gap: '0.5rem',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-            <div style={{ padding: '0.375rem', borderRadius: '8px', background: 'rgba(14,165,233,0.12)', color: '#0EA5E9' }}>
+            <div style={{ padding: '0.375rem', borderRadius: '8px', background: 'rgba(120,119,198,0.12)', color: '#7877C6' }}>
               <Layers size={15} />
             </div>
             <div>
@@ -205,10 +205,10 @@ export default function Tasks() {
       {/* ── Stat Cards ─────────────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${colCount}, 1fr)`, gap: '0.875rem' }}>
         {[
-          { label: 'Total Cards',   value: totalCount,      color: '#8B5CF6', sub: `${uniqueLists.length} lists`, icon: <ListTodo size={14} /> },
-          { label: 'In Progress',   value: inProgressCount, color: '#0EA5E9', sub: 'actively being worked',       icon: <Clock size={14} /> },
-          { label: 'Overdue',       value: overdueCount,    color: '#EF4444', sub: 'past due date',               icon: <AlertTriangle size={14} /> },
-          { label: 'Completed',     value: completedCount,  color: '#10B981', sub: 'finished cards',              icon: <CheckCircle size={14} /> },
+          { label: 'Total Cards',   value: totalCount,      color: '#A78BFA', sub: `${uniqueLists.length} lists`, icon: <ListTodo size={14} /> },
+          { label: 'In Progress',   value: inProgressCount, color: '#7877C6', sub: 'actively being worked',       icon: <Clock size={14} /> },
+          { label: 'Overdue',       value: overdueCount,    color: '#FF6B6B', sub: 'past due date',               icon: <AlertTriangle size={14} /> },
+          { label: 'Completed',     value: completedCount,  color: '#34D399', sub: 'finished cards',              icon: <CheckCircle size={14} /> },
         ].map(s => (
           <div key={s.label} className="metric-card" style={{ position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(90deg, ${s.color}, transparent)` }} />
@@ -287,7 +287,7 @@ export default function Tasks() {
       )}
 
       {!loading && error && (
-        <div style={{ padding: '1.25rem', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 'var(--radius-lg)', color: '#FCA5A5', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div style={{ padding: '1.25rem', background: 'rgba(255,107,107,0.08)', border: '1px solid rgba(255,107,107,0.2)', borderRadius: 'var(--radius-lg)', color: '#FCA5A5', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <AlertTriangle size={15} />
           {error}
           <button className="btn-ghost" style={{ marginLeft: 'auto', fontSize: '0.72rem' }} onClick={handleSync}>Retry</button>
@@ -404,7 +404,7 @@ export default function Tasks() {
                       <div style={{ padding: '0 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <span style={{
                           fontSize: '0.65rem', fontWeight: 600, padding: '2px 7px', borderRadius: '4px',
-                          background: 'rgba(0,212,255,0.07)', color: '#38BDF8', border: '1px solid rgba(0,212,255,0.16)',
+                          background: 'rgba(120,119,198,0.07)', color: '#7DD3FC', border: '1px solid rgba(120,119,198,0.16)',
                           maxWidth: '128px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block',
                         }}>
                           {card.listName}

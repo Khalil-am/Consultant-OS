@@ -17,11 +17,11 @@ const adminSections = [
 ];
 
 const roleColors: Record<string, { bg: string; text: string }> = {
-  Admin: { bg: 'rgba(139,92,246,0.15)', text: '#A78BFA' },
-  Manager: { bg: 'rgba(16,185,129,0.12)', text: '#34D399' },
-  Consultant: { bg: 'rgba(16,185,129,0.12)', text: '#34D399' },
-  Analyst: { bg: 'rgba(148,163,184,0.1)', text: '#94A3B8' },
-  Viewer: { bg: 'rgba(14,165,233,0.12)', text: '#38BDF8' },
+  Admin: { bg: 'rgba(167,139,250,0.15)', text: '#A78BFA' },
+  Manager: { bg: 'rgba(52,211,153,0.12)', text: '#34D399' },
+  Consultant: { bg: 'rgba(52,211,153,0.12)', text: '#34D399' },
+  Analyst: { bg: 'rgba(148,163,184,0.1)', text: '#8790A8' },
+  Viewer: { bg: 'rgba(120,119,198,0.12)', text: '#7DD3FC' },
 };
 
 const roleDisplayNames: Record<string, string> = {
@@ -210,11 +210,11 @@ export default function Admin() {
   }
 
   function getStatusDisplay(user: LocalUser): { label: string; color: string; dotColor: string } {
-    if (user.status === 'Active') return { label: 'ACTIVE', color: '#34D399', dotColor: '#10B981' };
+    if (user.status === 'Active') return { label: 'ACTIVE', color: '#34D399', dotColor: '#34D399' };
     // Randomly assign PENDING or LOCKED for inactive users
     const hash = user.id.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
-    if (hash % 2 === 0) return { label: 'PENDING', color: '#F59E0B', dotColor: '#F59E0B' };
-    return { label: 'LOCKED', color: '#EF4444', dotColor: '#EF4444' };
+    if (hash % 2 === 0) return { label: 'PENDING', color: '#F5B544', dotColor: '#F5B544' };
+    return { label: 'LOCKED', color: '#FF6B6B', dotColor: '#FF6B6B' };
   }
 
   /* ─── Stats Cards ─── */
@@ -224,7 +224,7 @@ export default function Admin() {
       value: userList.length.toLocaleString(),
       trend: '+12% vs last month',
       trendPositive: true,
-      color: '#0EA5E9',
+      color: '#7877C6',
       icon: <Users size={16} />,
     },
     {
@@ -232,7 +232,7 @@ export default function Admin() {
       value: '892',
       trend: '+5%',
       trendPositive: true,
-      color: '#10B981',
+      color: '#34D399',
       icon: <CheckCircle size={16} />,
       sparkline: true,
     },
@@ -241,7 +241,7 @@ export default function Admin() {
       value: '24',
       sub: '8 expiring soon',
       link: 'View All',
-      color: '#F59E0B',
+      color: '#F5B544',
       icon: <Mail size={16} />,
     },
     {
@@ -249,7 +249,7 @@ export default function Admin() {
       value: '3',
       sub: '2 unusual logins',
       link: 'Review',
-      color: '#EF4444',
+      color: '#FF6B6B',
       icon: <Shield size={16} />,
       redDot: true,
     },
@@ -257,10 +257,10 @@ export default function Admin() {
 
   /* ─── Role distribution for sidebar chart ─── */
   const roleDistribution = [
-    { label: 'Consultant', color: '#0EA5E9', pct: 50 },
-    { label: 'Analyst', color: '#F59E0B', pct: 20 },
+    { label: 'Consultant', color: '#7877C6', pct: 50 },
+    { label: 'Analyst', color: '#F5B544', pct: 20 },
     { label: 'Admin', color: '#A78BFA', pct: 15 },
-    { label: 'Client', color: '#EF4444', pct: 15 },
+    { label: 'Client', color: '#FF6B6B', pct: 15 },
   ];
 
   return (<>
@@ -270,7 +270,7 @@ export default function Admin() {
         <div style={{
           width: '220px', minWidth: '220px', borderRight: '1px solid rgba(255,255,255,0.05)',
           padding: '1rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '2px',
-          background: '#0C1220',
+          background: '#0C0F1A',
         }}>
           <div className="sidebar-section-label" style={{ marginBottom: '0.375rem' }}>Administration</div>
           {adminSections.map(section => (
@@ -304,9 +304,9 @@ export default function Admin() {
                   display: 'flex', alignItems: 'center', gap: '0.375rem',
                   padding: '6px 14px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 500,
                   whiteSpace: 'nowrap', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0,
-                  background: activeSection === section.id ? 'rgba(14,165,233,0.15)' : 'rgba(255,255,255,0.04)',
-                  color: activeSection === section.id ? '#38BDF8' : '#94A3B8',
-                  border: activeSection === section.id ? '1px solid rgba(14,165,233,0.3)' : '1px solid rgba(255,255,255,0.08)',
+                  background: activeSection === section.id ? 'rgba(120,119,198,0.15)' : 'rgba(255,255,255,0.04)',
+                  color: activeSection === section.id ? '#7DD3FC' : '#8790A8',
+                  border: activeSection === section.id ? '1px solid rgba(120,119,198,0.3)' : '1px solid rgba(255,255,255,0.08)',
                 }}
               >
                 {section.icon}
@@ -322,8 +322,8 @@ export default function Admin() {
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9', margin: 0, marginBottom: '0.25rem' }}>Users & Roles</h2>
-                <p style={{ fontSize: '0.8rem', color: '#64748B', margin: 0 }}>{userList.length} users · 5 roles</p>
+                <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#F8FAFC', margin: 0, marginBottom: '0.25rem' }}>Users & Roles</h2>
+                <p style={{ fontSize: '0.8rem', color: '#8790A8', margin: 0 }}>{userList.length} users · 5 roles</p>
               </div>
               <button className="btn-primary" style={{ height: '34px', fontSize: '0.8rem' }} onClick={() => setShowInvite(true)}>
                 <Plus size={13} /> Invite User
@@ -343,7 +343,7 @@ export default function Admin() {
                   }}>
                     {card.icon}
                   </div>
-                  <div style={{ fontSize: '0.62rem', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem' }}>
+                  <div style={{ fontSize: '0.62rem', fontWeight: 600, color: '#8790A8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem' }}>
                     {card.title}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -351,16 +351,16 @@ export default function Admin() {
                       {card.value}
                     </span>
                     {card.redDot && (
-                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#EF4444', display: 'inline-block', boxShadow: '0 0 6px rgba(239,68,68,0.5)' }} />
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#FF6B6B', display: 'inline-block', boxShadow: '0 0 6px rgba(255,107,107,0.5)' }} />
                     )}
                   </div>
                   {card.trend && (
                     <span style={{
                       display: 'inline-block', marginTop: '0.5rem',
                       fontSize: '0.62rem', padding: '2px 6px', borderRadius: '9999px',
-                      background: card.trendPositive ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)',
-                      color: card.trendPositive ? '#34D399' : '#EF4444',
-                      border: `1px solid ${card.trendPositive ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'}`,
+                      background: card.trendPositive ? 'rgba(52,211,153,0.12)' : 'rgba(255,107,107,0.12)',
+                      color: card.trendPositive ? '#34D399' : '#FF6B6B',
+                      border: `1px solid ${card.trendPositive ? 'rgba(52,211,153,0.25)' : 'rgba(255,107,107,0.25)'}`,
                     }}>
                       {card.trend}
                     </span>
@@ -373,7 +373,7 @@ export default function Admin() {
                     </div>
                   )}
                   {card.sub && (
-                    <div style={{ marginTop: '0.5rem', fontSize: '0.68rem', color: '#64748B' }}>
+                    <div style={{ marginTop: '0.5rem', fontSize: '0.68rem', color: '#8790A8' }}>
                       {card.sub}
                       {card.link && (
                         <span style={{ color: card.color, marginLeft: '0.5rem', cursor: 'pointer', fontWeight: 500 }}>{card.link}</span>
@@ -392,11 +392,11 @@ export default function Admin() {
                   {/* Table header bar */}
                   <div style={{ padding: '0.875rem 1.125rem', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Users Directory</span>
+                      <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F8FAFC' }}>Users Directory</span>
                       <span style={{
                         fontSize: '0.62rem', padding: '2px 8px', borderRadius: '9999px',
-                        background: 'rgba(14,165,233,0.1)', color: '#38BDF8',
-                        border: '1px solid rgba(14,165,233,0.2)',
+                        background: 'rgba(120,119,198,0.1)', color: '#7DD3FC',
+                        border: '1px solid rgba(120,119,198,0.2)',
                       }}>
                         {filteredUsers.length.toLocaleString()} total
                       </span>
@@ -409,9 +409,9 @@ export default function Admin() {
                           onClick={() => setRoleFilter(tab)}
                           style={{
                             padding: '4px 10px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 500,
-                            background: roleFilter === tab ? 'rgba(14,165,233,0.15)' : 'transparent',
-                            color: roleFilter === tab ? '#38BDF8' : '#64748B',
-                            border: roleFilter === tab ? '1px solid rgba(14,165,233,0.25)' : '1px solid transparent',
+                            background: roleFilter === tab ? 'rgba(120,119,198,0.15)' : 'transparent',
+                            color: roleFilter === tab ? '#7DD3FC' : '#8790A8',
+                            border: roleFilter === tab ? '1px solid rgba(120,119,198,0.25)' : '1px solid transparent',
                             cursor: 'pointer', fontFamily: 'inherit',
                           }}
                         >
@@ -419,10 +419,10 @@ export default function Admin() {
                         </button>
                       ))}
                       <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.08)', margin: '0 0.25rem' }} />
-                      <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748B', display: 'flex', padding: '4px' }}>
+                      <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8790A8', display: 'flex', padding: '4px' }}>
                         <Filter size={14} />
                       </button>
-                      <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748B', display: 'flex', padding: '4px' }}>
+                      <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8790A8', display: 'flex', padding: '4px' }}>
                         <Download size={14} />
                       </button>
                     </div>
@@ -431,28 +431,28 @@ export default function Admin() {
                   {/* Bulk action bar */}
                   {selectedUsers.size > 0 && (
                     <div style={{
-                      padding: '0.5rem 1.125rem', background: 'rgba(14,165,233,0.06)',
-                      borderBottom: '1px solid rgba(14,165,233,0.15)',
+                      padding: '0.5rem 1.125rem', background: 'rgba(120,119,198,0.06)',
+                      borderBottom: '1px solid rgba(120,119,198,0.15)',
                       display: 'flex', alignItems: 'center', gap: '0.75rem',
                     }}>
-                      <span style={{ fontSize: '0.75rem', color: '#0EA5E9', fontWeight: 600 }}>
+                      <span style={{ fontSize: '0.75rem', color: '#7877C6', fontWeight: 600 }}>
                         {selectedUsers.size} user{selectedUsers.size > 1 ? 's' : ''} selected
                       </span>
                       <div style={{ display: 'flex', gap: '0.375rem', marginLeft: 'auto' }}>
                         <button style={{
                           padding: '3px 10px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 500,
-                          background: 'rgba(255,255,255,0.06)', color: '#94A3B8',
+                          background: 'rgba(255,255,255,0.06)', color: '#8790A8',
                           border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', fontFamily: 'inherit',
                         }}>Change Role</button>
                         <button style={{
                           padding: '3px 10px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 500,
-                          background: 'rgba(255,255,255,0.06)', color: '#94A3B8',
+                          background: 'rgba(255,255,255,0.06)', color: '#8790A8',
                           border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', fontFamily: 'inherit',
                         }}>Reset Password</button>
                         <button style={{
                           padding: '3px 10px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 500,
-                          background: 'rgba(239,68,68,0.1)', color: '#EF4444',
-                          border: '1px solid rgba(239,68,68,0.2)', cursor: 'pointer', fontFamily: 'inherit',
+                          background: 'rgba(255,107,107,0.1)', color: '#FF6B6B',
+                          border: '1px solid rgba(255,107,107,0.2)', cursor: 'pointer', fontFamily: 'inherit',
                         }}>Suspend</button>
                       </div>
                     </div>
@@ -468,12 +468,12 @@ export default function Admin() {
                               onClick={toggleAllSelection}
                               style={{
                                 width: '16px', height: '16px', borderRadius: '3px', cursor: 'pointer',
-                                border: `1.5px solid ${selectedUsers.size === paginatedUsers.length && paginatedUsers.length > 0 ? '#0EA5E9' : 'rgba(255,255,255,0.2)'}`,
-                                background: selectedUsers.size === paginatedUsers.length && paginatedUsers.length > 0 ? 'rgba(14,165,233,0.3)' : 'transparent',
+                                border: `1.5px solid ${selectedUsers.size === paginatedUsers.length && paginatedUsers.length > 0 ? '#7877C6' : 'rgba(255,255,255,0.2)'}`,
+                                background: selectedUsers.size === paginatedUsers.length && paginatedUsers.length > 0 ? 'rgba(120,119,198,0.3)' : 'transparent',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                               }}
                             >
-                              {selectedUsers.size === paginatedUsers.length && paginatedUsers.length > 0 && <Check size={10} style={{ color: '#0EA5E9' }} />}
+                              {selectedUsers.size === paginatedUsers.length && paginatedUsers.length > 0 && <Check size={10} style={{ color: '#7877C6' }} />}
                             </div>
                           </th>
                           <th>User</th>
@@ -490,18 +490,18 @@ export default function Admin() {
                           const twoFA = has2FA(user.id);
                           const isSelected = selectedUsers.has(user.id);
                           return (
-                            <tr key={user.id} style={{ background: isSelected ? 'rgba(14,165,233,0.04)' : undefined }}>
+                            <tr key={user.id} style={{ background: isSelected ? 'rgba(120,119,198,0.04)' : undefined }}>
                               <td style={{ width: '36px' }}>
                                 <div
                                   onClick={() => toggleUserSelection(user.id)}
                                   style={{
                                     width: '16px', height: '16px', borderRadius: '3px', cursor: 'pointer',
-                                    border: `1.5px solid ${isSelected ? '#0EA5E9' : 'rgba(255,255,255,0.2)'}`,
-                                    background: isSelected ? 'rgba(14,165,233,0.3)' : 'transparent',
+                                    border: `1.5px solid ${isSelected ? '#7877C6' : 'rgba(255,255,255,0.2)'}`,
+                                    background: isSelected ? 'rgba(120,119,198,0.3)' : 'transparent',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                   }}
                                 >
-                                  {isSelected && <Check size={10} style={{ color: '#0EA5E9' }} />}
+                                  {isSelected && <Check size={10} style={{ color: '#7877C6' }} />}
                                 </div>
                               </td>
                               <td>
@@ -510,8 +510,8 @@ export default function Admin() {
                                     {(user as { avatar?: string }).avatar ?? user.initials}
                                   </div>
                                   <div>
-                                    <div style={{ fontSize: '0.82rem', fontWeight: 500, color: '#F1F5F9', lineHeight: 1.3 }}>{user.name}</div>
-                                    <div style={{ fontSize: '0.68rem', color: '#475569', lineHeight: 1.3 }}>{user.email}</div>
+                                    <div style={{ fontSize: '0.82rem', fontWeight: 500, color: '#F8FAFC', lineHeight: 1.3 }}>{user.name}</div>
+                                    <div style={{ fontSize: '0.68rem', color: '#4E566E', lineHeight: 1.3 }}>{user.email}</div>
                                   </div>
                                 </div>
                               </td>
@@ -538,13 +538,13 @@ export default function Admin() {
                                 </div>
                               </td>
                               {!isMobile && (
-                                <td style={{ fontSize: '0.75rem', color: '#94A3B8' }}>
+                                <td style={{ fontSize: '0.75rem', color: '#8790A8' }}>
                                   {lastActivityTimes[user.id] ?? user.lastActive}
                                 </td>
                               )}
                               {!isMobile && (
                                 <td>
-                                  <Shield size={14} style={{ color: twoFA ? '#10B981' : '#334155' }} />
+                                  <Shield size={14} style={{ color: twoFA ? '#34D399' : '#4E566E' }} />
                                 </td>
                               )}
                               <td>
@@ -554,7 +554,7 @@ export default function Admin() {
                                     style={{
                                       padding: '0.25rem 0.5rem', background: 'rgba(255,255,255,0.04)',
                                       border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px',
-                                      cursor: 'pointer', fontSize: '0.7rem', color: '#94A3B8', fontFamily: 'inherit',
+                                      cursor: 'pointer', fontSize: '0.7rem', color: '#8790A8', fontFamily: 'inherit',
                                     }}
                                   >
                                     {user.status === 'Active' ? 'Suspend' : 'Activate'}
@@ -573,7 +573,7 @@ export default function Admin() {
                     padding: '0.75rem 1.125rem', borderTop: '1px solid rgba(255,255,255,0.05)',
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   }}>
-                    <span style={{ fontSize: '0.72rem', color: '#64748B' }}>
+                    <span style={{ fontSize: '0.72rem', color: '#8790A8' }}>
                       Showing {Math.min((currentPage - 1) * USERS_PER_PAGE + 1, filteredUsers.length)}-{Math.min(currentPage * USERS_PER_PAGE, filteredUsers.length)} of {filteredUsers.length}
                     </span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -584,7 +584,7 @@ export default function Admin() {
                           width: '28px', height: '28px', borderRadius: '6px', display: 'flex',
                           alignItems: 'center', justifyContent: 'center', cursor: currentPage === 1 ? 'default' : 'pointer',
                           background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                          color: currentPage === 1 ? '#334155' : '#94A3B8', fontFamily: 'inherit',
+                          color: currentPage === 1 ? '#4E566E' : '#8790A8', fontFamily: 'inherit',
                         }}
                       >
                         <ChevronLeft size={14} />
@@ -596,9 +596,9 @@ export default function Admin() {
                           style={{
                             width: '28px', height: '28px', borderRadius: '6px', display: 'flex',
                             alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-                            background: page === currentPage ? 'rgba(14,165,233,0.15)' : 'rgba(255,255,255,0.04)',
-                            border: `1px solid ${page === currentPage ? 'rgba(14,165,233,0.3)' : 'rgba(255,255,255,0.08)'}`,
-                            color: page === currentPage ? '#38BDF8' : '#94A3B8',
+                            background: page === currentPage ? 'rgba(120,119,198,0.15)' : 'rgba(255,255,255,0.04)',
+                            border: `1px solid ${page === currentPage ? 'rgba(120,119,198,0.3)' : 'rgba(255,255,255,0.08)'}`,
+                            color: page === currentPage ? '#7DD3FC' : '#8790A8',
                             fontSize: '0.72rem', fontWeight: 500, fontFamily: 'inherit',
                           }}
                         >
@@ -612,7 +612,7 @@ export default function Admin() {
                           width: '28px', height: '28px', borderRadius: '6px', display: 'flex',
                           alignItems: 'center', justifyContent: 'center', cursor: currentPage === totalPages ? 'default' : 'pointer',
                           background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                          color: currentPage === totalPages ? '#334155' : '#94A3B8', fontFamily: 'inherit',
+                          color: currentPage === totalPages ? '#4E566E' : '#8790A8', fontFamily: 'inherit',
                         }}
                       >
                         <ChevronRight size={14} />
@@ -628,20 +628,20 @@ export default function Admin() {
                 {/* AI Access Auditor */}
                 <div style={{
                   borderRadius: '12px', padding: '1.125rem', position: 'relative', overflow: 'hidden',
-                  background: 'linear-gradient(135deg, rgba(139,92,246,0.08) 0%, rgba(14,165,233,0.04) 100%)',
-                  border: '1px solid rgba(139,92,246,0.15)',
+                  background: 'linear-gradient(135deg, rgba(167,139,250,0.08) 0%, rgba(120,119,198,0.04) 100%)',
+                  border: '1px solid rgba(167,139,250,0.15)',
                 }}>
                   {/* Purple orb decoration */}
                   <div style={{
                     position: 'absolute', top: '-20px', right: '-20px', width: '80px', height: '80px',
-                    borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.2) 0%, transparent 70%)',
+                    borderRadius: '50%', background: 'radial-gradient(circle, rgba(167,139,250,0.2) 0%, transparent 70%)',
                     filter: 'blur(10px)',
                   }} />
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem', position: 'relative' }}>
                     <Sparkles size={14} style={{ color: '#A78BFA' }} />
-                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#F1F5F9' }}>AI Access Auditor</span>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#F8FAFC' }}>AI Access Auditor</span>
                   </div>
-                  <p style={{ fontSize: '0.65rem', color: '#64748B', margin: '0 0 0.875rem 0', position: 'relative' }}>
+                  <p style={{ fontSize: '0.65rem', color: '#8790A8', margin: '0 0 0.875rem 0', position: 'relative' }}>
                     Automated permission and security analysis
                   </p>
 
@@ -651,16 +651,16 @@ export default function Admin() {
                     background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.05)',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.375rem' }}>
-                      <AlertTriangle size={12} style={{ color: '#EF4444' }} />
-                      <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#F1F5F9' }}>Stale Permissions</span>
+                      <AlertTriangle size={12} style={{ color: '#FF6B6B' }} />
+                      <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#F8FAFC' }}>Stale Permissions</span>
                     </div>
-                    <p style={{ fontSize: '0.65rem', color: '#94A3B8', margin: '0 0 0.5rem 0', lineHeight: 1.4 }}>
+                    <p style={{ fontSize: '0.65rem', color: '#8790A8', margin: '0 0 0.5rem 0', lineHeight: 1.4 }}>
                       3 users with &apos;Admin&apos; roles haven&apos;t accessed sensitive modules in 90+ days.
                     </p>
                     <button style={{
                       padding: '4px 10px', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 500,
-                      background: 'rgba(239,68,68,0.12)', color: '#EF4444',
-                      border: '1px solid rgba(239,68,68,0.25)', cursor: 'pointer', fontFamily: 'inherit',
+                      background: 'rgba(255,107,107,0.12)', color: '#FF6B6B',
+                      border: '1px solid rgba(255,107,107,0.25)', cursor: 'pointer', fontFamily: 'inherit',
                     }}>
                       Review & Downgrade
                     </button>
@@ -672,16 +672,16 @@ export default function Admin() {
                     background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.05)',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.375rem' }}>
-                      <Info size={12} style={{ color: '#38BDF8' }} />
-                      <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#F1F5F9' }}>Role Optimization</span>
+                      <Info size={12} style={{ color: '#7DD3FC' }} />
+                      <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#F8FAFC' }}>Role Optimization</span>
                     </div>
-                    <p style={{ fontSize: '0.65rem', color: '#94A3B8', margin: '0 0 0.5rem 0', lineHeight: 1.4 }}>
+                    <p style={{ fontSize: '0.65rem', color: '#8790A8', margin: '0 0 0.5rem 0', lineHeight: 1.4 }}>
                       Based on usage patterns, create a new &apos;Project Lead&apos; role to consolidate 15 custom permission sets.
                     </p>
                     <button style={{
                       padding: '4px 10px', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 500,
-                      background: 'rgba(16,185,129,0.12)', color: '#34D399',
-                      border: '1px solid rgba(16,185,129,0.25)', cursor: 'pointer', fontFamily: 'inherit',
+                      background: 'rgba(52,211,153,0.12)', color: '#34D399',
+                      border: '1px solid rgba(52,211,153,0.25)', cursor: 'pointer', fontFamily: 'inherit',
                     }}>
                       Generate Role
                     </button>
@@ -690,23 +690,23 @@ export default function Admin() {
 
                 {/* Role Distribution */}
                 <div className="section-card" style={{ padding: '1rem 1.125rem' }}>
-                  <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#F1F5F9', marginBottom: '0.875rem' }}>Role Distribution</div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#F8FAFC', marginBottom: '0.875rem' }}>Role Distribution</div>
 
                   {/* Simple donut via CSS conic-gradient */}
                   <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.875rem' }}>
                     <div style={{
                       width: '90px', height: '90px', borderRadius: '50%',
                       background: `conic-gradient(
-                        #0EA5E9 0% 50%,
-                        #F59E0B 50% 70%,
+                        #7877C6 0% 50%,
+                        #F5B544 50% 70%,
                         #A78BFA 70% 85%,
-                        #EF4444 85% 100%
+                        #FF6B6B 85% 100%
                       )`,
                       position: 'relative',
                     }}>
                       <div style={{
                         position: 'absolute', inset: '18px', borderRadius: '50%',
-                        background: '#0C1220',
+                        background: '#0C0F1A',
                       }} />
                     </div>
                   </div>
@@ -716,8 +716,8 @@ export default function Admin() {
                     {roleDistribution.map(r => (
                       <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
                         <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: r.color, flexShrink: 0 }} />
-                        <span style={{ fontSize: '0.65rem', color: '#94A3B8' }}>{r.label}</span>
-                        <span style={{ fontSize: '0.65rem', color: '#64748B', marginLeft: 'auto' }}>{r.pct}%</span>
+                        <span style={{ fontSize: '0.65rem', color: '#8790A8' }}>{r.label}</span>
+                        <span style={{ fontSize: '0.65rem', color: '#8790A8', marginLeft: 'auto' }}>{r.pct}%</span>
                       </div>
                     ))}
                   </div>
@@ -725,7 +725,7 @@ export default function Admin() {
 
                 {/* Security & Access */}
                 <div className="section-card" style={{ padding: '0.75rem 0' }}>
-                  <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#F1F5F9', padding: '0 1.125rem', marginBottom: '0.5rem' }}>Security & Access</div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#F8FAFC', padding: '0 1.125rem', marginBottom: '0.5rem' }}>Security & Access</div>
                   {[
                     { icon: <Lock size={14} />, title: 'Audit Logs', desc: 'Track all system changes' },
                     { icon: <Key size={14} />, title: 'SSO & SAML', desc: 'Identity provider settings' },
@@ -745,15 +745,15 @@ export default function Admin() {
                       <div style={{
                         width: '28px', height: '28px', borderRadius: '6px',
                         background: 'rgba(148,163,184,0.08)', display: 'flex',
-                        alignItems: 'center', justifyContent: 'center', color: '#64748B', flexShrink: 0,
+                        alignItems: 'center', justifyContent: 'center', color: '#8790A8', flexShrink: 0,
                       }}>
                         {item.icon}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '0.78rem', fontWeight: 500, color: '#F1F5F9' }}>{item.title}</div>
-                        <div style={{ fontSize: '0.62rem', color: '#475569' }}>{item.desc}</div>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 500, color: '#F8FAFC' }}>{item.title}</div>
+                        <div style={{ fontSize: '0.62rem', color: '#4E566E' }}>{item.desc}</div>
                       </div>
-                      <ChevronRight size={14} style={{ color: '#334155', flexShrink: 0 }} />
+                      <ChevronRight size={14} style={{ color: '#4E566E', flexShrink: 0 }} />
                     </div>
                   ))}
                 </div>
@@ -766,8 +766,8 @@ export default function Admin() {
         {activeSection === 'integrations' && (
           <div>
             <div style={{ marginBottom: '1.25rem' }}>
-              <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9', margin: 0, marginBottom: '0.25rem' }}>Integrations</h2>
-              <p style={{ fontSize: '0.8rem', color: '#64748B', margin: 0 }}>
+              <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#F8FAFC', margin: 0, marginBottom: '0.25rem' }}>Integrations</h2>
+              <p style={{ fontSize: '0.8rem', color: '#8790A8', margin: 0 }}>
                 {integrations.filter(i => i.status === 'Connected').length} connected · {integrations.filter(i => i.status === 'Disconnected').length} available
               </p>
             </div>
@@ -777,7 +777,7 @@ export default function Admin() {
               if (!catItems.length) return null;
               return (
                 <div key={category} style={{ marginBottom: '1.5rem' }}>
-                  <div style={{ fontSize: '0.72rem', color: '#334155', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.75rem' }}>{category}</div>
+                  <div style={{ fontSize: '0.72rem', color: '#4E566E', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.75rem' }}>{category}</div>
                   <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 900 ? 3 : width >= 600 ? 2 : 1}, 1fr)`, gap: '0.75rem' }}>
                     {catItems.map(integration => (
                       <div key={integration.name} className="elevated-card" style={{ padding: '1rem' }}>
@@ -785,15 +785,15 @@ export default function Admin() {
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
                             <span style={{ display: 'flex', color: 'inherit' }}>{integration.logo}</span>
                             <div>
-                              <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#F1F5F9' }}>{integration.name}</div>
-                              <div style={{ fontSize: '0.68rem', color: '#334155' }}>{integration.desc}</div>
+                              <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#F8FAFC' }}>{integration.name}</div>
+                              <div style={{ fontSize: '0.68rem', color: '#4E566E' }}>{integration.desc}</div>
                             </div>
                           </div>
                           <span style={{
                             fontSize: '0.65rem', padding: '2px 6px', borderRadius: '9999px',
-                            background: integration.status === 'Connected' ? 'rgba(16,185,129,0.12)' : 'rgba(148,163,184,0.08)',
-                            color: integration.status === 'Connected' ? '#34D399' : '#64748B',
-                            border: `1px solid ${integration.status === 'Connected' ? 'rgba(16,185,129,0.2)' : 'rgba(148,163,184,0.1)'}`,
+                            background: integration.status === 'Connected' ? 'rgba(52,211,153,0.12)' : 'rgba(148,163,184,0.08)',
+                            color: integration.status === 'Connected' ? '#34D399' : '#8790A8',
+                            border: `1px solid ${integration.status === 'Connected' ? 'rgba(52,211,153,0.2)' : 'rgba(148,163,184,0.1)'}`,
                           }}>
                             {integration.status}
                           </span>
@@ -827,9 +827,9 @@ export default function Admin() {
                         {integration.name === 'Trello' && trelloRefreshMsg && (
                           <div style={{
                             marginTop: '0.5rem', padding: '6px 10px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 500,
-                            background: trelloRefreshMsg.includes('successful') ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)',
-                            color: trelloRefreshMsg.includes('successful') ? '#34D399' : '#EF4444',
-                            border: `1px solid ${trelloRefreshMsg.includes('successful') ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'}`,
+                            background: trelloRefreshMsg.includes('successful') ? 'rgba(52,211,153,0.12)' : 'rgba(255,107,107,0.12)',
+                            color: trelloRefreshMsg.includes('successful') ? '#34D399' : '#FF6B6B',
+                            border: `1px solid ${trelloRefreshMsg.includes('successful') ? 'rgba(52,211,153,0.25)' : 'rgba(255,107,107,0.25)'}`,
                           }}>
                             {trelloRefreshMsg}
                           </div>
@@ -841,19 +841,19 @@ export default function Admin() {
                             marginTop: '0.75rem', padding: '0.875rem', borderRadius: '10px',
                             background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)',
                           }}>
-                            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#F1F5F9', marginBottom: '0.625rem' }}>Trello Configuration</div>
+                            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#F8FAFC', marginBottom: '0.625rem' }}>Trello Configuration</div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', fontSize: '0.72rem' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span style={{ color: '#64748B' }}>Board ID</span>
-                                <span style={{ color: '#CBD5E1', fontFamily: 'monospace', fontSize: '0.68rem' }}>66c5d907fffd4029f08565a4</span>
+                                <span style={{ color: '#8790A8' }}>Board ID</span>
+                                <span style={{ color: '#C0C6D6', fontFamily: 'monospace', fontSize: '0.68rem' }}>66c5d907fffd4029f08565a4</span>
                               </div>
                               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span style={{ color: '#64748B' }}>API Status</span>
+                                <span style={{ color: '#8790A8' }}>API Status</span>
                                 <span style={{ color: '#34D399', fontWeight: 600 }}>Connected</span>
                               </div>
                               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span style={{ color: '#64748B' }}>Last synced</span>
-                                <span style={{ color: '#CBD5E1' }}>{new Date().toLocaleTimeString()}</span>
+                                <span style={{ color: '#8790A8' }}>Last synced</span>
+                                <span style={{ color: '#C0C6D6' }}>{new Date().toLocaleTimeString()}</span>
                               </div>
                             </div>
                             <button
@@ -861,8 +861,8 @@ export default function Admin() {
                               disabled={trelloTesting}
                               style={{
                                 marginTop: '0.75rem', padding: '5px 12px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 500,
-                                background: 'rgba(14,165,233,0.12)', color: '#38BDF8',
-                                border: '1px solid rgba(14,165,233,0.25)', cursor: trelloTesting ? 'wait' : 'pointer',
+                                background: 'rgba(120,119,198,0.12)', color: '#7DD3FC',
+                                border: '1px solid rgba(120,119,198,0.25)', cursor: trelloTesting ? 'wait' : 'pointer',
                                 fontFamily: 'inherit', width: '100%',
                               }}
                             >
@@ -871,9 +871,9 @@ export default function Admin() {
                             {trelloTestResult && (
                               <div style={{
                                 marginTop: '0.5rem', padding: '5px 10px', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 500, textAlign: 'center',
-                                background: trelloTestResult.includes('successful') ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)',
-                                color: trelloTestResult.includes('successful') ? '#34D399' : '#EF4444',
-                                border: `1px solid ${trelloTestResult.includes('successful') ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'}`,
+                                background: trelloTestResult.includes('successful') ? 'rgba(52,211,153,0.12)' : 'rgba(255,107,107,0.12)',
+                                color: trelloTestResult.includes('successful') ? '#34D399' : '#FF6B6B',
+                                border: `1px solid ${trelloTestResult.includes('successful') ? 'rgba(52,211,153,0.25)' : 'rgba(255,107,107,0.25)'}`,
                               }}>
                                 {trelloTestResult}
                               </div>
@@ -904,13 +904,13 @@ export default function Admin() {
             <button onClick={() => { setShowInvite(false); setInviteError(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px', display: 'flex' }}><X size={16} /></button>
           </div>
           {inviteSuccess ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1rem', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: '8px', color: '#34D399', fontSize: '0.85rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1rem', background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: '8px', color: '#34D399', fontSize: '0.85rem' }}>
               <Check size={16} /> {inviteSuccess}
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {inviteError && (
-                <div style={{ padding: '0.625rem 0.875rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '8px', color: '#FCA5A5', fontSize: '0.78rem' }}>
+                <div style={{ padding: '0.625rem 0.875rem', background: 'rgba(255,107,107,0.1)', border: '1px solid rgba(255,107,107,0.25)', borderRadius: '8px', color: '#FCA5A5', fontSize: '0.78rem' }}>
                   {inviteError}
                 </div>
               )}

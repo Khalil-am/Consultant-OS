@@ -26,14 +26,14 @@ function getCategoryIcon(cat: string, size = 14): React.ReactNode {
 }
 
 const categoryColors: Record<string, string> = {
-  'BA & Requirements': '#0EA5E9',
-  'Meetings':          '#8B5CF6',
-  'Product':           '#10B981',
-  'Procurement':       '#F59E0B',
-  'PMO':               '#EC4899',
+  'BA & Requirements': '#7877C6',
+  'Meetings':          '#A78BFA',
+  'Product':           '#34D399',
+  'Procurement':       '#F5B544',
+  'PMO':               '#F472B6',
   'Reporting':         '#06B6D4',
   'Knowledge':         '#6366F1',
-  'Productivity':      '#00D4FF',
+  'Productivity':      '#A78BFA',
 };
 
 export default function Automations() {
@@ -123,10 +123,10 @@ export default function Automations() {
       {/* Stats Row */}
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 640 ? 4 : 2}, 1fr)`, gap: '0.875rem' }}>
         {[
-          { label: 'Total Automations', value: String(totalAutomations), icon: <Zap size={16} />,         color: '#00D4FF' },
-          { label: 'Active',            value: String(activeCount),      icon: <Play size={16} />,        color: '#10B981' },
+          { label: 'Total Automations', value: String(totalAutomations), icon: <Zap size={16} />,         color: '#A78BFA' },
+          { label: 'Active',            value: String(activeCount),      icon: <Play size={16} />,        color: '#34D399' },
           { label: 'Total Runs',        value: totalRuns.toLocaleString(), icon: <CheckCircle size={16} />, color: '#34D399' },
-          { label: 'Avg Success Rate',  value: `${avgSuccessRate}%`,     icon: <TrendingUp size={16} />,  color: '#8B5CF6' },
+          { label: 'Avg Success Rate',  value: `${avgSuccessRate}%`,     icon: <TrendingUp size={16} />,  color: '#A78BFA' },
         ].map(stat => (
           <div key={stat.label} style={{
             display: 'flex', alignItems: 'center', gap: '1rem',
@@ -144,10 +144,10 @@ export default function Automations() {
               {stat.icon}
             </div>
             <div>
-              <div style={{ fontSize: '1.375rem', fontWeight: 900, color: '#F1F5F9', lineHeight: 1, letterSpacing: '-0.025em' }}>
+              <div style={{ fontSize: '1.375rem', fontWeight: 900, color: '#F8FAFC', lineHeight: 1, letterSpacing: '-0.025em' }}>
                 {stat.value}
               </div>
-              <div style={{ fontSize: '0.7rem', color: '#475569', marginTop: '3px' }}>{stat.label}</div>
+              <div style={{ fontSize: '0.7rem', color: '#4E566E', marginTop: '3px' }}>{stat.label}</div>
             </div>
           </div>
         ))}
@@ -173,9 +173,9 @@ export default function Automations() {
                   padding: '0.35rem 0.75rem', borderRadius: '7px', border: 'none', cursor: 'pointer',
                   fontSize: '0.775rem', fontWeight: isActive ? 600 : 400, whiteSpace: 'nowrap',
                   fontFamily: 'inherit', transition: 'all 0.15s',
-                  background: isActive ? 'rgba(0,212,255,0.12)' : 'transparent',
-                  color: isActive ? '#00D4FF' : '#64748B',
-                  outline: isActive ? '1px solid rgba(0,212,255,0.25)' : 'none',
+                  background: isActive ? 'rgba(120,119,198,0.12)' : 'transparent',
+                  color: isActive ? '#A78BFA' : '#8790A8',
+                  outline: isActive ? '1px solid rgba(120,119,198,0.25)' : 'none',
                 }}
               >
                 {cat !== 'All' && <span style={{ display: 'flex', opacity: 0.8 }}>{getCategoryIcon(cat, 13)}</span>}
@@ -192,7 +192,7 @@ export default function Automations() {
           background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
           minWidth: '200px',
         }}>
-          <Search size={13} style={{ color: '#475569', flexShrink: 0 }} />
+          <Search size={13} style={{ color: '#4E566E', flexShrink: 0 }} />
           <input
             type="text"
             placeholder="Search automations..."
@@ -200,7 +200,7 @@ export default function Automations() {
             onChange={e => setSearch(e.target.value)}
             style={{
               background: 'transparent', border: 'none', outline: 'none',
-              fontSize: '0.8rem', color: '#F1F5F9', width: '100%', fontFamily: 'inherit',
+              fontSize: '0.8rem', color: '#F8FAFC', width: '100%', fontFamily: 'inherit',
             }}
           />
         </div>
@@ -211,7 +211,7 @@ export default function Automations() {
         {filtered.map(auto => {
           const isRunning = runningId === auto.id;
           const isStarred = starred.has(auto.id);
-          const catColor  = categoryColors[auto.category] ?? auto.category_color ?? '#00D4FF';
+          const catColor  = categoryColors[auto.category] ?? auto.category_color ?? '#A78BFA';
 
           return (
             <div
@@ -220,10 +220,10 @@ export default function Automations() {
               style={{
                 borderRadius: '14px', cursor: 'pointer', overflow: 'hidden',
                 background: isRunning
-                  ? 'linear-gradient(145deg, rgba(0,212,255,0.06) 0%, rgba(8,12,24,0.95) 60%)'
+                  ? 'linear-gradient(145deg, rgba(120,119,198,0.06) 0%, rgba(8,12,24,0.95) 60%)'
                   : 'rgba(255,255,255,0.025)',
                 border: isRunning
-                  ? '1px solid rgba(0,212,255,0.25)'
+                  ? '1px solid rgba(120,119,198,0.25)'
                   : '1px solid rgba(255,255,255,0.06)',
                 transition: 'all 0.2s ease',
                 display: 'flex', flexDirection: 'column',
@@ -236,7 +236,7 @@ export default function Automations() {
               }}
               onMouseLeave={e => {
                 const el = e.currentTarget as HTMLElement;
-                el.style.borderColor = isRunning ? 'rgba(0,212,255,0.25)' : 'rgba(255,255,255,0.06)';
+                el.style.borderColor = isRunning ? 'rgba(120,119,198,0.25)' : 'rgba(255,255,255,0.06)';
                 el.style.transform = 'translateY(0)';
                 el.style.boxShadow = 'none';
               }}
@@ -258,7 +258,7 @@ export default function Automations() {
                       </span>
                     </div>
                     <div style={{ minWidth: 0, flex: 1 }}>
-                      <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#F1F5F9', margin: '0 0 4px', lineHeight: 1.3, }}>
+                      <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#F8FAFC', margin: '0 0 4px', lineHeight: 1.3, }}>
                         {auto.name}
                       </h3>
                       {/* Category Badge */}
@@ -276,12 +276,12 @@ export default function Automations() {
                     onClick={e => toggleStar(auto.id, e)}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', flexShrink: 0 }}
                   >
-                    <Star size={15} style={{ color: isStarred ? '#F59E0B' : '#334155', fill: isStarred ? '#F59E0B' : 'none', transition: 'all 0.15s' }} />
+                    <Star size={15} style={{ color: isStarred ? '#F5B544' : '#4E566E', fill: isStarred ? '#F5B544' : 'none', transition: 'all 0.15s' }} />
                   </button>
                 </div>
 
                 {/* Description */}
-                <p style={{ fontSize: '0.78rem', color: '#475569', margin: '0 0 0.875rem', lineHeight: 1.55, flex: 1 }}>
+                <p style={{ fontSize: '0.78rem', color: '#4E566E', margin: '0 0 0.875rem', lineHeight: 1.55, flex: 1 }}>
                   {auto.description.length > 110 ? auto.description.slice(0, 110) + '…' : auto.description}
                 </p>
 
@@ -292,17 +292,17 @@ export default function Automations() {
                     padding: '3px 8px', borderRadius: '5px',
                     background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
                   }}>
-                    <span style={{ fontSize: '0.6rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>IN</span>
-                    <span style={{ fontSize: '0.72rem', color: '#94A3B8' }}>{auto.input_type}</span>
+                    <span style={{ fontSize: '0.6rem', color: '#4E566E', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>IN</span>
+                    <span style={{ fontSize: '0.72rem', color: '#8790A8' }}>{auto.input_type}</span>
                   </div>
-                  <ArrowRight size={12} style={{ color: '#334155', flexShrink: 0 }} />
+                  <ArrowRight size={12} style={{ color: '#4E566E', flexShrink: 0 }} />
                   <div style={{
                     display: 'flex', alignItems: 'center', gap: '0.375rem',
                     padding: '3px 8px', borderRadius: '5px',
                     background: `${catColor}0E`, border: `1px solid ${catColor}20`,
                   }}>
                     <span style={{ fontSize: '0.6rem', color: catColor, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>OUT</span>
-                    <span style={{ fontSize: '0.72rem', color: '#94A3B8' }}>{auto.output_type}</span>
+                    <span style={{ fontSize: '0.72rem', color: '#8790A8' }}>{auto.output_type}</span>
                   </div>
                 </div>
 
@@ -310,26 +310,26 @@ export default function Automations() {
                 {isRunning && (
                   <div style={{ marginBottom: '0.875rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                      <span style={{ fontSize: '0.7rem', color: '#00D4FF', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <span style={{ fontSize: '0.7rem', color: '#A78BFA', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                         <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} /> Processing… {runTimer}s
                       </span>
-                      <span style={{ fontSize: '0.7rem', color: '#475569' }}>Est. {Math.max(0, 3 - runTimer)}s remaining</span>
+                      <span style={{ fontSize: '0.7rem', color: '#4E566E' }}>Est. {Math.max(0, 3 - runTimer)}s remaining</span>
                     </div>
                     <div style={{ height: '4px', borderRadius: '9999px', background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-                      <div style={{ width: `${Math.min(100, (runTimer / 3) * 100)}%`, height: '100%', borderRadius: '9999px', background: 'linear-gradient(90deg, #00D4FF, #0EA5E9)', boxShadow: '0 0 8px rgba(0,212,255,0.5)', transition: 'width 1s linear' }} />
+                      <div style={{ width: `${Math.min(100, (runTimer / 3) * 100)}%`, height: '100%', borderRadius: '9999px', background: 'linear-gradient(90deg, #A78BFA, #7877C6)', boxShadow: '0 0 8px rgba(120,119,198,0.5)', transition: 'width 1s linear' }} />
                     </div>
-                    <div style={{ fontSize: '0.68rem', color: '#475569', marginTop: '3px' }}>{Math.min(100, Math.round((runTimer / 3) * 100))}%</div>
+                    <div style={{ fontSize: '0.68rem', color: '#4E566E', marginTop: '3px' }}>{Math.min(100, Math.round((runTimer / 3) * 100))}%</div>
                   </div>
                 )}
 
                 {/* Last run + success rate */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', paddingTop: '0.625rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                    <Clock size={11} style={{ color: '#334155' }} />
-                    <span style={{ fontSize: '0.72rem', color: '#475569' }}>Last run: {auto.last_run}</span>
+                    <Clock size={11} style={{ color: '#4E566E' }} />
+                    <span style={{ fontSize: '0.72rem', color: '#4E566E' }}>Last run: {auto.last_run}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                    <div style={{ width: '6px', height: '6px', borderRadius: '9999px', background: '#10B981', boxShadow: '0 0 5px rgba(16,185,129,0.6)' }} />
+                    <div style={{ width: '6px', height: '6px', borderRadius: '9999px', background: '#34D399', boxShadow: '0 0 5px rgba(52,211,153,0.6)' }} />
                     <span style={{ fontSize: '0.72rem', color: '#34D399', fontWeight: 600 }}>{auto.success_rate}%</span>
                   </div>
                 </div>
@@ -348,17 +348,17 @@ export default function Automations() {
                       fontSize: '0.8rem', fontWeight: 600, fontFamily: 'inherit',
                       opacity: runningId && !isRunning ? 0.5 : 1,
                       background: isRunning
-                        ? 'rgba(0,212,255,0.1)'
-                        : 'linear-gradient(135deg, #00D4FF 0%, #0EA5E9 100%)',
-                      color: isRunning ? '#00D4FF' : '#060C1A',
-                      boxShadow: isRunning ? 'none' : '0 2px 12px rgba(0,212,255,0.3)',
+                        ? 'rgba(120,119,198,0.1)'
+                        : 'linear-gradient(135deg, #A78BFA 0%, #7877C6 100%)',
+                      color: isRunning ? '#A78BFA' : '#060C1A',
+                      boxShadow: isRunning ? 'none' : '0 2px 12px rgba(120,119,198,0.3)',
                       transition: 'all 0.2s',
                     }}
                     onMouseEnter={e => {
-                      if (!runningId) (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 20px rgba(0,212,255,0.5)';
+                      if (!runningId) (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 20px rgba(120,119,198,0.5)';
                     }}
                     onMouseLeave={e => {
-                      if (!runningId) (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 12px rgba(0,212,255,0.3)';
+                      if (!runningId) (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 12px rgba(120,119,198,0.3)';
                     }}
                   >
                     {isRunning
@@ -371,16 +371,16 @@ export default function Automations() {
                     style={{
                       width: '34px', height: '34px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)',
                       cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: 'rgba(255,255,255,0.04)', color: '#475569', flexShrink: 0, fontFamily: 'inherit',
+                      background: 'rgba(255,255,255,0.04)', color: '#4E566E', flexShrink: 0, fontFamily: 'inherit',
                       transition: 'all 0.15s',
                     }}
                     onMouseEnter={e => {
                       (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)';
-                      (e.currentTarget as HTMLElement).style.color = '#94A3B8';
+                      (e.currentTarget as HTMLElement).style.color = '#8790A8';
                     }}
                     onMouseLeave={e => {
                       (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)';
-                      (e.currentTarget as HTMLElement).style.color = '#475569';
+                      (e.currentTarget as HTMLElement).style.color = '#4E566E';
                     }}
                   >
                     <Settings2 size={14} />
@@ -398,7 +398,7 @@ export default function Automations() {
           position: 'fixed', bottom: '2rem', right: '2rem', zIndex: 999,
           display: 'flex', alignItems: 'center', gap: '0.5rem',
           padding: '0.875rem 1.25rem', borderRadius: '10px',
-          background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)',
+          background: 'rgba(52,211,153,0.15)', border: '1px solid rgba(52,211,153,0.3)',
           color: '#34D399', fontSize: '0.82rem', fontWeight: 600,
           boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
           animation: 'fadeSlideUp 0.3s ease',

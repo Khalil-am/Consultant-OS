@@ -24,27 +24,27 @@ import {
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const tabs = ['Overview', 'Documents', 'Meetings', 'Tasks', 'Risks'];
-const RAG_COLORS: Record<string, string> = { Green: '#10B981', Amber: '#F59E0B', Red: '#EF4444' };
+const RAG_COLORS: Record<string, string> = { Green: '#34D399', Amber: '#F5B544', Red: '#FF6B6B' };
 const milestoneStatusColor: Record<string, string> = {
-  Completed: '#10B981', 'On Track': '#0EA5E9', 'At Risk': '#F59E0B', Delayed: '#EF4444', Upcoming: '#475569',
+  Completed: '#34D399', 'On Track': '#7877C6', 'At Risk': '#F5B544', Delayed: '#FF6B6B', Upcoming: '#4E566E',
 };
 const meetingTypeColors: Record<string, string> = {
-  Workshop: '#8B5CF6', Committee: '#F59E0B', Steering: '#0EA5E9',
-  Review: '#10B981', Kickoff: '#EC4899', Standup: '#06B6D4',
+  Workshop: '#A78BFA', Committee: '#F5B544', Steering: '#7877C6',
+  Review: '#34D399', Kickoff: '#F472B6', Standup: '#06B6D4',
 };
 const DOC_TYPES = ['BRD', 'Report', 'Architecture', 'Technical Spec', 'Policy', 'Charter', 'Assessment', 'Project Plan', 'Presentation', 'Other'];
 const DOC_TYPE_COLORS: Record<string, string> = {
-  BRD: '#0EA5E9', Report: '#10B981', Architecture: '#8B5CF6', 'Technical Spec': '#F59E0B',
-  Policy: '#10B981', Charter: '#8B5CF6', Assessment: '#F59E0B', 'Project Plan': '#0EA5E9',
-  Presentation: '#EC4899', Other: '#94A3B8',
+  BRD: '#7877C6', Report: '#34D399', Architecture: '#A78BFA', 'Technical Spec': '#F5B544',
+  Policy: '#34D399', Charter: '#A78BFA', Assessment: '#F5B544', 'Project Plan': '#7877C6',
+  Presentation: '#F472B6', Other: '#8790A8',
 };
 const MEETING_TYPES = ['Workshop', 'Committee', 'Steering', 'Review', 'Kickoff', 'Standup'] as const;
 const RISK_CATEGORIES = ['Governance', 'Technical', 'Procurement', 'Delivery', 'Financial', 'Vendor', 'Compliance', 'Other'];
 const SECTORS = ['Government', 'Energy', 'Healthcare', 'Infrastructure', 'Financial Services', 'Retail', 'Technology', 'Education', 'Internal'];
 const SECTOR_COLORS: Record<string, string> = {
-  Government: '#0EA5E9', Energy: '#F59E0B', Healthcare: '#10B981',
-  Infrastructure: '#8B5CF6', 'Financial Services': '#F59E0B', Internal: '#94A3B8', Retail: '#EC4899',
-  Technology: '#06B6D4', Education: '#8B5CF6',
+  Government: '#7877C6', Energy: '#F5B544', Healthcare: '#34D399',
+  Infrastructure: '#A78BFA', 'Financial Services': '#F5B544', Internal: '#8790A8', Retail: '#F472B6',
+  Technology: '#06B6D4', Education: '#A78BFA',
 };
 const BILLING_MODELS = ['Fixed Fee', 'Time & Material', 'Retainer', 'T&M'];
 
@@ -58,12 +58,12 @@ function fmtSAR(val: number): string {
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '0.625rem 0.75rem',
   background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-  borderRadius: '0.5rem', color: '#F1F5F9', fontSize: '0.85rem',
+  borderRadius: '0.5rem', color: '#F8FAFC', fontSize: '0.85rem',
   fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
 };
-const selectStyle: React.CSSProperties = { ...inputStyle, background: '#080C18' };
+const selectStyle: React.CSSProperties = { ...inputStyle, background: '#07080F' };
 const labelStyle: React.CSSProperties = {
-  fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', display: 'block', marginBottom: '0.375rem',
+  fontSize: '0.75rem', fontWeight: 600, color: '#8790A8', display: 'block', marginBottom: '0.375rem',
 };
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -230,7 +230,7 @@ export default function WorkspaceDetail() {
         setDocUploadPct(90);
       }
       const today = new Date().toISOString().slice(0, 10);
-      await upsertDocument({ id: `doc-${Date.now()}`, name: docForm.name.trim(), type: docForm.type, type_color: DOC_TYPE_COLORS[docForm.type] ?? '#94A3B8', workspace: data.ws.name, workspace_id: id, date: today, language: docForm.language, status: docForm.status, size: fileSize, author: docForm.author.trim(), pages: parseInt(docForm.pages) || 1, summary: docForm.summary.trim(), tags: [], file_url: fileUrl });
+      await upsertDocument({ id: `doc-${Date.now()}`, name: docForm.name.trim(), type: docForm.type, type_color: DOC_TYPE_COLORS[docForm.type] ?? '#8790A8', workspace: data.ws.name, workspace_id: id, date: today, language: docForm.language, status: docForm.status, size: fileSize, author: docForm.author.trim(), pages: parseInt(docForm.pages) || 1, summary: docForm.summary.trim(), tags: [], file_url: fileUrl });
       await updateWorkspace(id, { docs_count: data.docs.length + 1, last_activity: 'Just now' });
       setDocUploadPct(100);
       setShowDocModal(false);
@@ -334,7 +334,7 @@ export default function WorkspaceDetail() {
     setEditWsSaving(true); setEditWsError('');
     try {
       const progress = Math.min(100, Math.max(0, parseInt(editWsForm.progress) || 0));
-      await updateWorkspace(id, { name: editWsForm.name.trim(), client: editWsForm.client.trim(), sector: editWsForm.sector, sector_color: SECTOR_COLORS[editWsForm.sector] ?? '#0EA5E9', type: editWsForm.type, language: editWsForm.language, description: editWsForm.description.trim(), progress, status: editWsForm.status, last_activity: 'Just now' });
+      await updateWorkspace(id, { name: editWsForm.name.trim(), client: editWsForm.client.trim(), sector: editWsForm.sector, sector_color: SECTOR_COLORS[editWsForm.sector] ?? '#7877C6', type: editWsForm.type, language: editWsForm.language, description: editWsForm.description.trim(), progress, status: editWsForm.status, last_activity: 'Just now' });
       setShowEditWs(false);
       await loadData(true);
     } catch (e: unknown) { setEditWsError((e as Error).message ?? 'Failed to update workspace'); }
@@ -427,8 +427,8 @@ export default function WorkspaceDetail() {
   if (loading) {
     return (
       <div style={{ padding: isMobile ? '0.875rem' : '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#475569', fontSize: '0.85rem' }}>
-          <div style={{ width: 16, height: 16, border: '2px solid #0EA5E9', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#4E566E', fontSize: '0.85rem' }}>
+          <div style={{ width: 16, height: 16, border: '2px solid #7877C6', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
           Loading workspace…
         </div>
         <div style={{ height: '160px', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }} />
@@ -443,7 +443,7 @@ export default function WorkspaceDetail() {
   if (error || !data) {
     return (
       <div style={{ padding: isMobile ? '0.875rem' : '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', paddingTop: '4rem' }}>
-        <AlertCircle size={40} style={{ color: '#EF4444' }} />
+        <AlertCircle size={40} style={{ color: '#FF6B6B' }} />
         <div style={{ fontSize: '0.9rem', color: '#FCA5A5', fontWeight: 600 }}>{error ?? 'Workspace not found'}</div>
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           <button className="btn-ghost" onClick={() => navigate('/workspaces')}><ArrowLeft size={14} /> Back</button>
@@ -464,7 +464,7 @@ export default function WorkspaceDetail() {
 
       {/* Back + actions */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <button onClick={() => navigate('/workspaces')} style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', background: 'none', border: 'none', cursor: 'pointer', color: '#475569', fontSize: '0.8rem', padding: 0, fontFamily: 'inherit' }}>
+        <button onClick={() => navigate('/workspaces')} style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', background: 'none', border: 'none', cursor: 'pointer', color: '#4E566E', fontSize: '0.8rem', padding: 0, fontFamily: 'inherit' }}>
           <ArrowLeft size={14} /> Back to Workspaces
         </button>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -472,21 +472,21 @@ export default function WorkspaceDetail() {
             <RefreshCw size={13} style={{ animation: refreshing ? 'spin 0.8s linear infinite' : 'none' }} />
           </button>
           <button className="btn-ghost" style={{ fontSize: '0.78rem' }} onClick={openEditWs}><Settings size={13} /> Edit</button>
-          <button className="btn-ghost" style={{ fontSize: '0.78rem', color: '#FCA5A5', borderColor: 'rgba(239,68,68,0.2)' }} onClick={() => setShowDeleteWs(true)}>
+          <button className="btn-ghost" style={{ fontSize: '0.78rem', color: '#FCA5A5', borderColor: 'rgba(255,107,107,0.2)' }} onClick={() => setShowDeleteWs(true)}>
             <Trash2 size={13} /> Delete
           </button>
         </div>
       </div>
 
       {/* Banner */}
-      <div style={{ padding: isMobile ? '1.25rem' : '1.75rem', borderRadius: '0.875rem', background: 'linear-gradient(135deg, #0C1220 0%, #101828 60%, #0C1A30 100%)', border: '1px solid rgba(255,255,255,0.08)', borderLeft: `4px solid ${ws.sector_color}`, position: 'relative', overflow: 'hidden' }}>
+      <div style={{ padding: isMobile ? '1.25rem' : '1.75rem', borderRadius: '0.875rem', background: 'linear-gradient(135deg, #0C0F1A 0%, #161B2C 60%, #0C1A30 100%)', border: '1px solid rgba(255,255,255,0.08)', borderLeft: `4px solid ${ws.sector_color}`, position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '280px', height: '280px', borderRadius: '50%', background: `radial-gradient(circle, ${ws.sector_color}18 0%, transparent 70%)`, pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: '-60px', right: '30%', width: '200px', height: '200px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(0,212,255,0.06) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: '-60px', right: '30%', width: '200px', height: '200px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(120,119,198,0.06) 0%, transparent 70%)', pointerEvents: 'none' }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '0.7rem', color: '#475569' }}>{ws.type}</span>
-              <span style={{ color: '#334155' }}>·</span>
+              <span style={{ fontSize: '0.7rem', color: '#4E566E' }}>{ws.type}</span>
+              <span style={{ color: '#4E566E' }}>·</span>
               <span className={ws.status === 'Active' ? 'status-active' : 'status-pending'}>{ws.status}</span>
               {rag && (
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -499,9 +499,9 @@ export default function WorkspaceDetail() {
                 </div>
               )}
             </div>
-            <h1 style={{ fontSize: isMobile ? '1.25rem' : '1.625rem', fontWeight: 900, background: `linear-gradient(135deg, #F1F5F9 0%, ${ws.sector_color} 100%)`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', margin: 0, marginBottom: '0.375rem', letterSpacing: '-0.02em' }}>{ws.name}</h1>
-            <p style={{ fontSize: '0.875rem', color: '#94A3B8', margin: 0, marginBottom: '0.75rem' }}>{ws.client}</p>
-            <p style={{ fontSize: '0.8rem', color: '#475569', margin: 0, maxWidth: '600px', lineHeight: 1.5 }}>{ws.description}</p>
+            <h1 style={{ fontSize: isMobile ? '1.25rem' : '1.625rem', fontWeight: 900, background: `linear-gradient(135deg, #F8FAFC 0%, ${ws.sector_color} 100%)`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', margin: 0, marginBottom: '0.375rem', letterSpacing: '-0.02em' }}>{ws.name}</h1>
+            <p style={{ fontSize: '0.875rem', color: '#8790A8', margin: 0, marginBottom: '0.75rem' }}>{ws.client}</p>
+            <p style={{ fontSize: '0.8rem', color: '#4E566E', margin: 0, maxWidth: '600px', lineHeight: 1.5 }}>{ws.description}</p>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
             <button className="btn-ghost" style={{ fontSize: '0.8rem' }}><Zap size={14} /> Run Automation</button>
@@ -517,20 +517,20 @@ export default function WorkspaceDetail() {
             { icon: <TrendingUp size={13} />, value: `${ws.progress}%`, label: 'Progress', onClick: undefined },
           ].map(stat => (
             <div key={stat.label} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: stat.onClick ? 'pointer' : 'default' }} onClick={stat.onClick}>
-              <span style={{ color: '#475569' }}>{stat.icon}</span>
-              <span style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9' }}>{stat.value}</span>
-              <span style={{ fontSize: '0.75rem', color: stat.onClick ? '#38BDF8' : '#475569', textDecoration: stat.onClick ? 'underline' : 'none' }}>{stat.label}</span>
+              <span style={{ color: '#4E566E' }}>{stat.icon}</span>
+              <span style={{ fontSize: '1rem', fontWeight: 700, color: '#F8FAFC' }}>{stat.value}</span>
+              <span style={{ fontSize: '0.75rem', color: stat.onClick ? '#7DD3FC' : '#4E566E', textDecoration: stat.onClick ? 'underline' : 'none' }}>{stat.label}</span>
             </div>
           ))}
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <span style={{ fontSize: '0.75rem', color: '#475569' }}>Language:</span>
-            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#38BDF8' }}>{ws.language}</span>
+            <span style={{ fontSize: '0.75rem', color: '#4E566E' }}>Language:</span>
+            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#7DD3FC' }}>{ws.language}</span>
           </div>
         </div>
         {/* Progress bar */}
         <div style={{ marginTop: '1rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.375rem' }}>
-            <span style={{ fontSize: '0.7rem', color: '#475569' }}>Overall Progress</span>
+            <span style={{ fontSize: '0.7rem', color: '#4E566E' }}>Overall Progress</span>
             <span style={{ fontSize: '0.7rem', fontWeight: 700, color: ws.sector_color }}>{ws.progress}%</span>
           </div>
           <div style={{ height: '5px', borderRadius: '9999px', background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
@@ -544,8 +544,8 @@ export default function WorkspaceDetail() {
         {tabs.map(tab => (
           <button key={tab} className={`tab-underline ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)} style={{ marginRight: '1.5rem', whiteSpace: 'nowrap' }}>
             {tab}
-            {tab === 'Tasks' && openTasks.length > 0 && <span style={{ marginLeft: '5px', background: '#EF4444', color: 'white', borderRadius: '9999px', fontSize: '0.6rem', padding: '1px 5px', fontWeight: 700 }}>{openTasks.length}</span>}
-            {tab === 'Risks' && risks.filter(r => r.status === 'Open').length > 0 && <span style={{ marginLeft: '5px', background: '#F59E0B', color: 'white', borderRadius: '9999px', fontSize: '0.6rem', padding: '1px 5px', fontWeight: 700 }}>{risks.filter(r => r.status === 'Open').length}</span>}
+            {tab === 'Tasks' && openTasks.length > 0 && <span style={{ marginLeft: '5px', background: '#FF6B6B', color: 'white', borderRadius: '9999px', fontSize: '0.6rem', padding: '1px 5px', fontWeight: 700 }}>{openTasks.length}</span>}
+            {tab === 'Risks' && risks.filter(r => r.status === 'Open').length > 0 && <span style={{ marginLeft: '5px', background: '#F5B544', color: 'white', borderRadius: '9999px', fontSize: '0.6rem', padding: '1px 5px', fontWeight: 700 }}>{risks.filter(r => r.status === 'Open').length}</span>}
           </button>
         ))}
       </div>
@@ -555,25 +555,25 @@ export default function WorkspaceDetail() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
           {/* Financial Summary */}
-          <div style={{ background: 'linear-gradient(135deg, #0C1220 0%, #101828 100%)', border: '1px solid rgba(245,158,11,0.15)', borderRadius: '12px', padding: '1.25rem', position: 'relative', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', top: '-30px', right: '-30px', width: '160px', height: '160px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(245,158,11,0.08) 0%, transparent 70%)', pointerEvents: 'none' }} />
+          <div style={{ background: 'linear-gradient(135deg, #0C0F1A 0%, #161B2C 100%)', border: '1px solid rgba(245,181,68,0.15)', borderRadius: '12px', padding: '1.25rem', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: '-30px', right: '-30px', width: '160px', height: '160px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(245,181,68,0.08) 0%, transparent 70%)', pointerEvents: 'none' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-              <DollarSign size={15} style={{ color: '#F59E0B' }} />
-              <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#F1F5F9' }}>Financial Summary</span>
-              {fin && <span style={{ fontSize: '0.65rem', padding: '1px 7px', borderRadius: '9999px', background: 'rgba(245,158,11,0.12)', color: '#FCD34D', border: '1px solid rgba(245,158,11,0.2)' }}>{fin.billing_model} · {fin.currency}</span>}
+              <DollarSign size={15} style={{ color: '#F5B544' }} />
+              <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#F8FAFC' }}>Financial Summary</span>
+              {fin && <span style={{ fontSize: '0.65rem', padding: '1px 7px', borderRadius: '9999px', background: 'rgba(245,181,68,0.12)', color: '#FDCE78', border: '1px solid rgba(245,181,68,0.2)' }}>{fin.billing_model} · {fin.currency}</span>}
               <button className="btn-ghost" style={{ marginLeft: 'auto', fontSize: '0.75rem', padding: '0.2rem 0.6rem', height: 'auto' }} onClick={openEditFin}><Pencil size={11} /> Edit</button>
             </div>
             {fin ? (
               <>
                 <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 768 ? 4 : 2}, 1fr)`, gap: '0.875rem', marginBottom: '1rem' }}>
                   {[
-                    { label: 'Contract Value', value: fmtSAR(fin.contract_value), color: '#00D4FF', icon: <DollarSign size={14} /> },
-                    { label: 'Spent to Date', value: fmtSAR(fin.spent), color: spentPct !== null && spentPct >= 95 ? '#EF4444' : spentPct !== null && spentPct >= 80 ? '#F59E0B' : '#10B981', icon: <TrendingUp size={14} /> },
-                    { label: 'Forecast at Completion', value: fmtSAR(fin.forecast), color: '#8B5CF6', icon: <TrendingUp size={14} /> },
+                    { label: 'Contract Value', value: fmtSAR(fin.contract_value), color: '#A78BFA', icon: <DollarSign size={14} /> },
+                    { label: 'Spent to Date', value: fmtSAR(fin.spent), color: spentPct !== null && spentPct >= 95 ? '#FF6B6B' : spentPct !== null && spentPct >= 80 ? '#F5B544' : '#34D399', icon: <TrendingUp size={14} /> },
+                    { label: 'Forecast at Completion', value: fmtSAR(fin.forecast), color: '#A78BFA', icon: <TrendingUp size={14} /> },
                     { label: 'Variance', value: fin.variance === 0 ? 'On Budget' : (fin.variance > 0 ? '+' : '') + fmtSAR(Math.abs(fin.variance)), color: fin.variance <= 0 ? '#34D399' : '#FCA5A5', icon: fin.variance > 0 ? <TrendingDown size={14} /> : <TrendingUp size={14} /> },
                   ].map(m => (
                     <div key={m.label} style={{ padding: '0.875rem', borderRadius: '8px', background: `${m.color}08`, border: `1px solid ${m.color}20` }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.375rem', color: m.color }}>{m.icon}<span style={{ fontSize: '0.65rem', color: '#475569' }}>{m.label}</span></div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.375rem', color: m.color }}>{m.icon}<span style={{ fontSize: '0.65rem', color: '#4E566E' }}>{m.label}</span></div>
                       <div style={{ fontSize: '1.1rem', fontWeight: 800, color: m.color }}>{m.value}</div>
                     </div>
                   ))}
@@ -581,30 +581,30 @@ export default function WorkspaceDetail() {
                 {spentPct !== null && (
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.375rem' }}>
-                      <span style={{ fontSize: '0.7rem', color: '#475569' }}>Budget Utilization</span>
-                      <span style={{ fontSize: '0.7rem', fontWeight: 600, color: spentPct >= 95 ? '#FCA5A5' : spentPct >= 80 ? '#FCD34D' : '#34D399' }}>{spentPct}% spent · Forecast {forecastPct}%</span>
+                      <span style={{ fontSize: '0.7rem', color: '#4E566E' }}>Budget Utilization</span>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 600, color: spentPct >= 95 ? '#FCA5A5' : spentPct >= 80 ? '#FDCE78' : '#34D399' }}>{spentPct}% spent · Forecast {forecastPct}%</span>
                     </div>
                     <div style={{ height: '6px', borderRadius: '9999px', background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${spentPct}%`, background: `linear-gradient(90deg, ${spentPct >= 95 ? '#EF4444' : spentPct >= 80 ? '#F59E0B' : '#10B981'}, ${spentPct >= 95 ? '#FCA5A5' : spentPct >= 80 ? '#FCD34D' : '#34D399'})`, borderRadius: '9999px', transition: 'width 0.6s ease' }} />
+                      <div style={{ height: '100%', width: `${spentPct}%`, background: `linear-gradient(90deg, ${spentPct >= 95 ? '#FF6B6B' : spentPct >= 80 ? '#F5B544' : '#34D399'}, ${spentPct >= 95 ? '#FCA5A5' : spentPct >= 80 ? '#FDCE78' : '#34D399'})`, borderRadius: '9999px', transition: 'width 0.6s ease' }} />
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.375rem' }}>
-                      <span style={{ fontSize: '0.65rem', color: '#334155' }}>Last Invoice: {fin.last_invoice || '—'}</span>
-                      <span style={{ fontSize: '0.65rem', color: '#F59E0B' }}>Next Milestone: {fmtSAR(fin.next_milestone_value)}</span>
+                      <span style={{ fontSize: '0.65rem', color: '#4E566E' }}>Last Invoice: {fin.last_invoice || '—'}</span>
+                      <span style={{ fontSize: '0.65rem', color: '#F5B544' }}>Next Milestone: {fmtSAR(fin.next_milestone_value)}</span>
                     </div>
                   </div>
                 )}
               </>
             ) : (
-              <div style={{ textAlign: 'center', padding: '1.5rem', color: '#334155', fontSize: '0.8rem' }}>No financial data — click Edit to add</div>
+              <div style={{ textAlign: 'center', padding: '1.5rem', color: '#4E566E', fontSize: '0.8rem' }}>No financial data — click Edit to add</div>
             )}
           </div>
 
           {/* Milestone Tracker */}
           <div className="section-card">
             <div className="section-card-header">
-              <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Milestone Tracker</span>
+              <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F8FAFC' }}>Milestone Tracker</span>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.7rem', color: '#475569' }}>{milestones.filter(m => m.status !== 'Completed').length} active</span>
+                <span style={{ fontSize: '0.7rem', color: '#4E566E' }}>{milestones.filter(m => m.status !== 'Completed').length} active</span>
                 <button className="btn-primary" style={{ fontSize: '0.75rem', padding: '0.2rem 0.7rem', height: 'auto' }} onClick={openAddMs}><Plus size={11} /> Add</button>
               </div>
             </div>
@@ -614,20 +614,20 @@ export default function WorkspaceDetail() {
                   <thead><tr><th>Milestone</th><th>Due Date</th><th>Progress</th><th>Value</th><th>Owner</th><th>Status</th><th></th></tr></thead>
                   <tbody>
                     {milestones.map(ms => {
-                      const sc = milestoneStatusColor[ms.status] ?? '#475569';
+                      const sc = milestoneStatusColor[ms.status] ?? '#4E566E';
                       return (
                         <tr key={ms.id}>
-                          <td><div style={{ fontSize: '0.82rem', fontWeight: 500, color: '#F1F5F9' }}>{ms.title}</div></td>
-                          <td style={{ fontSize: '0.78rem', color: '#475569' }}>{ms.due_date}</td>
+                          <td><div style={{ fontSize: '0.82rem', fontWeight: 500, color: '#F8FAFC' }}>{ms.title}</div></td>
+                          <td style={{ fontSize: '0.78rem', color: '#4E566E' }}>{ms.due_date}</td>
                           <td style={{ minWidth: '120px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                               <div style={{ flex: 1, height: '5px', borderRadius: '9999px', background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
                                 <div style={{ height: '100%', width: `${ms.completion_pct}%`, background: `linear-gradient(90deg, ${sc}, ${sc}cc)`, borderRadius: '9999px' }} />
                               </div>
-                              <span style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 600, flexShrink: 0 }}>{ms.completion_pct}%</span>
+                              <span style={{ fontSize: '0.68rem', color: '#8790A8', fontWeight: 600, flexShrink: 0 }}>{ms.completion_pct}%</span>
                             </div>
                           </td>
-                          <td style={{ fontSize: '0.78rem', color: '#F59E0B', fontWeight: 600 }}>{fmtSAR(ms.value)}</td>
+                          <td style={{ fontSize: '0.78rem', color: '#F5B544', fontWeight: 600 }}>{fmtSAR(ms.value)}</td>
                           <td><div className="avatar" style={{ width: '22px', height: '22px', fontSize: '0.58rem' }}>{ms.owner}</div></td>
                           <td><span style={{ fontSize: '0.68rem', padding: '2px 6px', borderRadius: '4px', background: `${sc}15`, color: sc, border: `1px solid ${sc}25` }}>{ms.status}</span></td>
                           <td>
@@ -640,7 +640,7 @@ export default function WorkspaceDetail() {
                 </table>
               </div>
             ) : (
-              <div style={{ padding: '2rem', textAlign: 'center', color: '#334155', fontSize: '0.8rem' }}>No milestones yet — add one above</div>
+              <div style={{ padding: '2rem', textAlign: 'center', color: '#4E566E', fontSize: '0.8rem' }}>No milestones yet — add one above</div>
             )}
           </div>
 
@@ -648,7 +648,7 @@ export default function WorkspaceDetail() {
           <div style={{ display: 'grid', gridTemplateColumns: isTablet ? '1fr' : '1fr 1fr', gap: '1rem' }}>
             <div className="section-card">
               <div className="section-card-header">
-                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Recent Documents</span>
+                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F8FAFC' }}>Recent Documents</span>
                 <button className="btn-ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.625rem' }} onClick={() => setActiveTab('Documents')}>View All</button>
               </div>
               <div>
@@ -660,36 +660,36 @@ export default function WorkspaceDetail() {
                   >
                     <div style={{ padding: '0.375rem', borderRadius: '6px', background: `${doc.type_color}15`, color: doc.type_color, flexShrink: 0 }}><FileText size={13} /></div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F1F5F9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.name}</div>
-                      <div style={{ fontSize: '0.7rem', color: '#475569' }}>{doc.date} · {doc.pages} pages</div>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F8FAFC', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.name}</div>
+                      <div style={{ fontSize: '0.7rem', color: '#4E566E' }}>{doc.date} · {doc.pages} pages</div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
                       <span className={`status-${doc.status === 'Approved' ? 'approved' : doc.status === 'Under Review' ? 'review' : 'draft'}`} style={{ fontSize: '0.65rem' }}>{doc.status}</span>
-                      {doc.file_url && <Download size={12} style={{ color: '#38BDF8' }} />}
+                      {doc.file_url && <Download size={12} style={{ color: '#7DD3FC' }} />}
                     </div>
                   </div>
                 ))}
-                {docs.length === 0 && <div style={{ padding: '2rem', textAlign: 'center', color: '#334155', fontSize: '0.8rem' }}>No documents yet</div>}
+                {docs.length === 0 && <div style={{ padding: '2rem', textAlign: 'center', color: '#4E566E', fontSize: '0.8rem' }}>No documents yet</div>}
               </div>
             </div>
 
             <div className="section-card">
               <div className="section-card-header">
-                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Open Actions</span>
+                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F8FAFC' }}>Open Actions</span>
                 <button className="btn-ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.625rem' }} onClick={() => setActiveTab('Tasks')}>View All</button>
               </div>
               <div>
                 {openTasks.slice(0, 4).map((task, i) => (
                   <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1.25rem', borderBottom: i < Math.min(openTasks.length, 4) - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '9999px', background: task.priority === 'High' ? '#EF4444' : task.priority === 'Medium' ? '#F59E0B' : '#10B981', flexShrink: 0 }} />
+                    <div style={{ width: '8px', height: '8px', borderRadius: '9999px', background: task.priority === 'High' ? '#FF6B6B' : task.priority === 'Medium' ? '#F5B544' : '#34D399', flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F1F5F9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</div>
-                      <div style={{ fontSize: '0.7rem', color: '#475569' }}>Due: {task.due_date} · {task.assignee}</div>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F8FAFC', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</div>
+                      <div style={{ fontSize: '0.7rem', color: '#4E566E' }}>Due: {task.due_date} · {task.assignee}</div>
                     </div>
-                    <span style={{ fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', background: task.status === 'Overdue' ? 'rgba(239,68,68,0.15)' : 'rgba(14,165,233,0.1)', color: task.status === 'Overdue' ? '#FCA5A5' : '#38BDF8', border: `1px solid ${task.status === 'Overdue' ? 'rgba(239,68,68,0.2)' : 'rgba(14,165,233,0.15)'}` }}>{task.status}</span>
+                    <span style={{ fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', background: task.status === 'Overdue' ? 'rgba(255,107,107,0.15)' : 'rgba(120,119,198,0.1)', color: task.status === 'Overdue' ? '#FCA5A5' : '#7DD3FC', border: `1px solid ${task.status === 'Overdue' ? 'rgba(255,107,107,0.2)' : 'rgba(120,119,198,0.15)'}` }}>{task.status}</span>
                   </div>
                 ))}
-                {openTasks.length === 0 && <div style={{ padding: '2rem', textAlign: 'center', color: '#334155', fontSize: '0.8rem' }}>No open tasks</div>}
+                {openTasks.length === 0 && <div style={{ padding: '2rem', textAlign: 'center', color: '#4E566E', fontSize: '0.8rem' }}>No open tasks</div>}
               </div>
             </div>
           </div>
@@ -698,7 +698,7 @@ export default function WorkspaceDetail() {
           <div style={{ display: 'grid', gridTemplateColumns: isTablet ? '1fr' : '1fr 1fr', gap: '1rem' }}>
             <div className="section-card">
               <div className="section-card-header">
-                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Upcoming Meetings</span>
+                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F8FAFC' }}>Upcoming Meetings</span>
                 <button className="btn-ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.625rem' }} onClick={() => setActiveTab('Meetings')}>View All</button>
               </div>
               <div>
@@ -708,38 +708,38 @@ export default function WorkspaceDetail() {
                     onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
-                    <div style={{ padding: '0.375rem', borderRadius: '6px', background: `${meetingTypeColors[mtg.type] ?? '#8B5CF6'}15`, color: meetingTypeColors[mtg.type] ?? '#8B5CF6', flexShrink: 0 }}><Video size={13} /></div>
+                    <div style={{ padding: '0.375rem', borderRadius: '6px', background: `${meetingTypeColors[mtg.type] ?? '#A78BFA'}15`, color: meetingTypeColors[mtg.type] ?? '#A78BFA', flexShrink: 0 }}><Video size={13} /></div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F1F5F9' }}>{mtg.title}</div>
-                      <div style={{ fontSize: '0.7rem', color: '#475569' }}>{mtg.date} · {mtg.time} · {mtg.duration}</div>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F8FAFC' }}>{mtg.title}</div>
+                      <div style={{ fontSize: '0.7rem', color: '#4E566E' }}>{mtg.date} · {mtg.time} · {mtg.duration}</div>
                     </div>
-                    <ExternalLink size={13} style={{ color: '#334155' }} />
+                    <ExternalLink size={13} style={{ color: '#4E566E' }} />
                   </div>
                 ))}
-                {upcomingMeetings.length === 0 && <div style={{ padding: '2rem', textAlign: 'center', color: '#334155', fontSize: '0.8rem' }}>No upcoming meetings</div>}
+                {upcomingMeetings.length === 0 && <div style={{ padding: '2rem', textAlign: 'center', color: '#4E566E', fontSize: '0.8rem' }}>No upcoming meetings</div>}
               </div>
             </div>
 
             <div className="section-card">
               <div className="section-card-header">
-                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Open Risks</span>
+                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F8FAFC' }}>Open Risks</span>
                 <button className="btn-ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.625rem' }} onClick={() => setActiveTab('Risks')}>View All</button>
               </div>
               <div>
                 {risks.filter(r => r.status === 'Open' || r.status === 'Monitoring').slice(0, 3).map((risk, i, arr) => {
-                  const sc = risk.severity === 'Critical' ? '#EF4444' : risk.severity === 'High' ? '#F59E0B' : '#10B981';
+                  const sc = risk.severity === 'Critical' ? '#FF6B6B' : risk.severity === 'High' ? '#F5B544' : '#34D399';
                   return (
                     <div key={risk.id} style={{ display: 'flex', gap: '0.75rem', padding: '0.875rem 1.25rem', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
                       <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: sc, boxShadow: `0 0 4px ${sc}80`, flexShrink: 0, marginTop: '5px' }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F1F5F9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{risk.title}</div>
-                        <div style={{ fontSize: '0.7rem', color: '#475569' }}>{risk.category} · P{risk.probability}×I{risk.impact}</div>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F8FAFC', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{risk.title}</div>
+                        <div style={{ fontSize: '0.7rem', color: '#4E566E' }}>{risk.category} · P{risk.probability}×I{risk.impact}</div>
                       </div>
                       <span style={{ fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', background: `${sc}15`, color: sc, border: `1px solid ${sc}25`, flexShrink: 0 }}>{risk.severity}</span>
                     </div>
                   );
                 })}
-                {risks.filter(r => r.status === 'Open' || r.status === 'Monitoring').length === 0 && <div style={{ padding: '2rem', textAlign: 'center', color: '#334155', fontSize: '0.8rem' }}>No open risks</div>}
+                {risks.filter(r => r.status === 'Open' || r.status === 'Monitoring').length === 0 && <div style={{ padding: '2rem', textAlign: 'center', color: '#4E566E', fontSize: '0.8rem' }}>No open risks</div>}
               </div>
             </div>
           </div>
@@ -750,7 +750,7 @@ export default function WorkspaceDetail() {
       {activeTab === 'Documents' && (
         <div className="section-card">
           <div className="section-card-header">
-            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Documents ({docs.length})</span>
+            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F8FAFC' }}>Documents ({docs.length})</span>
             <button className="btn-primary" style={{ fontSize: '0.8rem' }} onClick={() => setShowDocModal(true)}><Plus size={13} /> Add Document</button>
           </div>
           <div style={{ overflowX: 'auto' }}>
@@ -760,15 +760,15 @@ export default function WorkspaceDetail() {
                 {docs.map(doc => (
                   <tr key={doc.id}>
                     <td>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F1F5F9' }}>{doc.name}</div>
-                      <div style={{ fontSize: '0.7rem', color: '#475569' }}>{doc.author} · {doc.size}</div>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F8FAFC' }}>{doc.name}</div>
+                      <div style={{ fontSize: '0.7rem', color: '#4E566E' }}>{doc.author} · {doc.size}</div>
                     </td>
                     <td><span style={{ fontSize: '0.72rem', padding: '2px 7px', borderRadius: '4px', background: `${doc.type_color}15`, color: doc.type_color, border: `1px solid ${doc.type_color}25` }}>{doc.type}</span></td>
                     <td style={{ fontSize: '0.78rem' }}>{doc.date}</td>
-                    <td><span style={{ fontSize: '0.72rem', color: '#38BDF8' }}>{doc.language}</span></td>
+                    <td><span style={{ fontSize: '0.72rem', color: '#7DD3FC' }}>{doc.language}</span></td>
                     <td>
                       <select value={doc.status} onChange={e => handleUpdateDocStatus(doc.id, e.target.value as DocumentRow['status'])}
-                        style={{ background: 'transparent', border: 'none', color: doc.status === 'Approved' ? '#34D399' : doc.status === 'Under Review' ? '#FCD34D' : doc.status === 'Final' ? '#38BDF8' : '#94A3B8', fontSize: '0.72rem', cursor: 'pointer', fontFamily: 'inherit', outline: 'none' }}>
+                        style={{ background: 'transparent', border: 'none', color: doc.status === 'Approved' ? '#34D399' : doc.status === 'Under Review' ? '#FDCE78' : doc.status === 'Final' ? '#7DD3FC' : '#8790A8', fontSize: '0.72rem', cursor: 'pointer', fontFamily: 'inherit', outline: 'none' }}>
                         <option value="Draft">Draft</option>
                         <option value="Under Review">Under Review</option>
                         <option value="Approved">Approved</option>
@@ -779,17 +779,17 @@ export default function WorkspaceDetail() {
                     <td>
                       {doc.file_url ? (
                         <a href={doc.file_url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: '#38BDF8', textDecoration: 'none', padding: '2px 8px', borderRadius: '4px', background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.2)' }}>
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: '#7DD3FC', textDecoration: 'none', padding: '2px 8px', borderRadius: '4px', background: 'rgba(120,119,198,0.1)', border: '1px solid rgba(120,119,198,0.2)' }}>
                           <Download size={11} /> Open
                         </a>
-                      ) : <span style={{ fontSize: '0.7rem', color: '#334155' }}>—</span>}
+                      ) : <span style={{ fontSize: '0.7rem', color: '#4E566E' }}>—</span>}
                     </td>
                     <td>
                       <DeleteOrConfirm id={doc.id} confirmDelete={confirmDelete} setConfirmDelete={setConfirmDelete} deleting={deleting} onDelete={() => handleDeleteDoc(doc.id)} />
                     </td>
                   </tr>
                 ))}
-                {docs.length === 0 && <tr><td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: '#334155' }}>No documents yet</td></tr>}
+                {docs.length === 0 && <tr><td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: '#4E566E' }}>No documents yet</td></tr>}
               </tbody>
             </table>
           </div>
@@ -800,7 +800,7 @@ export default function WorkspaceDetail() {
       {activeTab === 'Meetings' && (
         <div className="section-card">
           <div className="section-card-header">
-            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Meetings ({meetings.length})</span>
+            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F8FAFC' }}>Meetings ({meetings.length})</span>
             <button className="btn-primary" style={{ fontSize: '0.8rem' }} onClick={() => setShowMtgModal(true)}><Plus size={13} /> Schedule Meeting</button>
           </div>
           <div style={{ overflowX: 'auto' }}>
@@ -808,27 +808,27 @@ export default function WorkspaceDetail() {
               <thead><tr><th>Meeting</th><th>Type</th><th>Date & Time</th><th>Duration</th><th>Participants</th><th>Status</th><th></th></tr></thead>
               <tbody>
                 {meetings.map(mtg => {
-                  const tc = meetingTypeColors[mtg.type] ?? '#8B5CF6';
+                  const tc = meetingTypeColors[mtg.type] ?? '#A78BFA';
                   return (
                     <tr key={mtg.id}>
                       <td>
-                        <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F1F5F9' }}>{mtg.title}</div>
-                        {mtg.location && <div style={{ fontSize: '0.7rem', color: '#475569' }}>{mtg.location}</div>}
+                        <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F8FAFC' }}>{mtg.title}</div>
+                        {mtg.location && <div style={{ fontSize: '0.7rem', color: '#4E566E' }}>{mtg.location}</div>}
                       </td>
                       <td><span style={{ fontSize: '0.72rem', padding: '2px 7px', borderRadius: '4px', background: `${tc}15`, color: tc, border: `1px solid ${tc}25` }}>{mtg.type}</span></td>
-                      <td style={{ fontSize: '0.78rem', color: '#94A3B8' }}>{mtg.date} · {mtg.time}</td>
-                      <td style={{ fontSize: '0.78rem', color: '#94A3B8' }}>{mtg.duration}</td>
+                      <td style={{ fontSize: '0.78rem', color: '#8790A8' }}>{mtg.date} · {mtg.time}</td>
+                      <td style={{ fontSize: '0.78rem', color: '#8790A8' }}>{mtg.duration}</td>
                       <td>
                         <div style={{ display: 'flex' }}>
                           {mtg.participants.slice(0, 3).map((p, i) => (
-                            <div key={i} title={p} style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'linear-gradient(135deg, #0EA5E9, #8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.55rem', fontWeight: 700, color: 'white', border: '2px solid #0C1220', marginLeft: i > 0 ? '-5px' : 0 }}>{p.slice(0, 2)}</div>
+                            <div key={i} title={p} style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'linear-gradient(135deg, #7877C6, #A78BFA)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.55rem', fontWeight: 700, color: 'white', border: '2px solid #0C0F1A', marginLeft: i > 0 ? '-5px' : 0 }}>{p.slice(0, 2)}</div>
                           ))}
-                          {mtg.participants.length > 3 && <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.55rem', color: '#94A3B8', border: '2px solid #0C1220', marginLeft: '-5px' }}>+{mtg.participants.length - 3}</div>}
+                          {mtg.participants.length > 3 && <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.55rem', color: '#8790A8', border: '2px solid #0C0F1A', marginLeft: '-5px' }}>+{mtg.participants.length - 3}</div>}
                         </div>
                       </td>
                       <td>
                         <select value={mtg.status} onChange={e => handleUpdateMeetingStatus(mtg.id, e.target.value as MeetingRow['status'])}
-                          style={{ background: 'transparent', border: 'none', color: mtg.status === 'Completed' ? '#34D399' : mtg.status === 'In Progress' ? '#38BDF8' : '#FCD34D', fontSize: '0.72rem', cursor: 'pointer', fontFamily: 'inherit', outline: 'none' }}>
+                          style={{ background: 'transparent', border: 'none', color: mtg.status === 'Completed' ? '#34D399' : mtg.status === 'In Progress' ? '#7DD3FC' : '#FDCE78', fontSize: '0.72rem', cursor: 'pointer', fontFamily: 'inherit', outline: 'none' }}>
                           <option value="Upcoming">Upcoming</option>
                           <option value="In Progress">In Progress</option>
                           <option value="Completed">Completed</option>
@@ -840,7 +840,7 @@ export default function WorkspaceDetail() {
                     </tr>
                   );
                 })}
-                {meetings.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: '#334155' }}>No meetings yet</td></tr>}
+                {meetings.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: '#4E566E' }}>No meetings yet</td></tr>}
               </tbody>
             </table>
           </div>
@@ -851,7 +851,7 @@ export default function WorkspaceDetail() {
       {activeTab === 'Tasks' && (
         <div className="section-card">
           <div className="section-card-header">
-            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Tasks ({tasks.length})</span>
+            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F8FAFC' }}>Tasks ({tasks.length})</span>
             <button className="btn-primary" style={{ fontSize: '0.8rem' }} onClick={() => setShowTaskModal(true)}><Plus size={13} /> New Task</button>
           </div>
           <div style={{ overflowX: 'auto' }}>
@@ -861,15 +861,15 @@ export default function WorkspaceDetail() {
                 {tasks.map(task => (
                   <tr key={task.id}>
                     <td>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F1F5F9' }}>{task.title}</div>
-                      {task.description && <div style={{ fontSize: '0.7rem', color: '#475569' }}>{task.description.slice(0, 60)}{task.description.length > 60 ? '…' : ''}</div>}
+                      <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F8FAFC' }}>{task.title}</div>
+                      {task.description && <div style={{ fontSize: '0.7rem', color: '#4E566E' }}>{task.description.slice(0, 60)}{task.description.length > 60 ? '…' : ''}</div>}
                     </td>
                     <td>
-                      <span style={{ fontSize: '0.72rem', padding: '2px 7px', borderRadius: '4px', background: task.priority === 'High' ? 'rgba(239,68,68,0.15)' : task.priority === 'Medium' ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)', color: task.priority === 'High' ? '#FCA5A5' : task.priority === 'Medium' ? '#FCD34D' : '#34D399' }}>{task.priority}</span>
+                      <span style={{ fontSize: '0.72rem', padding: '2px 7px', borderRadius: '4px', background: task.priority === 'High' ? 'rgba(255,107,107,0.15)' : task.priority === 'Medium' ? 'rgba(245,181,68,0.1)' : 'rgba(52,211,153,0.1)', color: task.priority === 'High' ? '#FCA5A5' : task.priority === 'Medium' ? '#FDCE78' : '#34D399' }}>{task.priority}</span>
                     </td>
                     <td>
                       <select value={task.status} onChange={e => handleUpdateTaskStatus(task.id, e.target.value as TaskRow['status'])}
-                        style={{ background: 'transparent', border: 'none', color: task.status === 'Completed' ? '#34D399' : task.status === 'In Progress' ? '#38BDF8' : task.status === 'Overdue' ? '#FCA5A5' : task.status === 'In Review' ? '#FCD34D' : '#94A3B8', fontSize: '0.72rem', cursor: 'pointer', fontFamily: 'inherit', outline: 'none' }}>
+                        style={{ background: 'transparent', border: 'none', color: task.status === 'Completed' ? '#34D399' : task.status === 'In Progress' ? '#7DD3FC' : task.status === 'Overdue' ? '#FCA5A5' : task.status === 'In Review' ? '#FDCE78' : '#8790A8', fontSize: '0.72rem', cursor: 'pointer', fontFamily: 'inherit', outline: 'none' }}>
                         <option value="Backlog">Backlog</option>
                         <option value="In Progress">In Progress</option>
                         <option value="In Review">In Review</option>
@@ -877,11 +877,11 @@ export default function WorkspaceDetail() {
                         <option value="Overdue">Overdue</option>
                       </select>
                     </td>
-                    <td style={{ fontSize: '0.78rem', color: task.status === 'Overdue' ? '#FCA5A5' : '#94A3B8' }}>{task.due_date}</td>
+                    <td style={{ fontSize: '0.78rem', color: task.status === 'Overdue' ? '#FCA5A5' : '#8790A8' }}>{task.due_date}</td>
                     <td><div className="avatar" style={{ width: '24px', height: '24px', fontSize: '0.62rem' }}>{task.assignee.slice(0, 2).toUpperCase()}</div></td>
                     <td>
                       {updatingTaskId === task.id ? (
-                        <span style={{ fontSize: '0.68rem', color: '#475569' }}>…</span>
+                        <span style={{ fontSize: '0.68rem', color: '#4E566E' }}>…</span>
                       ) : task.status !== 'Completed' ? (
                         <button className="btn-ghost" style={{ fontSize: '0.68rem', padding: '2px 8px', height: 'auto' }}
                           onClick={() => handleUpdateTaskStatus(task.id, task.status === 'Backlog' ? 'In Progress' : task.status === 'In Progress' ? 'In Review' : 'Completed')}>
@@ -894,7 +894,7 @@ export default function WorkspaceDetail() {
                     </td>
                   </tr>
                 ))}
-                {tasks.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: '#334155' }}>No tasks yet</td></tr>}
+                {tasks.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: '#4E566E' }}>No tasks yet</td></tr>}
               </tbody>
             </table>
           </div>
@@ -905,7 +905,7 @@ export default function WorkspaceDetail() {
       {activeTab === 'Risks' && (
         <div className="section-card">
           <div className="section-card-header">
-            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Risk Register ({risks.length})</span>
+            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F8FAFC' }}>Risk Register ({risks.length})</span>
             <button className="btn-primary" style={{ fontSize: '0.8rem' }} onClick={() => setShowRiskModal(true)}><Plus size={13} /> Log Risk</button>
           </div>
           <div style={{ overflowX: 'auto' }}>
@@ -915,19 +915,19 @@ export default function WorkspaceDetail() {
                 {risks.map(risk => (
                   <tr key={risk.id}>
                     <td>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F1F5F9' }}>{risk.title}</div>
-                      {risk.mitigation && <div style={{ fontSize: '0.7rem', color: '#475569' }}>{risk.mitigation.slice(0, 55)}{risk.mitigation.length > 55 ? '…' : ''}</div>}
+                      <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F8FAFC' }}>{risk.title}</div>
+                      {risk.mitigation && <div style={{ fontSize: '0.7rem', color: '#4E566E' }}>{risk.mitigation.slice(0, 55)}{risk.mitigation.length > 55 ? '…' : ''}</div>}
                     </td>
                     <td style={{ fontSize: '0.78rem' }}>{risk.category}</td>
                     <td>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: risk.probability * risk.impact >= 17 ? 'rgba(239,68,68,0.15)' : risk.probability * risk.impact >= 10 ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)', color: risk.probability * risk.impact >= 17 ? '#FCA5A5' : risk.probability * risk.impact >= 10 ? '#FCD34D' : '#34D399' }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: risk.probability * risk.impact >= 17 ? 'rgba(255,107,107,0.15)' : risk.probability * risk.impact >= 10 ? 'rgba(245,181,68,0.1)' : 'rgba(52,211,153,0.1)', color: risk.probability * risk.impact >= 17 ? '#FCA5A5' : risk.probability * risk.impact >= 10 ? '#FDCE78' : '#34D399' }}>
                         {risk.probability}×{risk.impact}={risk.probability * risk.impact}
                       </span>
                     </td>
                     <td><span className={`status-risk-${risk.severity.toLowerCase()}`}>{risk.severity}</span></td>
                     <td>
                       <select value={risk.status} onChange={e => handleUpdateRiskStatus(risk.id, e.target.value as RiskRow['status'])}
-                        style={{ background: 'transparent', border: 'none', color: risk.status === 'Mitigated' || risk.status === 'Closed' ? '#34D399' : risk.status === 'Monitoring' ? '#FCD34D' : '#FCA5A5', fontSize: '0.72rem', cursor: 'pointer', fontFamily: 'inherit', outline: 'none' }}>
+                        style={{ background: 'transparent', border: 'none', color: risk.status === 'Mitigated' || risk.status === 'Closed' ? '#34D399' : risk.status === 'Monitoring' ? '#FDCE78' : '#FCA5A5', fontSize: '0.72rem', cursor: 'pointer', fontFamily: 'inherit', outline: 'none' }}>
                         <option value="Open">Open</option>
                         <option value="Monitoring">Monitoring</option>
                         <option value="Mitigated">Mitigated</option>
@@ -935,13 +935,13 @@ export default function WorkspaceDetail() {
                       </select>
                     </td>
                     <td><div className="avatar" style={{ width: '24px', height: '24px', fontSize: '0.62rem' }}>{risk.owner.split(' ').map(n => n[0]).join('').slice(0, 2)}</div></td>
-                    {!isMobile && <td style={{ fontSize: '0.78rem', color: '#F59E0B', fontWeight: 600 }}>{risk.financial_exposure ? fmtSAR(risk.financial_exposure) : '—'}</td>}
+                    {!isMobile && <td style={{ fontSize: '0.78rem', color: '#F5B544', fontWeight: 600 }}>{risk.financial_exposure ? fmtSAR(risk.financial_exposure) : '—'}</td>}
                     <td>
                       <DeleteOrConfirm id={risk.id} confirmDelete={confirmDelete} setConfirmDelete={setConfirmDelete} deleting={deleting} onDelete={() => handleDeleteRisk(risk.id)} />
                     </td>
                   </tr>
                 ))}
-                {risks.length === 0 && <tr><td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: '#334155' }}>No risks logged yet</td></tr>}
+                {risks.length === 0 && <tr><td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: '#4E566E' }}>No risks logged yet</td></tr>}
               </tbody>
             </table>
           </div>
@@ -953,8 +953,8 @@ export default function WorkspaceDetail() {
       {/* Delete Workspace confirm */}
       {showDeleteWs && (
         <Modal title="Delete Workspace" onClose={() => setShowDeleteWs(false)}>
-          <div style={{ fontSize: '0.875rem', color: '#94A3B8', marginBottom: '1.5rem', lineHeight: 1.6 }}>
-            Are you sure you want to delete <strong style={{ color: '#F1F5F9' }}>{ws.name}</strong>?<br />
+          <div style={{ fontSize: '0.875rem', color: '#8790A8', marginBottom: '1.5rem', lineHeight: 1.6 }}>
+            Are you sure you want to delete <strong style={{ color: '#F8FAFC' }}>{ws.name}</strong>?<br />
             This action is <strong style={{ color: '#FCA5A5' }}>permanent and cannot be undone</strong>. The following will also be deleted:
             <ul style={{ marginTop: '0.75rem', paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
               <li>{data?.docs.length ?? ws.docs_count} document{(data?.docs.length ?? ws.docs_count) !== 1 ? 's' : ''}</li>
@@ -966,7 +966,7 @@ export default function WorkspaceDetail() {
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
             <button className="btn-ghost" onClick={() => setShowDeleteWs(false)}>Cancel</button>
-            <button className="btn-primary" style={{ background: 'rgba(239,68,68,0.2)', borderColor: 'rgba(239,68,68,0.4)', color: '#FCA5A5' }} onClick={handleDeleteWorkspace} disabled={deletingWs}>
+            <button className="btn-primary" style={{ background: 'rgba(255,107,107,0.2)', borderColor: 'rgba(255,107,107,0.4)', color: '#FCA5A5' }} onClick={handleDeleteWorkspace} disabled={deletingWs}>
               {deletingWs ? 'Deleting…' : 'Yes, Delete Workspace'}
             </button>
           </div>
@@ -1084,7 +1084,7 @@ export default function WorkspaceDetail() {
         <Modal title="Add Document" onClose={() => { setShowDocModal(false); setDocError(''); setDocForm({ name: '', type: 'BRD', language: 'EN', status: 'Draft', author: '', pages: '1', summary: '', file: null }); }}>
           {docError && <ErrorBanner msg={docError} />}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
-            <div style={{ border: `2px dashed ${docForm.file ? '#10B981' : 'rgba(255,255,255,0.12)'}`, borderRadius: '0.75rem', padding: '1.25rem', textAlign: 'center', cursor: 'pointer', background: docForm.file ? 'rgba(16,185,129,0.05)' : 'rgba(255,255,255,0.02)', transition: 'all 0.2s' }}
+            <div style={{ border: `2px dashed ${docForm.file ? '#34D399' : 'rgba(255,255,255,0.12)'}`, borderRadius: '0.75rem', padding: '1.25rem', textAlign: 'center', cursor: 'pointer', background: docForm.file ? 'rgba(52,211,153,0.05)' : 'rgba(255,255,255,0.02)', transition: 'all 0.2s' }}
               onClick={() => fileInputRef.current?.click()}
               onDragOver={e => e.preventDefault()}
               onDrop={e => { e.preventDefault(); const file = e.dataTransfer.files[0]; if (file) setDocForm(f => ({ ...f, file, name: f.name || file.name.replace(/\.[^.]+$/, '') })); }}>
@@ -1092,24 +1092,24 @@ export default function WorkspaceDetail() {
                 onChange={e => { const file = e.target.files?.[0]; if (file) setDocForm(f => ({ ...f, file, name: f.name || file.name.replace(/\.[^.]+$/, '') })); }} />
               {docForm.file ? (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.625rem' }}>
-                  <FileText size={20} style={{ color: '#10B981' }} />
+                  <FileText size={20} style={{ color: '#34D399' }} />
                   <div style={{ textAlign: 'left' }}>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#F1F5F9' }}>{docForm.file.name}</div>
-                    <div style={{ fontSize: '0.72rem', color: '#475569' }}>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#F8FAFC' }}>{docForm.file.name}</div>
+                    <div style={{ fontSize: '0.72rem', color: '#4E566E' }}>
                       {docForm.file.size >= 1_048_576 ? `${(docForm.file.size / 1_048_576).toFixed(1)} MB` : `${(docForm.file.size / 1024).toFixed(0)} KB`}
-                      {' · '}<span style={{ color: '#10B981', cursor: 'pointer' }} onClick={e => { e.stopPropagation(); setDocForm(f => ({ ...f, file: null })); }}>Remove</span>
+                      {' · '}<span style={{ color: '#34D399', cursor: 'pointer' }} onClick={e => { e.stopPropagation(); setDocForm(f => ({ ...f, file: null })); }}>Remove</span>
                     </div>
                   </div>
                 </div>
               ) : (
-                <div><Upload size={24} style={{ color: '#475569', marginBottom: '0.5rem' }} /><div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#94A3B8' }}>Click or drag & drop a file</div><div style={{ fontSize: '0.72rem', color: '#334155', marginTop: '0.25rem' }}>PDF, Word, PowerPoint, Excel, images (optional)</div></div>
+                <div><Upload size={24} style={{ color: '#4E566E', marginBottom: '0.5rem' }} /><div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#8790A8' }}>Click or drag & drop a file</div><div style={{ fontSize: '0.72rem', color: '#4E566E', marginTop: '0.25rem' }}>PDF, Word, PowerPoint, Excel, images (optional)</div></div>
               )}
             </div>
             {docSaving && docUploadPct > 0 && docUploadPct < 100 && (
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><span style={{ fontSize: '0.72rem', color: '#475569' }}>Uploading…</span><span style={{ fontSize: '0.72rem', color: '#38BDF8' }}>{docUploadPct}%</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><span style={{ fontSize: '0.72rem', color: '#4E566E' }}>Uploading…</span><span style={{ fontSize: '0.72rem', color: '#7DD3FC' }}>{docUploadPct}%</span></div>
                 <div style={{ height: '4px', borderRadius: '9999px', background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${docUploadPct}%`, background: 'linear-gradient(90deg, #0EA5E9, #00D4FF)', borderRadius: '9999px', transition: 'width 0.3s ease' }} />
+                  <div style={{ height: '100%', width: `${docUploadPct}%`, background: 'linear-gradient(90deg, #7877C6, #A78BFA)', borderRadius: '9999px', transition: 'width 0.3s ease' }} />
                 </div>
               </div>
             )}
@@ -1178,7 +1178,7 @@ function DeleteOrConfirm({ id, confirmDelete, setConfirmDelete, deleting, onDele
   if (confirmDelete === id) {
     return (
       <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
-        <button className="btn-ghost" style={{ fontSize: '0.65rem', padding: '2px 6px', height: 'auto', color: '#FCA5A5', borderColor: 'rgba(239,68,68,0.3)' }} onClick={onDelete} disabled={deleting}>
+        <button className="btn-ghost" style={{ fontSize: '0.65rem', padding: '2px 6px', height: 'auto', color: '#FCA5A5', borderColor: 'rgba(255,107,107,0.3)' }} onClick={onDelete} disabled={deleting}>
           {deleting ? '…' : 'Delete'}
         </button>
         <button className="btn-ghost" style={{ fontSize: '0.65rem', padding: '2px 6px', height: 'auto' }} onClick={() => setConfirmDelete(null)}>Cancel</button>
@@ -1189,11 +1189,11 @@ function DeleteOrConfirm({ id, confirmDelete, setConfirmDelete, deleting, onDele
     <div style={{ display: 'flex', gap: '0.25rem' }}>
       {onEdit && (
         <button className="btn-ghost" style={{ padding: '3px 5px', height: 'auto' }} onClick={onEdit} title="Edit">
-          <Pencil size={11} style={{ color: '#475569' }} />
+          <Pencil size={11} style={{ color: '#4E566E' }} />
         </button>
       )}
       <button className="btn-ghost" style={{ padding: '3px 5px', height: 'auto' }} onClick={() => setConfirmDelete(id)} title="Delete">
-        <Trash2 size={11} style={{ color: '#475569' }} />
+        <Trash2 size={11} style={{ color: '#4E566E' }} />
       </button>
     </div>
   );
@@ -1203,10 +1203,10 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{ background: '#0C1220', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', padding: '1.75rem', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto' }}>
+      <div style={{ background: '#0C0F1A', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', padding: '1.75rem', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <div style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9' }}>{title}</div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><X size={18} /></button>
+          <div style={{ fontSize: '1rem', fontWeight: 700, color: '#F8FAFC' }}>{title}</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4E566E', padding: '4px' }}><X size={18} /></button>
         </div>
         {children}
       </div>
@@ -1219,7 +1219,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function ErrorBanner({ msg }: { msg: string }) {
-  return <div style={{ padding: '0.75rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', color: '#FCA5A5', fontSize: '0.8rem', marginBottom: '1rem' }}>{msg}</div>;
+  return <div style={{ padding: '0.75rem', background: 'rgba(255,107,107,0.1)', border: '1px solid rgba(255,107,107,0.2)', borderRadius: '6px', color: '#FCA5A5', fontSize: '0.8rem', marginBottom: '1rem' }}>{msg}</div>;
 }
 
 function ModalFooter({ onCancel, onConfirm, saving, label }: { onCancel: () => void; onConfirm: () => void; saving: boolean; label: string }) {

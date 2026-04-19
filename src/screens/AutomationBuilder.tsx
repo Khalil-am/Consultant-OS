@@ -25,14 +25,14 @@ interface FlowNode {
 }
 
 const flowNodes: FlowNode[] = [
-  { id: 'n1', label: 'Trigger',      type: 'trigger', icon: <Play size={14} />,       color: '#10B981', status: 'done',   description: 'Document uploaded or manual run' },
-  { id: 'n2', label: 'Read File',    type: 'input',   icon: <Upload size={14} />,      color: '#0EA5E9', status: 'done',   description: 'Parse PDF/Word document' },
-  { id: 'n3', label: 'Extract Text', type: 'process', icon: <ChevronRight size={14} />,color: '#0EA5E9', status: 'done',   description: 'OCR and text extraction' },
-  { id: 'n4', label: 'Classify',     type: 'process', icon: <Filter size={14} />,      color: '#8B5CF6', status: 'active', description: 'Detect document type & structure' },
-  { id: 'n5', label: 'LLM Generate', type: 'ai',      icon: <Cpu size={14} />,         color: '#8B5CF6', status: 'idle',   description: 'GPT-4o generation with template' },
-  { id: 'n6', label: 'Validate',     type: 'process', icon: <Check size={14} />,       color: '#F59E0B', status: 'idle',   description: 'Schema & quality validation' },
-  { id: 'n7', label: 'Create Doc',   type: 'output',  icon: <Save size={14} />,        color: '#10B981', status: 'idle',   description: 'Generate Word/PDF output' },
-  { id: 'n8', label: 'Notify',       type: 'notify',  icon: <AlertCircle size={14} />, color: '#F59E0B', status: 'idle',   description: 'Email/Slack notification' },
+  { id: 'n1', label: 'Trigger',      type: 'trigger', icon: <Play size={14} />,       color: '#34D399', status: 'done',   description: 'Document uploaded or manual run' },
+  { id: 'n2', label: 'Read File',    type: 'input',   icon: <Upload size={14} />,      color: '#7877C6', status: 'done',   description: 'Parse PDF/Word document' },
+  { id: 'n3', label: 'Extract Text', type: 'process', icon: <ChevronRight size={14} />,color: '#7877C6', status: 'done',   description: 'OCR and text extraction' },
+  { id: 'n4', label: 'Classify',     type: 'process', icon: <Filter size={14} />,      color: '#A78BFA', status: 'active', description: 'Detect document type & structure' },
+  { id: 'n5', label: 'LLM Generate', type: 'ai',      icon: <Cpu size={14} />,         color: '#A78BFA', status: 'idle',   description: 'GPT-4o generation with template' },
+  { id: 'n6', label: 'Validate',     type: 'process', icon: <Check size={14} />,       color: '#F5B544', status: 'idle',   description: 'Schema & quality validation' },
+  { id: 'n7', label: 'Create Doc',   type: 'output',  icon: <Save size={14} />,        color: '#34D399', status: 'idle',   description: 'Generate Word/PDF output' },
+  { id: 'n8', label: 'Notify',       type: 'notify',  icon: <AlertCircle size={14} />, color: '#F5B544', status: 'idle',   description: 'Email/Slack notification' },
 ];
 
 const rightPanelTabs = ['Prompt', 'Schema', 'Destinations', 'Notifications', 'Logs'];
@@ -78,9 +78,9 @@ function runDuration(run: AutomationRunRow): string {
 }
 
 function runStatusLabel(run: AutomationRunRow): { label: string; color: string; bg: string } {
-  if (run.status === 'completed') return { label: 'Success', color: '#34D399', bg: 'rgba(16,185,129,0.15)' };
-  if (run.status === 'failed')    return { label: 'Error',   color: '#FCA5A5', bg: 'rgba(239,68,68,0.15)' };
-  return { label: 'Running', color: '#FCD34D', bg: 'rgba(245,158,11,0.15)' };
+  if (run.status === 'completed') return { label: 'Success', color: '#34D399', bg: 'rgba(52,211,153,0.15)' };
+  if (run.status === 'failed')    return { label: 'Error',   color: '#FCA5A5', bg: 'rgba(255,107,107,0.15)' };
+  return { label: 'Running', color: '#FDCE78', bg: 'rgba(245,181,68,0.15)' };
 }
 
 function parseRunInput(optionsJson: string): string {
@@ -242,7 +242,7 @@ export default function AutomationBuilder() {
               id: uuidv4(),
               name: `${auto.name} – ${new Date().toLocaleDateString('en-GB')}`,
               type: 'BRD',
-              type_color: '#0EA5E9',
+              type_color: '#7877C6',
               workspace: ws.name,
               workspace_id: ws.id,
               date: new Date().toISOString().split('T')[0],
@@ -310,14 +310,14 @@ export default function AutomationBuilder() {
 
   const getNodeBg = (node: FlowNode) => {
     if (node.id === selectedNode)    return `${node.color}20`;
-    if (node.status === 'done')      return 'rgba(16,185,129,0.08)';
+    if (node.status === 'done')      return 'rgba(52,211,153,0.08)';
     if (node.status === 'active')    return `${node.color}12`;
     return 'rgba(255,255,255,0.03)';
   };
 
   const getNodeBorder = (node: FlowNode) => {
     if (node.id === selectedNode)  return `${node.color}60`;
-    if (node.status === 'done')    return 'rgba(16,185,129,0.3)';
+    if (node.status === 'done')    return 'rgba(52,211,153,0.3)';
     if (node.status === 'active')  return `${node.color}50`;
     return 'rgba(255,255,255,0.08)';
   };
@@ -333,19 +333,19 @@ export default function AutomationBuilder() {
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '0.875rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)',
-        background: '#0C1220', flexShrink: 0,
+        background: '#0C0F1A', flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <button
             onClick={() => navigate('/automations')}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8rem', fontFamily: 'inherit' }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4E566E', display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8rem', fontFamily: 'inherit' }}
           >
             <ArrowLeft size={14} /> Automations
           </button>
           <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.08)' }} />
           <div>
-            <h2 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#F1F5F9', margin: 0 }}>{auto.name}</h2>
-            <p style={{ fontSize: '0.7rem', color: '#475569', margin: 0 }}>{auto.category} · {auto.run_count} runs</p>
+            <h2 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#F8FAFC', margin: 0 }}>{auto.name}</h2>
+            <p style={{ fontSize: '0.7rem', color: '#4E566E', margin: 0 }}>{auto.category} · {auto.run_count} runs</p>
           </div>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -380,21 +380,21 @@ export default function AutomationBuilder() {
         {/* ── Left Panel – Config ── */}
         <div style={{
           width: '280px', minWidth: '280px', borderRight: '1px solid rgba(255,255,255,0.05)',
-          display: 'flex', flexDirection: 'column', overflowY: 'auto', background: '#0C1220',
+          display: 'flex', flexDirection: 'column', overflowY: 'auto', background: '#0C0F1A',
         }}>
           <div style={{ padding: '1rem' }}>
             {/* Trigger */}
             <div style={{ marginBottom: '1.25rem' }}>
-              <div style={{ fontSize: '0.7rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.625rem' }}>Trigger</div>
-              <div style={{ padding: '0.75rem', borderRadius: '0.5rem', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', cursor: 'pointer' }}>
+              <div style={{ fontSize: '0.7rem', color: '#4E566E', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.625rem' }}>Trigger</div>
+              <div style={{ padding: '0.75rem', borderRadius: '0.5rem', background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.2)', cursor: 'pointer' }}>
                 <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#34D399', marginBottom: '0.375rem' }}>Document Upload</div>
-                <div style={{ fontSize: '0.72rem', color: '#475569' }}>Fires when a new document is uploaded to workspace</div>
+                <div style={{ fontSize: '0.72rem', color: '#4E566E' }}>Fires when a new document is uploaded to workspace</div>
               </div>
             </div>
 
             {/* Input Settings */}
             <div style={{ marginBottom: '1.25rem' }}>
-              <div style={{ fontSize: '0.7rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.625rem' }}>Input Settings</div>
+              <div style={{ fontSize: '0.7rem', color: '#4E566E', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.625rem' }}>Input Settings</div>
               {[
                 { label: 'Accepted Formats', value: 'PDF, DOCX, TXT' },
                 { label: 'Max File Size',    value: '50 MB' },
@@ -402,14 +402,14 @@ export default function AutomationBuilder() {
                 { label: 'OCR Engine',       value: 'Azure Form Recognizer' },
               ].map(field => (
                 <div key={field.label} style={{ marginBottom: '0.625rem' }}>
-                  <div style={{ fontSize: '0.68rem', color: '#475569', marginBottom: '3px' }}>{field.label}</div>
+                  <div style={{ fontSize: '0.68rem', color: '#4E566E', marginBottom: '3px' }}>{field.label}</div>
                   <div style={{
-                    padding: '0.375rem 0.625rem', borderRadius: '6px', fontSize: '0.78rem', color: '#94A3B8',
+                    padding: '0.375rem 0.625rem', borderRadius: '6px', fontSize: '0.78rem', color: '#8790A8',
                     background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                   }}>
                     <span>{field.value}</span>
-                    <ChevronDown size={11} style={{ color: '#475569' }} />
+                    <ChevronDown size={11} style={{ color: '#4E566E' }} />
                   </div>
                 </div>
               ))}
@@ -417,9 +417,9 @@ export default function AutomationBuilder() {
 
             {/* Workspace Scope – real workspaces from Supabase */}
             <div>
-              <div style={{ fontSize: '0.7rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.625rem' }}>Workspace Scope</div>
+              <div style={{ fontSize: '0.7rem', color: '#4E566E', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.625rem' }}>Workspace Scope</div>
               {workspaces.length === 0
-                ? <div style={{ fontSize: '0.72rem', color: '#334155' }}>Loading workspaces…</div>
+                ? <div style={{ fontSize: '0.72rem', color: '#4E566E' }}>Loading workspaces…</div>
                 : workspaces.map(ws => {
                   const checked = selectedWsIds.has(ws.id);
                   return (
@@ -434,13 +434,13 @@ export default function AutomationBuilder() {
                     >
                       <div style={{
                         width: '14px', height: '14px', borderRadius: '3px',
-                        background: checked ? 'rgba(0,212,255,0.2)' : 'rgba(255,255,255,0.05)',
-                        border: `1px solid ${checked ? 'rgba(0,212,255,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                        background: checked ? 'rgba(120,119,198,0.2)' : 'rgba(255,255,255,0.05)',
+                        border: `1px solid ${checked ? 'rgba(120,119,198,0.4)' : 'rgba(255,255,255,0.1)'}`,
                         display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                       }}>
-                        {checked && <Check size={9} style={{ color: '#00D4FF' }} />}
+                        {checked && <Check size={9} style={{ color: '#A78BFA' }} />}
                       </div>
-                      <span style={{ fontSize: '0.75rem', color: checked ? '#94A3B8' : '#475569' }}>{ws.name}</span>
+                      <span style={{ fontSize: '0.75rem', color: checked ? '#8790A8' : '#4E566E' }}>{ws.name}</span>
                     </div>
                   );
                 })
@@ -450,7 +450,7 @@ export default function AutomationBuilder() {
         </div>
 
         {/* ── Center Canvas ── */}
-        <div style={{ flex: 1, overflow: 'auto', background: '#080C18', padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div style={{ flex: 1, overflow: 'auto', background: '#07080F', padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0, minWidth: '280px' }}>
             {flowNodes.map((node, i) => (
               <div key={node.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -469,12 +469,12 @@ export default function AutomationBuilder() {
                       {node.icon}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#F1F5F9' }}>{node.label}</div>
-                      <div style={{ fontSize: '0.7rem', color: '#475569' }}>{node.description}</div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#F8FAFC' }}>{node.label}</div>
+                      <div style={{ fontSize: '0.7rem', color: '#4E566E' }}>{node.description}</div>
                     </div>
                     <div style={{
                       width: '8px', height: '8px', borderRadius: '9999px', flexShrink: 0,
-                      background: node.status === 'done' ? '#10B981' : node.status === 'active' ? node.color : node.status === 'error' ? '#EF4444' : 'rgba(255,255,255,0.15)',
+                      background: node.status === 'done' ? '#34D399' : node.status === 'active' ? node.color : node.status === 'error' ? '#FF6B6B' : 'rgba(255,255,255,0.15)',
                       boxShadow: node.status === 'active' ? `0 0 8px ${node.color}` : 'none',
                     }} />
                   </div>
@@ -482,7 +482,7 @@ export default function AutomationBuilder() {
                 {i < flowNodes.length - 1 && (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '4px 0' }}>
                     <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.1)' }} />
-                    <ChevronRight size={12} style={{ color: '#334155', transform: 'rotate(90deg)' }} />
+                    <ChevronRight size={12} style={{ color: '#4E566E', transform: 'rotate(90deg)' }} />
                   </div>
                 )}
               </div>
@@ -491,14 +491,14 @@ export default function AutomationBuilder() {
           {/* Legend */}
           <div style={{ display: 'flex', gap: '1.5rem', marginTop: '2rem', opacity: 0.7 }}>
             {[
-              { color: '#10B981', label: 'Completed' },
-              { color: '#8B5CF6', label: 'Active' },
+              { color: '#34D399', label: 'Completed' },
+              { color: '#A78BFA', label: 'Active' },
               { color: 'rgba(255,255,255,0.2)', label: 'Pending' },
-              { color: '#EF4444', label: 'Error' },
+              { color: '#FF6B6B', label: 'Error' },
             ].map(l => (
               <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
                 <div style={{ width: '8px', height: '8px', borderRadius: '9999px', background: l.color }} />
-                <span style={{ fontSize: '0.72rem', color: '#475569' }}>{l.label}</span>
+                <span style={{ fontSize: '0.72rem', color: '#4E566E' }}>{l.label}</span>
               </div>
             ))}
           </div>
@@ -507,7 +507,7 @@ export default function AutomationBuilder() {
         {/* ── Right Panel ── */}
         <div style={{
           width: '340px', minWidth: '340px', borderLeft: '1px solid rgba(255,255,255,0.05)',
-          display: 'flex', flexDirection: 'column', overflowY: 'auto', background: '#0C1220',
+          display: 'flex', flexDirection: 'column', overflowY: 'auto', background: '#0C0F1A',
         }}>
           {/* Tab Bar */}
           <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '0 0.75rem' }}>
@@ -529,7 +529,7 @@ export default function AutomationBuilder() {
             {activeTab === 'Prompt' && (
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.625rem', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#94A3B8' }}>System Prompt</span>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#8790A8' }}>System Prompt</span>
                   <button
                     className="btn-ghost"
                     style={{ padding: '0.125rem 0.5rem', fontSize: '0.68rem' }}
@@ -545,9 +545,9 @@ export default function AutomationBuilder() {
                     onChange={e => setEditablePrompt(e.target.value)}
                     style={{
                       width: '100%', minHeight: '300px', padding: '0.875rem',
-                      background: '#060C1A', border: '1px solid rgba(0,212,255,0.3)',
+                      background: '#060C1A', border: '1px solid rgba(120,119,198,0.3)',
                       borderRadius: '0.5rem', fontSize: '0.72rem',
-                      fontFamily: 'ui-monospace, monospace', color: '#94A3B8',
+                      fontFamily: 'ui-monospace, monospace', color: '#8790A8',
                       lineHeight: 1.6, resize: 'vertical', boxSizing: 'border-box',
                     }}
                   />
@@ -555,7 +555,7 @@ export default function AutomationBuilder() {
                   <div style={{
                     background: '#060C1A', border: '1px solid rgba(255,255,255,0.08)',
                     borderRadius: '0.5rem', padding: '0.875rem', fontSize: '0.72rem',
-                    fontFamily: 'ui-monospace, monospace', color: '#94A3B8',
+                    fontFamily: 'ui-monospace, monospace', color: '#8790A8',
                     lineHeight: 1.6, whiteSpace: 'pre-wrap', overflow: 'auto', maxHeight: '300px',
                   }}>
                     {editablePrompt}
@@ -564,14 +564,14 @@ export default function AutomationBuilder() {
 
                 {/* Input for Run Now */}
                 <div style={{ marginTop: '0.875rem' }}>
-                  <div style={{ fontSize: '0.7rem', color: '#475569', marginBottom: '0.375rem' }}>Input (paste document text to test)</div>
+                  <div style={{ fontSize: '0.7rem', color: '#4E566E', marginBottom: '0.375rem' }}>Input (paste document text to test)</div>
                   <textarea
                     ref={fileInputRef}
                     placeholder="Paste requirements text here to test the automation…"
                     style={{
                       width: '100%', minHeight: '80px', padding: '0.625rem 0.75rem',
                       background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
-                      borderRadius: '0.5rem', color: '#94A3B8', fontSize: '0.72rem',
+                      borderRadius: '0.5rem', color: '#8790A8', fontSize: '0.72rem',
                       fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box',
                     }}
                   />
@@ -580,7 +580,7 @@ export default function AutomationBuilder() {
                   <select style={{
                     flex: 1, padding: '0.375rem 0.625rem', borderRadius: '6px', fontSize: '0.78rem',
                     background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                    color: '#94A3B8', fontFamily: 'inherit',
+                    color: '#8790A8', fontFamily: 'inherit',
                   }}>
                     <option>GPT-4o</option>
                     <option>GPT-4 Turbo</option>
@@ -589,7 +589,7 @@ export default function AutomationBuilder() {
                   <select style={{
                     width: '80px', padding: '0.375rem 0.625rem', borderRadius: '6px', fontSize: '0.78rem',
                     background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                    color: '#94A3B8', fontFamily: 'inherit',
+                    color: '#8790A8', fontFamily: 'inherit',
                   }}>
                     <option>T: 0.3</option>
                     <option>T: 0.5</option>
@@ -602,11 +602,11 @@ export default function AutomationBuilder() {
             {/* ── SCHEMA TAB ── */}
             {activeTab === 'Schema' && (
               <div>
-                <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#94A3B8', marginBottom: '0.625rem' }}>Output Schema</div>
+                <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#8790A8', marginBottom: '0.625rem' }}>Output Schema</div>
                 <div style={{
                   background: '#060C1A', border: '1px solid rgba(255,255,255,0.08)',
                   borderRadius: '0.5rem', padding: '0.875rem', fontSize: '0.72rem',
-                  fontFamily: 'ui-monospace, monospace', color: '#94A3B8', lineHeight: 1.6,
+                  fontFamily: 'ui-monospace, monospace', color: '#8790A8', lineHeight: 1.6,
                 }}>
 {`{
   "title": "string",
@@ -631,13 +631,13 @@ export default function AutomationBuilder() {
             {/* ── DESTINATIONS TAB ── */}
             {activeTab === 'Destinations' && (
               <div>
-                <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#94A3B8', marginBottom: '0.875rem' }}>Output Destinations</div>
+                <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#8790A8', marginBottom: '0.875rem' }}>Output Destinations</div>
                 {([
-                  { key: 'saveToWorkspace', label: 'Save to Workspace',  detail: 'Creates a Document in Supabase Documents library', color: '#0EA5E9', comingSoon: false },
-                  { key: 'exportWord',      label: 'Export as Word',      detail: 'Download output as .txt (Word-compatible)',         color: '#0EA5E9', comingSoon: false },
-                  { key: 'exportPdf',       label: 'Export as PDF',       detail: 'Open browser print dialog (Save as PDF)',           color: '#8B5CF6', comingSoon: false },
-                  { key: 'sharePoint',      label: 'Sync to SharePoint',  detail: 'NCA Programme folder',                              color: '#F59E0B', comingSoon: true },
-                  { key: 'jira',            label: 'Push to Jira',        detail: 'Create requirements tickets',                       color: '#10B981', comingSoon: true },
+                  { key: 'saveToWorkspace', label: 'Save to Workspace',  detail: 'Creates a Document in Supabase Documents library', color: '#7877C6', comingSoon: false },
+                  { key: 'exportWord',      label: 'Export as Word',      detail: 'Download output as .txt (Word-compatible)',         color: '#7877C6', comingSoon: false },
+                  { key: 'exportPdf',       label: 'Export as PDF',       detail: 'Open browser print dialog (Save as PDF)',           color: '#A78BFA', comingSoon: false },
+                  { key: 'sharePoint',      label: 'Sync to SharePoint',  detail: 'NCA Programme folder',                              color: '#F5B544', comingSoon: true },
+                  { key: 'jira',            label: 'Push to Jira',        detail: 'Create requirements tickets',                       color: '#34D399', comingSoon: true },
                 ] as const).map(dest => {
                   const checked = destToggles[dest.key];
                   return (
@@ -659,16 +659,16 @@ export default function AutomationBuilder() {
                       </div>
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                          <span style={{ fontSize: '0.8rem', fontWeight: 500, color: dest.comingSoon ? '#334155' : (checked ? '#F1F5F9' : '#475569') }}>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 500, color: dest.comingSoon ? '#4E566E' : (checked ? '#F8FAFC' : '#4E566E') }}>
                             {dest.label}
                           </span>
                           {dest.comingSoon && (
-                            <span style={{ fontSize: '0.6rem', padding: '1px 5px', borderRadius: '4px', background: 'rgba(245,158,11,0.1)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}>
+                            <span style={{ fontSize: '0.6rem', padding: '1px 5px', borderRadius: '4px', background: 'rgba(245,181,68,0.1)', color: '#F5B544', border: '1px solid rgba(245,181,68,0.2)' }}>
                               Soon
                             </span>
                           )}
                         </div>
-                        <div style={{ fontSize: '0.68rem', color: '#334155' }}>{dest.detail}</div>
+                        <div style={{ fontSize: '0.68rem', color: '#4E566E' }}>{dest.detail}</div>
                       </div>
                     </div>
                   );
@@ -679,7 +679,7 @@ export default function AutomationBuilder() {
             {/* ── NOTIFICATIONS TAB ── */}
             {activeTab === 'Notifications' && (
               <div>
-                <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#94A3B8', marginBottom: '0.875rem' }}>Notification Rules</div>
+                <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#8790A8', marginBottom: '0.875rem' }}>Notification Rules</div>
                 {([
                   { key: 'emailSuccess', label: 'Email on Success', detail: 'Send to assigned consultant' },
                   { key: 'emailError',   label: 'Email on Error',   detail: 'Alert to workspace admin' },
@@ -692,21 +692,21 @@ export default function AutomationBuilder() {
                     <div key={notif.key}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.625rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                         <div>
-                          <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#94A3B8' }}>{notif.label}</div>
-                          <div style={{ fontSize: '0.68rem', color: '#334155' }}>{notif.detail}</div>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#8790A8' }}>{notif.label}</div>
+                          <div style={{ fontSize: '0.68rem', color: '#4E566E' }}>{notif.detail}</div>
                         </div>
                         <div
                           onClick={() => setNotifToggles(p => ({ ...p, [notif.key]: !p[notif.key] }))}
                           style={{
                             width: '32px', height: '18px', borderRadius: '9999px', cursor: 'pointer',
-                            background: enabled ? 'rgba(0,212,255,0.3)' : 'rgba(255,255,255,0.08)',
-                            border: `1px solid ${enabled ? 'rgba(0,212,255,0.5)' : 'rgba(255,255,255,0.12)'}`,
+                            background: enabled ? 'rgba(120,119,198,0.3)' : 'rgba(255,255,255,0.08)',
+                            border: `1px solid ${enabled ? 'rgba(120,119,198,0.5)' : 'rgba(255,255,255,0.12)'}`,
                             position: 'relative', transition: 'all 0.2s', flexShrink: 0,
                           }}
                         >
                           <div style={{
                             position: 'absolute', width: '12px', height: '12px', borderRadius: '9999px',
-                            background: enabled ? '#00D4FF' : '#475569',
+                            background: enabled ? '#A78BFA' : '#4E566E',
                             top: '2px', left: enabled ? '17px' : '2px', transition: 'left 0.2s',
                           }} />
                         </div>
@@ -714,7 +714,7 @@ export default function AutomationBuilder() {
                       {/* Slack webhook URL input */}
                       {notif.key === 'slack' && enabled && (
                         <div style={{ padding: '0.5rem 0 0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                          <div style={{ fontSize: '0.68rem', color: '#475569', marginBottom: '0.25rem' }}>Webhook URL</div>
+                          <div style={{ fontSize: '0.68rem', color: '#4E566E', marginBottom: '0.25rem' }}>Webhook URL</div>
                           <input
                             type="url"
                             placeholder="https://hooks.slack.com/services/…"
@@ -723,7 +723,7 @@ export default function AutomationBuilder() {
                             style={{
                               width: '100%', padding: '0.375rem 0.625rem', borderRadius: '6px',
                               background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-                              color: '#94A3B8', fontSize: '0.72rem', fontFamily: 'inherit', boxSizing: 'border-box',
+                              color: '#8790A8', fontSize: '0.72rem', fontFamily: 'inherit', boxSizing: 'border-box',
                             }}
                           />
                         </div>
@@ -739,7 +739,7 @@ export default function AutomationBuilder() {
               <div>
                 {/* Live run output */}
                 {(running || runOutput || runError) && (
-                  <div style={{ marginBottom: '1rem', padding: '0.875rem', borderRadius: '0.5rem', background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)' }}>
+                  <div style={{ marginBottom: '1rem', padding: '0.875rem', borderRadius: '0.5rem', background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.2)' }}>
                     <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#A78BFA', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
                       {running
                         ? <><Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> Running…</>
@@ -750,19 +750,19 @@ export default function AutomationBuilder() {
                     </div>
                     {runError && <div style={{ fontSize: '0.75rem', color: '#FCA5A5' }}>{runError}</div>}
                     {runOutput && (
-                      <pre style={{ margin: 0, fontSize: '0.72rem', color: '#CBD5E1', lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: '300px', overflowY: 'auto', fontFamily: 'inherit' }}>
+                      <pre style={{ margin: 0, fontSize: '0.72rem', color: '#C0C6D6', lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: '300px', overflowY: 'auto', fontFamily: 'inherit' }}>
                         {runOutput}
                       </pre>
                     )}
                   </div>
                 )}
 
-                <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#94A3B8', marginBottom: '0.875rem' }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#8790A8', marginBottom: '0.875rem' }}>
                   Run History {runsFromDb.length > 0 ? `(${runsFromDb.length})` : ''}
                 </div>
 
                 {runsFromDb.length === 0 ? (
-                  <div style={{ fontSize: '0.75rem', color: '#334155', padding: '1rem 0' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#4E566E', padding: '1rem 0' }}>
                     No runs recorded yet. Click Run Now to start.
                   </div>
                 ) : (
@@ -776,17 +776,17 @@ export default function AutomationBuilder() {
                       }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.375rem' }}>
                           <span style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: '3px', background: bg, color }}>{label}</span>
-                          <span style={{ fontSize: '0.7rem', color: '#334155' }}>{timeAgo(run.created_at)}</span>
+                          <span style={{ fontSize: '0.7rem', color: '#4E566E' }}>{timeAgo(run.created_at)}</span>
                         </div>
-                        <div style={{ fontSize: '0.72rem', color: '#475569', marginBottom: '2px' }}>
-                          <span style={{ color: '#94A3B8' }}>In:</span> {parseRunInput(run.options_json)}
+                        <div style={{ fontSize: '0.72rem', color: '#4E566E', marginBottom: '2px' }}>
+                          <span style={{ color: '#8790A8' }}>In:</span> {parseRunInput(run.options_json)}
                         </div>
                         {run.error_message && (
                           <div style={{ fontSize: '0.72rem', color: '#FCA5A5', marginBottom: '2px' }}>
-                            <span style={{ color: '#94A3B8' }}>Error:</span> {run.error_message.slice(0, 80)}
+                            <span style={{ color: '#8790A8' }}>Error:</span> {run.error_message.slice(0, 80)}
                           </div>
                         )}
-                        <div style={{ fontSize: '0.68rem', color: '#334155', marginTop: '2px' }}>Duration: {runDuration(run)}</div>
+                        <div style={{ fontSize: '0.68rem', color: '#4E566E', marginTop: '2px' }}>Duration: {runDuration(run)}</div>
                       </div>
                     );
                   })
@@ -803,8 +803,8 @@ export default function AutomationBuilder() {
           position: 'fixed', bottom: '2rem', right: '2rem', zIndex: 999,
           display: 'flex', alignItems: 'center', gap: '0.5rem',
           padding: '0.875rem 1.25rem', borderRadius: '10px',
-          background: toast.ok ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
-          border: `1px solid ${toast.ok ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
+          background: toast.ok ? 'rgba(52,211,153,0.15)' : 'rgba(255,107,107,0.15)',
+          border: `1px solid ${toast.ok ? 'rgba(52,211,153,0.3)' : 'rgba(255,107,107,0.3)'}`,
           color: toast.ok ? '#34D399' : '#FCA5A5',
           fontSize: '0.82rem', fontWeight: 600,
           boxShadow: '0 8px 32px rgba(0,0,0,0.4)',

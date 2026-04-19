@@ -122,10 +122,10 @@ function DropZone({
       onDragLeave={() => setDragging(false)}
       onDrop={handleDrop}
       style={{
-        border: `1.5px dashed ${dragging ? '#00D4FF' : file ? 'rgba(16,185,129,0.5)' : 'rgba(255,255,255,0.12)'}`,
+        border: `1.5px dashed ${dragging ? '#A78BFA' : file ? 'rgba(52,211,153,0.5)' : 'rgba(255,255,255,0.12)'}`,
         borderRadius: '0.625rem',
         padding: '1rem 1.25rem',
-        background: dragging ? 'rgba(0,212,255,0.05)' : file ? 'rgba(16,185,129,0.05)' : 'rgba(255,255,255,0.02)',
+        background: dragging ? 'rgba(120,119,198,0.05)' : file ? 'rgba(52,211,153,0.05)' : 'rgba(255,255,255,0.02)',
         cursor: file ? 'default' : 'pointer',
         transition: 'all 0.2s',
         display: 'flex', alignItems: 'center', gap: '0.75rem',
@@ -135,26 +135,26 @@ function DropZone({
         onChange={e => { const f = e.target.files?.[0]; if (f) onFile(wrap(f)); }} />
       {file ? (
         <>
-          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <FileText size={16} style={{ color: '#34D399' }} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#F1F5F9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{file.name}</div>
-            <div style={{ fontSize: '0.68rem', color: '#475569' }}>{(file.size / 1024).toFixed(1)} KB · {label}</div>
+            <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#F8FAFC', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{file.name}</div>
+            <div style={{ fontSize: '0.68rem', color: '#4E566E' }}>{(file.size / 1024).toFixed(1)} KB · {label}</div>
           </div>
           <button onClick={e => { e.stopPropagation(); onClear(); }}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', display: 'flex', padding: '0.25rem' }}>
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4E566E', display: 'flex', padding: '0.25rem' }}>
             <X size={14} />
           </button>
         </>
       ) : (
         <>
           <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Upload size={16} style={{ color: '#475569' }} />
+            <Upload size={16} style={{ color: '#4E566E' }} />
           </div>
           <div>
-            <div style={{ fontSize: '0.82rem', color: '#94A3B8' }}>{label}</div>
-            <div style={{ fontSize: '0.68rem', color: '#475569' }}>PDF, DOCX, TXT, MD · Drag & drop or click</div>
+            <div style={{ fontSize: '0.82rem', color: '#8790A8' }}>{label}</div>
+            <div style={{ fontSize: '0.68rem', color: '#4E566E' }}>PDF, DOCX, TXT, MD · Drag & drop or click</div>
           </div>
         </>
       )}
@@ -164,13 +164,13 @@ function DropZone({
 
 function ScoreBadge({ score, label }: { score: number; label: string }) {
   const pct = Math.round(score * 100);
-  const color = pct >= 85 ? '#10B981' : pct >= 65 ? '#F59E0B' : '#EF4444';
+  const color = pct >= 85 ? '#34D399' : pct >= 65 ? '#F5B544' : '#FF6B6B';
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.375rem' }}>
       <div style={{ width: 52, height: 52, borderRadius: '50%', border: `3px solid ${color}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <span style={{ fontSize: '0.85rem', fontWeight: 700, color }}>{pct}%</span>
       </div>
-      <span style={{ fontSize: '0.65rem', color: '#475569', textAlign: 'center' }}>{label}</span>
+      <span style={{ fontSize: '0.65rem', color: '#4E566E', textAlign: 'center' }}>{label}</span>
     </div>
   );
 }
@@ -415,24 +415,24 @@ export default function BrdRunPage() {
       <div style={{ padding: '1.5rem', maxWidth: 820, margin: '0 auto' }}>
         {/* Back */}
         <button onClick={() => navigate('/automations')}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8rem', fontFamily: 'inherit', marginBottom: '1.25rem' }}>
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4E566E', display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8rem', fontFamily: 'inherit', marginBottom: '1.25rem' }}>
           <ArrowLeft size={14} /> Automations
         </button>
 
         {/* Header */}
         <div style={{ marginBottom: '1.75rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(0,212,255,0.1)', border: '1px solid rgba(0,212,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>📋</div>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(120,119,198,0.1)', border: '1px solid rgba(120,119,198,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>📋</div>
             <div>
-              <h1 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#F1F5F9', margin: 0 }}>BRD Generator from Requirements</h1>
-              <p style={{ fontSize: '0.75rem', color: '#475569', margin: 0 }}>BA & Requirements · Powered by n8n + Claude</p>
+              <h1 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#F8FAFC', margin: 0 }}>BRD Generator from Requirements</h1>
+              <p style={{ fontSize: '0.75rem', color: '#4E566E', margin: 0 }}>BA & Requirements · Powered by n8n + Claude</p>
             </div>
           </div>
         </div>
 
         {/* Error banner */}
         {startError && (
-          <div style={{ padding: '0.875rem 1rem', borderRadius: '0.625rem', background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)', marginBottom: '1.25rem' }}>
+          <div style={{ padding: '0.875rem 1rem', borderRadius: '0.625rem', background: 'rgba(255,107,107,0.07)', border: '1px solid rgba(255,107,107,0.2)', marginBottom: '1.25rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
               <AlertCircle size={13} style={{ color: '#FCA5A5' }} />
               <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#FCA5A5' }}>Failed to start run</span>
@@ -446,7 +446,7 @@ export default function BrdRunPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             {/* Upload BRD */}
             <div className="section-card" style={{ padding: '1.125rem' }}>
-              <div style={{ fontSize: '0.72rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.75rem', fontWeight: 600 }}>Source BRD / Requirements</div>
+              <div style={{ fontSize: '0.72rem', color: '#4E566E', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.75rem', fontWeight: 600 }}>Source BRD / Requirements</div>
               <DropZone label="Upload BRD or requirements document" accept=".pdf,.docx,.doc,.txt,.md"
                 file={brdFile} onFile={setBrdFile} onClear={() => setBrdFile(null)} />
             </div>
@@ -454,15 +454,15 @@ export default function BrdRunPage() {
             {/* Sample Documents */}
             <div className="section-card" style={{ padding: '1.125rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                <div style={{ fontSize: '0.72rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>Sample / Reference Documents</div>
-                <span style={{ fontSize: '0.65rem', color: '#475569' }}>Optional</span>
+                <div style={{ fontSize: '0.72rem', color: '#4E566E', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>Sample / Reference Documents</div>
+                <span style={{ fontSize: '0.65rem', color: '#4E566E' }}>Optional</span>
               </div>
               {sampleFiles.map((f, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.75rem', borderRadius: 6, background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.15)', marginBottom: '0.5rem' }}>
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.75rem', borderRadius: 6, background: 'rgba(167,139,250,0.05)', border: '1px solid rgba(167,139,250,0.15)', marginBottom: '0.5rem' }}>
                   <FileText size={13} style={{ color: '#A78BFA', flexShrink: 0 }} />
-                  <span style={{ fontSize: '0.78rem', color: '#94A3B8', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                  <span style={{ fontSize: '0.78rem', color: '#8790A8', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
                   <button onClick={() => setSampleFiles(prev => prev.filter((_, j) => j !== i))}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569' }}><X size={12} /></button>
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4E566E' }}><X size={12} /></button>
                 </div>
               ))}
               <DropZone label="Add sample BRD for blueprint alignment" accept=".pdf,.docx,.doc,.txt,.md"
@@ -476,28 +476,28 @@ export default function BrdRunPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             {/* Prompt Template */}
             <div className="section-card" style={{ padding: '1.125rem' }}>
-              <div style={{ fontSize: '0.72rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.75rem', fontWeight: 600 }}>Prompt Template</div>
+              <div style={{ fontSize: '0.72rem', color: '#4E566E', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.75rem', fontWeight: 600 }}>Prompt Template</div>
               {PROMPT_TEMPLATES.map(t => (
                 <div key={t.id} onClick={() => setSelectedTemplate(t.id)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', padding: '0.625rem 0.75rem', borderRadius: 6, background: selectedTemplate === t.id ? 'rgba(0,212,255,0.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${selectedTemplate === t.id ? 'rgba(0,212,255,0.3)' : 'rgba(255,255,255,0.06)'}`, cursor: 'pointer', marginBottom: '0.375rem', transition: 'all 0.15s' }}>
-                  <div style={{ width: 14, height: 14, borderRadius: '50%', background: selectedTemplate === t.id ? 'rgba(0,212,255,0.3)' : 'transparent', border: `2px solid ${selectedTemplate === t.id ? '#00D4FF' : '#334155'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    {selectedTemplate === t.id && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#00D4FF' }} />}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', padding: '0.625rem 0.75rem', borderRadius: 6, background: selectedTemplate === t.id ? 'rgba(120,119,198,0.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${selectedTemplate === t.id ? 'rgba(120,119,198,0.3)' : 'rgba(255,255,255,0.06)'}`, cursor: 'pointer', marginBottom: '0.375rem', transition: 'all 0.15s' }}>
+                  <div style={{ width: 14, height: 14, borderRadius: '50%', background: selectedTemplate === t.id ? 'rgba(120,119,198,0.3)' : 'transparent', border: `2px solid ${selectedTemplate === t.id ? '#A78BFA' : '#4E566E'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {selectedTemplate === t.id && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#A78BFA' }} />}
                   </div>
-                  <span style={{ fontSize: '0.8rem', color: selectedTemplate === t.id ? '#F1F5F9' : '#94A3B8', flex: 1 }}>{t.name}</span>
-                  <span style={{ fontSize: '0.6rem', padding: '1px 5px', borderRadius: 3, background: 'rgba(0,212,255,0.1)', color: '#00D4FF', border: '1px solid rgba(0,212,255,0.2)' }}>{t.badge}</span>
+                  <span style={{ fontSize: '0.8rem', color: selectedTemplate === t.id ? '#F8FAFC' : '#8790A8', flex: 1 }}>{t.name}</span>
+                  <span style={{ fontSize: '0.6rem', padding: '1px 5px', borderRadius: 3, background: 'rgba(120,119,198,0.1)', color: '#A78BFA', border: '1px solid rgba(120,119,198,0.2)' }}>{t.badge}</span>
                 </div>
               ))}
             </div>
 
             {/* Options */}
             <div className="section-card" style={{ padding: '1.125rem' }}>
-              <div style={{ fontSize: '0.72rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.75rem', fontWeight: 600 }}>Output Options</div>
+              <div style={{ fontSize: '0.72rem', color: '#4E566E', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.75rem', fontWeight: 600 }}>Output Options</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.75rem' }}>
                 {/* Language */}
                 <div>
-                  <div style={{ fontSize: '0.68rem', color: '#475569', marginBottom: '3px' }}>Language</div>
+                  <div style={{ fontSize: '0.68rem', color: '#4E566E', marginBottom: '3px' }}>Language</div>
                   <select value={language} onChange={e => setLanguage(e.target.value as typeof language)}
-                    style={{ width: '100%', padding: '0.375rem 0.5rem', borderRadius: 6, fontSize: '0.78rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#94A3B8', fontFamily: 'inherit' }}>
+                    style={{ width: '100%', padding: '0.375rem 0.5rem', borderRadius: 6, fontSize: '0.78rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#8790A8', fontFamily: 'inherit' }}>
                     <option value="en">English</option>
                     <option value="ar">Arabic</option>
                     <option value="bilingual">Bilingual</option>
@@ -505,9 +505,9 @@ export default function BrdRunPage() {
                 </div>
                 {/* Format */}
                 <div>
-                  <div style={{ fontSize: '0.68rem', color: '#475569', marginBottom: '3px' }}>Output Format</div>
+                  <div style={{ fontSize: '0.68rem', color: '#4E566E', marginBottom: '3px' }}>Output Format</div>
                   <select value={outputFormat} onChange={e => setOutputFormat(e.target.value as typeof outputFormat)}
-                    style={{ width: '100%', padding: '0.375rem 0.5rem', borderRadius: 6, fontSize: '0.78rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#94A3B8', fontFamily: 'inherit' }}>
+                    style={{ width: '100%', padding: '0.375rem 0.5rem', borderRadius: 6, fontSize: '0.78rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#8790A8', fontFamily: 'inherit' }}>
                     <option value="both">DOCX + PDF</option>
                     <option value="docx">DOCX only</option>
                     <option value="pdf">PDF only</option>
@@ -522,12 +522,12 @@ export default function BrdRunPage() {
               ].map(item => (
                 <div key={item.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
                   <div>
-                    <div style={{ fontSize: '0.8rem', color: '#94A3B8' }}>{item.label}</div>
-                    <div style={{ fontSize: '0.68rem', color: '#334155' }}>{item.sublabel}</div>
+                    <div style={{ fontSize: '0.8rem', color: '#8790A8' }}>{item.label}</div>
+                    <div style={{ fontSize: '0.68rem', color: '#4E566E' }}>{item.sublabel}</div>
                   </div>
                   <div onClick={() => item.set(!item.value)}
-                    style={{ width: 32, height: 18, borderRadius: 9999, background: item.value ? 'rgba(0,212,255,0.3)' : 'rgba(255,255,255,0.08)', border: `1px solid ${item.value ? 'rgba(0,212,255,0.5)' : 'rgba(255,255,255,0.12)'}`, cursor: 'pointer', position: 'relative', flexShrink: 0 }}>
-                    <div style={{ position: 'absolute', width: 12, height: 12, borderRadius: '50%', background: item.value ? '#00D4FF' : '#475569', top: 2, left: item.value ? 17 : 2, transition: 'left 0.2s' }} />
+                    style={{ width: 32, height: 18, borderRadius: 9999, background: item.value ? 'rgba(120,119,198,0.3)' : 'rgba(255,255,255,0.08)', border: `1px solid ${item.value ? 'rgba(120,119,198,0.5)' : 'rgba(255,255,255,0.12)'}`, cursor: 'pointer', position: 'relative', flexShrink: 0 }}>
+                    <div style={{ position: 'absolute', width: 12, height: 12, borderRadius: '50%', background: item.value ? '#A78BFA' : '#4E566E', top: 2, left: item.value ? 17 : 2, transition: 'left 0.2s' }} />
                   </div>
                 </div>
               ))}
@@ -535,9 +535,9 @@ export default function BrdRunPage() {
 
             {/* Notes */}
             <div className="section-card" style={{ padding: '1.125rem' }}>
-              <div style={{ fontSize: '0.72rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.5rem', fontWeight: 600 }}>Special Instructions</div>
+              <div style={{ fontSize: '0.72rem', color: '#4E566E', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.5rem', fontWeight: 600 }}>Special Instructions</div>
               <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any specific requirements, focus areas, or constraints for the LLM..."
-                style={{ width: '100%', minHeight: 70, padding: '0.625rem 0.75rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, color: '#94A3B8', fontSize: '0.78rem', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }} />
+                style={{ width: '100%', minHeight: 70, padding: '0.625rem 0.75rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, color: '#8790A8', fontSize: '0.78rem', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }} />
             </div>
           </div>
         </div>
@@ -566,13 +566,13 @@ export default function BrdRunPage() {
       <div style={{ padding: '1.5rem', maxWidth: 700, margin: '0 auto' }}>
         {/* Header */}
         <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
-          <div style={{ fontSize: '0.78rem', color: '#475569', marginBottom: '0.5rem' }}>Run ID: <span style={{ color: '#94A3B8', fontFamily: 'monospace' }}>{run.runId}</span></div>
-          <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#F1F5F9', margin: '0 0 0.375rem' }}>
+          <div style={{ fontSize: '0.78rem', color: '#4E566E', marginBottom: '0.5rem' }}>Run ID: <span style={{ color: '#8790A8', fontFamily: 'monospace' }}>{run.runId}</span></div>
+          <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#F8FAFC', margin: '0 0 0.375rem' }}>
             {run.status === 'completed' ? 'BRD Generated Successfully' :
               isFailed ? 'Run Needs Review' :
                 'Generating BRD...'}
           </h2>
-          <p style={{ fontSize: '0.8rem', color: '#475569', margin: 0 }}>
+          <p style={{ fontSize: '0.8rem', color: '#4E566E', margin: 0 }}>
             {run.status === 'completed' ? `${run.sectionsGenerated} sections · Powered by n8n + Claude` :
               isFailed ? 'The document did not pass quality checks' :
                 'n8n pipeline is processing your document'}
@@ -581,7 +581,7 @@ export default function BrdRunPage() {
 
         {/* Progress bar */}
         <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.05)', marginBottom: '2rem', overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${progressPct}%`, background: isFailed ? '#EF4444' : 'linear-gradient(90deg, #00D4FF, #8B5CF6)', borderRadius: 2, transition: 'width 0.8s ease' }} />
+          <div style={{ height: '100%', width: `${progressPct}%`, background: isFailed ? '#FF6B6B' : 'linear-gradient(90deg, #A78BFA, #A78BFA)', borderRadius: 2, transition: 'width 0.8s ease' }} />
         </div>
 
         {/* Pipeline stages */}
@@ -596,24 +596,24 @@ export default function BrdRunPage() {
               <div key={stage.id} style={{
                 display: 'flex', alignItems: 'center', gap: '0.875rem',
                 padding: '0.75rem 1rem', borderRadius: '0.625rem',
-                background: isActive ? 'rgba(139,92,246,0.08)' : isDone ? 'rgba(16,185,129,0.05)' : 'rgba(255,255,255,0.02)',
-                border: `1px solid ${isActive ? 'rgba(139,92,246,0.3)' : isDone ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.05)'}`,
+                background: isActive ? 'rgba(167,139,250,0.08)' : isDone ? 'rgba(52,211,153,0.05)' : 'rgba(255,255,255,0.02)',
+                border: `1px solid ${isActive ? 'rgba(167,139,250,0.3)' : isDone ? 'rgba(52,211,153,0.2)' : 'rgba(255,255,255,0.05)'}`,
                 transition: 'all 0.3s',
               }}>
                 {/* Stage icon */}
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: isActive ? 'rgba(139,92,246,0.15)' : isDone ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem', flexShrink: 0 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: isActive ? 'rgba(167,139,250,0.15)' : isDone ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem', flexShrink: 0 }}>
                   {isDone ? <CheckCircle size={14} style={{ color: '#34D399' }} /> :
                     isActive && !isError ? <Loader size={14} style={{ color: '#A78BFA', animation: 'spin 1s linear infinite' }} /> :
                       isError ? <AlertCircle size={14} style={{ color: '#FCA5A5' }} /> :
-                        <span style={{ display: 'flex', color: '#475569' }}>{stage.icon}</span>}
+                        <span style={{ display: 'flex', color: '#4E566E' }}>{stage.icon}</span>}
                 </div>
 
                 {/* Label */}
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '0.82rem', fontWeight: isActive ? 700 : 500, color: isDone ? '#34D399' : isActive ? '#F1F5F9' : '#475569' }}>
+                  <div style={{ fontSize: '0.82rem', fontWeight: isActive ? 700 : 500, color: isDone ? '#34D399' : isActive ? '#F8FAFC' : '#4E566E' }}>
                     {stage.label}
                   </div>
-                  <div style={{ fontSize: '0.67rem', color: '#334155' }}>{stage.wf}</div>
+                  <div style={{ fontSize: '0.67rem', color: '#4E566E' }}>{stage.wf}</div>
                 </div>
 
                 {/* Section counter for generating stage */}
@@ -624,7 +624,7 @@ export default function BrdRunPage() {
                 )}
 
                 {/* Status dot */}
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: isDone ? '#10B981' : isActive ? '#8B5CF6' : 'rgba(255,255,255,0.1)', boxShadow: isActive ? '0 0 6px rgba(139,92,246,0.8)' : 'none' }} />
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: isDone ? '#34D399' : isActive ? '#A78BFA' : 'rgba(255,255,255,0.1)', boxShadow: isActive ? '0 0 6px rgba(167,139,250,0.8)' : 'none' }} />
               </div>
             );
           })}
@@ -632,10 +632,10 @@ export default function BrdRunPage() {
 
         {/* Warnings */}
         {run.warnings.length > 0 && (
-          <div style={{ padding: '0.875rem 1rem', borderRadius: '0.625rem', background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)', marginBottom: '1.25rem' }}>
+          <div style={{ padding: '0.875rem 1rem', borderRadius: '0.625rem', background: 'rgba(245,181,68,0.07)', border: '1px solid rgba(245,181,68,0.2)', marginBottom: '1.25rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.375rem' }}>
-              <AlertCircle size={13} style={{ color: '#FCD34D' }} />
-              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#FCD34D' }}>Warnings</span>
+              <AlertCircle size={13} style={{ color: '#FDCE78' }} />
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#FDCE78' }}>Warnings</span>
             </div>
             {run.warnings.map((w, i) => <div key={i} style={{ fontSize: '0.73rem', color: '#D97706' }}>· {w}</div>)}
           </div>
@@ -680,15 +680,15 @@ export default function BrdRunPage() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 60px)', overflow: 'hidden' }}>
         {/* Header */}
-        <div style={{ padding: '0.875rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)', background: '#0C1220', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <div style={{ padding: '0.875rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)', background: '#0C0F1A', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <button onClick={() => navigate('/automations')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8rem', fontFamily: 'inherit' }}>
+            <button onClick={() => navigate('/automations')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4E566E', display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8rem', fontFamily: 'inherit' }}>
               <ArrowLeft size={14} /> Automations
             </button>
             <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.08)' }} />
             <div>
-              <h2 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#F1F5F9', margin: 0 }}>BRD Generated · {brdFile?.name}</h2>
-              <p style={{ fontSize: '0.68rem', color: '#475569', margin: 0 }}>Run {run.runId} · {CANONICAL_SECTIONS.length} sections · n8n + Claude</p>
+              <h2 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#F8FAFC', margin: 0 }}>BRD Generated · {brdFile?.name}</h2>
+              <p style={{ fontSize: '0.68rem', color: '#4E566E', margin: 0 }}>Run {run.runId} · {CANONICAL_SECTIONS.length} sections · n8n + Claude</p>
             </div>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -701,7 +701,7 @@ export default function BrdRunPage() {
         </div>
 
         {/* Tab bar */}
-        <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '0 1.5rem', background: '#0C1220', flexShrink: 0 }}>
+        <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '0 1.5rem', background: '#0C0F1A', flexShrink: 0 }}>
           {tabs.map(tab => (
             <button key={tab.id} className={`tab-underline ${outputTab === tab.id ? 'active' : ''}`}
               onClick={() => setOutputTab(tab.id)}
@@ -718,18 +718,18 @@ export default function BrdRunPage() {
           {outputTab === 'preview' && (
             <div>
               <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '0.78rem', color: '#475569' }}>{CANONICAL_SECTIONS.length} sections generated · {Math.round((run.qualityScore || 0.85) * 100)}% quality score</span>
+                <span style={{ fontSize: '0.78rem', color: '#4E566E' }}>{CANONICAL_SECTIONS.length} sections generated · {Math.round((run.qualityScore || 0.85) * 100)}% quality score</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: '1.25rem' }}>
                 {/* TOC */}
                 <div className="section-card" style={{ padding: '1rem', alignSelf: 'start', position: 'sticky', top: 0 }}>
-                  <div style={{ fontSize: '0.7rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.75rem', fontWeight: 600 }}>Table of Contents</div>
+                  <div style={{ fontSize: '0.7rem', color: '#4E566E', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.75rem', fontWeight: 600 }}>Table of Contents</div>
                   {CANONICAL_SECTIONS.map((s, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.3rem 0.375rem', borderRadius: 4, cursor: 'pointer', marginBottom: 1 }}
                       onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                      <span style={{ fontSize: '0.62rem', color: '#334155', minWidth: 16 }}>{i + 1}.</span>
-                      <span style={{ fontSize: '0.72rem', color: '#64748B' }}>{s}</span>
+                      <span style={{ fontSize: '0.62rem', color: '#4E566E', minWidth: 16 }}>{i + 1}.</span>
+                      <span style={{ fontSize: '0.72rem', color: '#8790A8' }}>{s}</span>
                     </div>
                   ))}
                 </div>
@@ -742,9 +742,9 @@ export default function BrdRunPage() {
                     return (
                       <div key={i} className="section-card" style={{ padding: '1.125rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                          <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#F1F5F9', margin: 0 }}>{section.section_name}</h3>
+                          <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#F8FAFC', margin: 0 }}>{section.section_name}</h3>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <span style={{ fontSize: '0.65rem', color: '#34D399', background: 'rgba(16,185,129,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid rgba(16,185,129,0.15)' }}>
+                            <span style={{ fontSize: '0.65rem', color: '#34D399', background: 'rgba(52,211,153,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid rgba(52,211,153,0.15)' }}>
                               {Math.round(confidence * 100)}% conf.
                             </span>
                             <button className="btn-ghost" style={{ height: 24, padding: '0 0.5rem', fontSize: '0.65rem' }}
@@ -753,11 +753,11 @@ export default function BrdRunPage() {
                             </button>
                           </div>
                         </div>
-                        <div style={{ fontSize: '0.8rem', color: '#64748B', lineHeight: 1.7 }}>
+                        <div style={{ fontSize: '0.8rem', color: '#8790A8', lineHeight: 1.7 }}>
                           {hasContent ? (
                             <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{section.content}</p>
                           ) : (
-                            <em style={{ color: '#334155', fontSize: '0.73rem' }}>
+                            <em style={{ color: '#4E566E', fontSize: '0.73rem' }}>
                               [Generated content for "{section.section_name}" will appear here after the n8n pipeline runs. Content is stored in <code>automation_run_sections</code> in Supabase and fetched via WF09.]
                             </em>
                           )}
@@ -774,10 +774,10 @@ export default function BrdRunPage() {
           {outputTab === 'compare' && (
             <div>
               {sampleFiles.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '3rem', color: '#334155' }}>
+                <div style={{ textAlign: 'center', padding: '3rem', color: '#4E566E' }}>
                   <GitCompare size={32} style={{ marginBottom: '0.75rem', opacity: 0.3 }} />
-                  <div style={{ fontSize: '0.875rem', color: '#475569' }}>No sample documents were provided</div>
-                  <div style={{ fontSize: '0.78rem', color: '#334155', marginTop: '0.375rem' }}>Run again with sample documents to enable comparison</div>
+                  <div style={{ fontSize: '0.875rem', color: '#4E566E' }}>No sample documents were provided</div>
+                  <div style={{ fontSize: '0.78rem', color: '#4E566E', marginTop: '0.375rem' }}>Run again with sample documents to enable comparison</div>
                 </div>
               ) : (
                 <div style={{ maxWidth: 700 }}>
@@ -790,27 +790,27 @@ export default function BrdRunPage() {
                       { label: 'Remaining Gaps', value: run.comparison.remainingGaps.length, isCount: true, danger: true },
                     ].map(m => (
                       <div key={m.label} className="metric-card">
-                        <div style={{ fontSize: '1.25rem', fontWeight: 900, color: m.danger && (m.value as number) > 0 ? '#FCA5A5' : '#F1F5F9', letterSpacing: '-0.02em' }}>
+                        <div style={{ fontSize: '1.25rem', fontWeight: 900, color: m.danger && (m.value as number) > 0 ? '#FCA5A5' : '#F8FAFC', letterSpacing: '-0.02em' }}>
                           {m.isCount ? m.value : `${Math.round((m.value as number) * 100)}%`}
                         </div>
-                        <div style={{ fontSize: '0.68rem', color: '#475569', marginTop: 2 }}>{m.label}</div>
+                        <div style={{ fontSize: '0.68rem', color: '#4E566E', marginTop: 2 }}>{m.label}</div>
                       </div>
                     ))}
                   </div>
 
                   {/* Section coverage table */}
                   <div className="section-card" style={{ padding: '1.125rem' }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8', marginBottom: '0.875rem' }}>Section Coverage vs Sample Blueprint</div>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#8790A8', marginBottom: '0.875rem' }}>Section Coverage vs Sample Blueprint</div>
                     {CANONICAL_SECTIONS.map((s, i) => {
                       const covered = i < CANONICAL_SECTIONS.length - 1;
                       const wasGap = i === 7 || i === 11;
                       return (
                         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.4rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                          <div style={{ width: 16, height: 16, borderRadius: '50%', background: covered ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)', border: `1px solid ${covered ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <div style={{ width: 16, height: 16, borderRadius: '50%', background: covered ? 'rgba(52,211,153,0.15)' : 'rgba(255,107,107,0.15)', border: `1px solid ${covered ? 'rgba(52,211,153,0.4)' : 'rgba(255,107,107,0.4)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                             {covered ? <CheckCircle size={9} style={{ color: '#34D399' }} /> : <X size={9} style={{ color: '#FCA5A5' }} />}
                           </div>
-                          <span style={{ fontSize: '0.78rem', color: '#64748B', flex: 1 }}>{s}</span>
-                          {wasGap && <span style={{ fontSize: '0.62rem', color: '#34D399', background: 'rgba(16,185,129,0.08)', padding: '1px 5px', borderRadius: 3 }}>Added from sample</span>}
+                          <span style={{ fontSize: '0.78rem', color: '#8790A8', flex: 1 }}>{s}</span>
+                          {wasGap && <span style={{ fontSize: '0.62rem', color: '#34D399', background: 'rgba(52,211,153,0.08)', padding: '1px 5px', borderRadius: 3 }}>Added from sample</span>}
                         </div>
                       );
                     })}
@@ -828,12 +828,12 @@ export default function BrdRunPage() {
                   { label: 'Quality Score', value: `${Math.round((run.qualityScore || 0.85) * 100)}%`, color: '#34D399' },
                   { label: 'Consistency', value: '88%', color: '#34D399' },
                   { label: 'Unsupported Claims', value: '0', color: '#34D399' },
-                  { label: 'Open Questions', value: '4', color: '#FCD34D' },
+                  { label: 'Open Questions', value: '4', color: '#FDCE78' },
                 ].map(m => (
                   <div key={m.label} className="metric-card" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <div>
                       <div style={{ fontSize: '1.25rem', fontWeight: 900, color: m.color, letterSpacing: '-0.02em' }}>{m.value}</div>
-                      <div style={{ fontSize: '0.68rem', color: '#475569' }}>{m.label}</div>
+                      <div style={{ fontSize: '0.68rem', color: '#4E566E' }}>{m.label}</div>
                     </div>
                   </div>
                 ))}
@@ -843,7 +843,7 @@ export default function BrdRunPage() {
                 <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#34D399', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <CheckCircle size={13} /> QA Summary
                 </div>
-                <p style={{ fontSize: '0.8rem', color: '#64748B', lineHeight: 1.6, margin: 0 }}>
+                <p style={{ fontSize: '0.8rem', color: '#8790A8', lineHeight: 1.6, margin: 0 }}>
                   BRD meets enterprise quality standards. All {CANONICAL_SECTIONS.length} sections generated with high confidence.
                   No hallucinated facts detected. {sampleFiles.length > 0 ? 'Sample blueprint alignment confirmed.' : 'No sample provided — default template applied.'}
                   {' '}4 open questions flagged for client review.
@@ -851,7 +851,7 @@ export default function BrdRunPage() {
               </div>
 
               <div className="section-card" style={{ padding: '1.125rem' }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#FCD34D', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#FDCE78', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <AlertCircle size={13} /> Open Questions for Client Review
                 </div>
                 {[
@@ -861,7 +861,7 @@ export default function BrdRunPage() {
                   'Performance SLA for peak load scenarios not specified in source',
                 ].map((q, i) => (
                   <div key={i} style={{ display: 'flex', gap: '0.5rem', padding: '0.4rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '0.78rem', color: '#D97706' }}>
-                    <span style={{ color: '#475569', fontSize: '0.7rem', minWidth: 18 }}>Q{i + 1}.</span>
+                    <span style={{ color: '#4E566E', fontSize: '0.7rem', minWidth: 18 }}>Q{i + 1}.</span>
                     {q}
                   </div>
                 ))}
@@ -874,10 +874,10 @@ export default function BrdRunPage() {
             <div style={{ maxWidth: 520 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {[
-                  { label: 'BRD Document (Word)', sublabel: 'Branded .docx with TOC, title page, tables', icon: <FileText size={18} />, color: '#0EA5E9', url: run.outputs.docxUrl },
-                  { label: 'BRD Document (PDF)', sublabel: 'Print-ready PDF with Consultant OS branding', icon: <Download size={18} />, color: '#8B5CF6', url: run.outputs.pdfUrl },
-                  { label: 'HTML Preview', sublabel: 'Web-based interactive preview', icon: <Globe size={18} />, color: '#10B981', url: run.outputs.previewUrl },
-                  { label: 'BRD Model (JSON)', sublabel: 'Structured semantic model — for integrations', icon: <Code2 size={18} />, color: '#F59E0B', url: undefined },
+                  { label: 'BRD Document (Word)', sublabel: 'Branded .docx with TOC, title page, tables', icon: <FileText size={18} />, color: '#7877C6', url: run.outputs.docxUrl },
+                  { label: 'BRD Document (PDF)', sublabel: 'Print-ready PDF with Consultant OS branding', icon: <Download size={18} />, color: '#A78BFA', url: run.outputs.pdfUrl },
+                  { label: 'HTML Preview', sublabel: 'Web-based interactive preview', icon: <Globe size={18} />, color: '#34D399', url: run.outputs.previewUrl },
+                  { label: 'BRD Model (JSON)', sublabel: 'Structured semantic model — for integrations', icon: <Code2 size={18} />, color: '#F5B544', url: undefined },
                 ].map(item => (
                   <div key={item.label} className="section-card"
                     style={{ padding: '1rem 1.125rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -885,8 +885,8 @@ export default function BrdRunPage() {
                       {item.icon}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>{item.label}</div>
-                      <div style={{ fontSize: '0.72rem', color: '#475569' }}>{item.sublabel}</div>
+                      <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F8FAFC' }}>{item.label}</div>
+                      <div style={{ fontSize: '0.72rem', color: '#4E566E' }}>{item.sublabel}</div>
                     </div>
                     <a href={item.url ?? '#'} download={!!item.url}
                       style={{ pointerEvents: item.url ? 'auto' : 'none', opacity: item.url ? 1 : 0.4, textDecoration: 'none' }}>
@@ -903,20 +903,20 @@ export default function BrdRunPage() {
           {/* Regenerate */}
           {outputTab === 'regenerate' && (
             <div style={{ maxWidth: 600 }}>
-              <div style={{ fontSize: '0.8rem', color: '#475569', marginBottom: '1.25rem' }}>
+              <div style={{ fontSize: '0.8rem', color: '#4E566E', marginBottom: '1.25rem' }}>
                 Select a section to regenerate independently. The pipeline will re-run only WF07 for the selected section with updated instructions.
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {CANONICAL_SECTIONS.map(s => (
                   <div key={s} style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem',
-                    borderRadius: '0.625rem', background: regeneratingSection === s ? 'rgba(139,92,246,0.08)' : 'rgba(255,255,255,0.02)',
-                    border: `1px solid ${regeneratingSection === s ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.05)'}`,
+                    borderRadius: '0.625rem', background: regeneratingSection === s ? 'rgba(167,139,250,0.08)' : 'rgba(255,255,255,0.02)',
+                    border: `1px solid ${regeneratingSection === s ? 'rgba(167,139,250,0.3)' : 'rgba(255,255,255,0.05)'}`,
                     cursor: 'pointer', transition: 'all 0.15s',
                   }} onClick={() => setRegeneratingSection(regeneratingSection === s ? null : s)}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: regeneratingSection === s ? '#8B5CF6' : '#334155' }} />
-                      <span style={{ fontSize: '0.82rem', color: regeneratingSection === s ? '#F1F5F9' : '#94A3B8' }}>{s}</span>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: regeneratingSection === s ? '#A78BFA' : '#4E566E' }} />
+                      <span style={{ fontSize: '0.82rem', color: regeneratingSection === s ? '#F8FAFC' : '#8790A8' }}>{s}</span>
                     </div>
                     {regeneratingSection === s && (
                       <button className="btn-primary" style={{ height: 28, fontSize: '0.72rem', padding: '0 0.75rem' }}>

@@ -23,7 +23,7 @@ function isOverdue(dueDate: string): boolean {
 
 const LABEL_COLORS: Record<string, { bg: string; color: string; border: string }> = {
   automation: { bg: 'rgba(99,102,241,0.15)', color: '#818CF8', border: 'rgba(99,102,241,0.3)' },
-  default:    { bg: 'rgba(148,163,184,0.1)',  color: '#94A3B8', border: 'rgba(148,163,184,0.2)' },
+  default:    { bg: 'rgba(148,163,184,0.1)',  color: '#8790A8', border: 'rgba(148,163,184,0.2)' },
 };
 
 function LabelBadge({ name }: { name: string }) {
@@ -79,7 +79,7 @@ function TrelloCardItem({ card }: { card: BACard }) {
           target="_blank"
           rel="noopener noreferrer"
           title="Open in Trello"
-          style={{ color: '#475569', flexShrink: 0, marginTop: '2px' }}
+          style={{ color: '#4E566E', flexShrink: 0, marginTop: '2px' }}
           onClick={e => e.stopPropagation()}
         >
           <ExternalLink size={14} />
@@ -89,7 +89,7 @@ function TrelloCardItem({ card }: { card: BACard }) {
       {/* Description */}
       {card.desc && (
         <p style={{
-          margin: 0, fontSize: '0.75rem', color: '#64748B',
+          margin: 0, fontSize: '0.75rem', color: '#8790A8',
           lineHeight: 1.5, display: '-webkit-box',
           WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
         }}>
@@ -107,7 +107,7 @@ function TrelloCardItem({ card }: { card: BACard }) {
       {/* Meta row */}
       <div style={{
         display: 'flex', flexWrap: 'wrap', gap: '0.75rem',
-        fontSize: '0.7rem', color: '#475569',
+        fontSize: '0.7rem', color: '#4E566E',
         borderTop: '1px solid rgba(255,255,255,0.05)',
         paddingTop: '0.5rem', marginTop: 'auto',
       }}>
@@ -121,7 +121,7 @@ function TrelloCardItem({ card }: { card: BACard }) {
         {card.dueDate && (
           <span style={{
             display: 'flex', alignItems: 'center', gap: '4px',
-            color: card.dueComplete ? '#34D399' : overdue ? '#FCA5A5' : '#475569',
+            color: card.dueComplete ? '#34D399' : overdue ? '#FCA5A5' : '#4E566E',
           }}>
             <Calendar size={11} />
             {card.dueComplete ? '✓ ' : ''}{fmtDate(card.dueDate)}
@@ -195,10 +195,10 @@ export default function TrelloCards() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#F1F5F9' }}>
+          <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#F8FAFC' }}>
             Trello — Automation Cards
           </h1>
-          <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: '#475569' }}>
+          <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: '#4E566E' }}>
             {boardName ? `Board: ${boardName}` : 'Cards labelled "automation"'}
             {lastFetched && ` · Last synced ${lastFetched.toLocaleTimeString()}`}
           </p>
@@ -225,7 +225,7 @@ export default function TrelloCards() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
           {[
             { label: 'Total Cards', value: cards.length, color: '#818CF8' },
-            { label: 'Open', value: cards.filter(c => !c.dueComplete).length, color: '#38BDF8' },
+            { label: 'Open', value: cards.filter(c => !c.dueComplete).length, color: '#7DD3FC' },
             { label: 'Completed', value: cards.filter(c => c.dueComplete).length, color: '#34D399' },
             { label: 'Overdue', value: cards.filter(c => c.dueDate && !c.dueComplete && isOverdue(c.dueDate)).length, color: '#FCA5A5' },
           ].map(s => (
@@ -234,7 +234,7 @@ export default function TrelloCards() {
               borderRadius: '10px', padding: '0.75rem 1rem',
             }}>
               <div style={{ fontSize: '1.375rem', fontWeight: 700, color: s.color }}>{s.value}</div>
-              <div style={{ fontSize: '0.7rem', color: '#475569', marginTop: '2px' }}>{s.label}</div>
+              <div style={{ fontSize: '0.7rem', color: '#4E566E', marginTop: '2px' }}>{s.label}</div>
             </div>
           ))}
         </div>
@@ -243,7 +243,7 @@ export default function TrelloCards() {
       {/* Search */}
       {!loading && !error && cards.length > 0 && (
         <div style={{ position: 'relative', maxWidth: '360px' }}>
-          <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#475569' }} />
+          <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#4E566E' }} />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -261,7 +261,7 @@ export default function TrelloCards() {
 
       {/* Loading */}
       {loading && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', padding: '3rem 0', color: '#475569' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', padding: '3rem 0', color: '#4E566E' }}>
           <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', color: '#818CF8' }} />
           <span style={{ fontSize: '0.875rem' }}>Fetching Trello cards…</span>
         </div>
@@ -270,19 +270,19 @@ export default function TrelloCards() {
       {/* Error */}
       {!loading && error && (
         <div style={{
-          background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+          background: 'rgba(255,107,107,0.08)', border: '1px solid rgba(255,107,107,0.2)',
           borderRadius: '10px', padding: '1.25rem',
           display: 'flex', alignItems: 'flex-start', gap: '0.75rem',
         }}>
           <AlertCircle size={18} style={{ color: '#FCA5A5', flexShrink: 0, marginTop: '1px' }} />
           <div>
             <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#FCA5A5' }}>Failed to load cards</div>
-            <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginTop: '4px' }}>{error}</div>
+            <div style={{ fontSize: '0.8rem', color: '#8790A8', marginTop: '4px' }}>{error}</div>
             <button
               onClick={fetchCards}
               style={{
                 marginTop: '0.75rem', padding: '0.375rem 0.875rem',
-                background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)',
+                background: 'rgba(255,107,107,0.12)', border: '1px solid rgba(255,107,107,0.25)',
                 borderRadius: '6px', color: '#FCA5A5', fontSize: '0.75rem',
                 fontWeight: 600, cursor: 'pointer',
               }}
@@ -295,7 +295,7 @@ export default function TrelloCards() {
 
       {/* Empty state */}
       {!loading && !error && cards.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '3rem 0', color: '#475569' }}>
+        <div style={{ textAlign: 'center', padding: '3rem 0', color: '#4E566E' }}>
           <Tag size={32} style={{ opacity: 0.3, marginBottom: '0.75rem' }} />
           <div style={{ fontSize: '0.875rem' }}>No cards found with the "automation" label</div>
         </div>
@@ -303,8 +303,8 @@ export default function TrelloCards() {
 
       {/* No search results */}
       {!loading && !error && cards.length > 0 && filtered.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '2rem 0', color: '#475569', fontSize: '0.875rem' }}>
-          No cards match "<strong style={{ color: '#94A3B8' }}>{search}</strong>"
+        <div style={{ textAlign: 'center', padding: '2rem 0', color: '#4E566E', fontSize: '0.875rem' }}>
+          No cards match "<strong style={{ color: '#8790A8' }}>{search}</strong>"
         </div>
       )}
 
