@@ -1,30 +1,28 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useLayout } from '../hooks/useLayout';
 import {
-  Users, Briefcase, Zap, Shield,
-  Check, X, Settings, Plus, RefreshCw, ExternalLink,
-  Share2, HardDrive, Cloud, Mail, MessageSquare, Hash,
-  LayoutDashboard, BookOpen, Github, ScanLine, Sparkles, Brain,
-  CheckCircle, ChevronLeft, ChevronRight, Download, Filter,
-  Lock, Key, AlertTriangle, Info, Code2,
+  Users, Zap, Shield, Check, X, Plus, RefreshCw, ExternalLink,
+  Mail, CheckCircle, Download, Key, LayoutDashboard, Sparkles, Brain, AlertTriangle,
 } from 'lucide-react';
+import { motion } from 'motion/react';
+import { useLayout } from '../hooks/useLayout';
 import { getTeamMembers, createTeamMember, updateTeamMember } from '../lib/db';
 import { fetchBATrafficBoard } from '../lib/trello';
+import { Badge, cn, fadeUp, stagger } from '../components/ui';
 
-const adminSections = [
-  { id: 'users', label: 'Users & Roles', icon: <Users size={15} /> },
-  { id: 'integrations', label: 'Integrations', icon: <Zap size={15} /> },
-];
+const SECTIONS = [
+  { id: 'users',        label: 'Users & Roles', Icon: Users },
+  { id: 'integrations', label: 'Integrations',  Icon: Zap },
+] as const;
 
-const roleColors: Record<string, { bg: string; text: string }> = {
-  Admin: { bg: 'rgba(167,139,250,0.15)', text: '#A78BFA' },
-  Manager: { bg: 'rgba(52,211,153,0.12)', text: '#34D399' },
-  Consultant: { bg: 'rgba(52,211,153,0.12)', text: '#34D399' },
-  Analyst: { bg: 'rgba(148,163,184,0.1)', text: '#8790A8' },
-  Viewer: { bg: 'rgba(120,119,198,0.12)', text: '#7DD3FC' },
+const ROLE_TONE: Record<string, { bg: string; text: string }> = {
+  Admin:      { bg: 'rgba(167,139,250,0.15)', text: '#C4B5FD' },
+  Manager:    { bg: 'rgba(99,230,190,0.15)',  text: '#63E6BE' },
+  Consultant: { bg: 'rgba(52,211,153,0.12)',  text: '#34D399' },
+  Analyst:    { bg: 'rgba(148,163,184,0.1)',  text: '#8790A8' },
+  Viewer:     { bg: 'rgba(120,119,198,0.12)', text: '#7DD3FC' },
 };
 
-const roleDisplayNames: Record<string, string> = {
+const ROLE_DISPLAY: Record<string, string> = {
   Admin: 'System Admin',
   Manager: 'Senior Consultant',
   Consultant: 'Consultant',
@@ -32,159 +30,93 @@ const roleDisplayNames: Record<string, string> = {
   Viewer: 'Client Viewer',
 };
 
-const INTEGRATIONS_BASE: { name: string; category: string; logo: React.ReactNode; desc: string }[] = [
-  { name: 'Trello', category: 'Project Management', logo: <LayoutDashboard size={18} />, desc: 'BA Traffic Board — live task sync from Trello API' },
-];
-
-
-interface LocalUser { id: string; name: string; email: string; role: string; workspaces: number; lastActive: string; status: 'Active' | 'Inactive'; initials: string; }
-
-const USERS_PER_PAGE = 5;
-
-// Mock 2FA data (deterministic based on user id)
-function has2FA(userId: string): boolean {
-  const hash = userId.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
-  return hash % 3 !== 0;
+interface LocalUser {
+  id: string; name: string; email: string; role: string;
+  workspaces: number; lastActive: string;
+  status: 'Active' | 'Inactive'; initials: string;
 }
 
-// Mock last activity relative times
-const lastActivityTimes: Record<string, string> = {
-  'usr-001': 'Just now',
-  'usr-002': '15 mins ago',
-  'usr-003': '1 hour ago',
-  'usr-004': '30 mins ago',
-  'usr-005': '3 hours ago',
-  'usr-006': '5 hours ago',
-  'usr-007': '2 days ago',
-  'usr-008': '1 day ago',
-  'usr-009': '10 mins ago',
-  'usr-010': '4 days ago',
-};
-
-// Suppress unused import warnings
-void Code2;
-
 export default function Admin() {
-  const { width, isMobile, isTablet } = useLayout();
-  const [activeSection, setActiveSection] = useState('users');
+  const { isMobile } = useLayout();
+  const [activeSection, setActiveSection] = useState<typeof SECTIONS[number]['id']>('users');
   const [userList, setUserList] = useState<LocalUser[]>([]);
 
-  // Load team members from Supabase on mount
-  useEffect(() => {
-    getTeamMembers().then(data => {
-      setUserList(data.map(m => ({
-        id: m.id,
-        name: m.name,
-        email: m.email,
-        role: m.role,
-        workspaces: m.workspaces_count,
-        lastActive: m.last_active,
-        status: m.status,
-        initials: m.initials,
-      })));
-    }).catch(() => {});
-  }, []);
   const [showInvite, setShowInvite] = useState(false);
   const [inviteForm, setInviteForm] = useState({ name: '', email: '', role: 'Analyst' });
   const [inviteSaving, setInviteSaving] = useState(false);
   const [inviteSuccess, setInviteSuccess] = useState('');
   const [inviteError, setInviteError] = useState('');
-  const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
-  const [roleFilter, setRoleFilter] = useState<string>('All');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [showTrelloConfig, setShowTrelloConfig] = useState(false);
-  const [trelloTestResult, setTrelloTestResult] = useState<string | null>(null);
+  const [roleFilter, setRoleFilter] = useState('All');
+
+  const [trelloStatus, setTrelloStatus] = useState<'Checking' | 'Connected' | 'Disconnected'>('Checking');
   const [trelloTesting, setTrelloTesting] = useState(false);
   const [trelloRefreshMsg, setTrelloRefreshMsg] = useState<string | null>(null);
-  const [trelloStatus, setTrelloStatus] = useState<'Checking' | 'Connected' | 'Disconnected'>('Checking');
 
-  // Check Trello connectivity on mount
+  useEffect(() => {
+    getTeamMembers().then((data) => {
+      setUserList(data.map((m) => ({
+        id: m.id, name: m.name, email: m.email, role: m.role,
+        workspaces: m.workspaces_count, lastActive: m.last_active,
+        status: m.status, initials: m.initials,
+      })));
+    }).catch(() => {});
+  }, []);
+
   useEffect(() => {
     fetchBATrafficBoard()
       .then(() => setTrelloStatus('Connected'))
       .catch(() => setTrelloStatus('Disconnected'));
   }, []);
 
-  const integrations = INTEGRATIONS_BASE.map(i =>
-    i.name === 'Trello' ? { ...i, status: trelloStatus } : { ...i, status: 'Connected' }
-  );
-
-
   const filteredUsers = useMemo(() => {
     if (roleFilter === 'All') return userList;
-    if (roleFilter === 'Admins') return userList.filter(u => u.role === 'Admin');
-    if (roleFilter === 'Consultants') return userList.filter(u => u.role === 'Consultant' || u.role === 'Manager');
-    if (roleFilter === 'Clients') return userList.filter(u => u.role === 'Viewer');
+    if (roleFilter === 'Admins') return userList.filter((u) => u.role === 'Admin');
+    if (roleFilter === 'Consultants') return userList.filter((u) => u.role === 'Consultant' || u.role === 'Manager');
+    if (roleFilter === 'Clients') return userList.filter((u) => u.role === 'Viewer');
     return userList;
   }, [userList, roleFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / USERS_PER_PAGE));
-  const paginatedUsers = filteredUsers.slice((currentPage - 1) * USERS_PER_PAGE, currentPage * USERS_PER_PAGE);
-
-  useEffect(() => { setCurrentPage(1); }, [roleFilter]);
-
-  function handleInviteUser() {
+  function handleInvite() {
     if (!inviteForm.name || !inviteForm.email) return;
     setInviteSaving(true);
     setInviteError('');
     const newId = crypto.randomUUID();
-    const initials = inviteForm.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+    const initials = inviteForm.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
     createTeamMember({
-      id: newId,
-      name: inviteForm.name,
-      email: inviteForm.email,
+      id: newId, name: inviteForm.name, email: inviteForm.email,
       role: inviteForm.role as 'Admin' | 'Consultant' | 'Manager' | 'Viewer' | 'Analyst',
-      workspaces_count: 0,
-      last_active: 'Just now',
-      status: 'Active',
-      initials,
-    }).then(saved => {
-      const newUser: LocalUser = {
-        id: saved.id,
-        name: saved.name,
-        email: saved.email,
-        role: saved.role,
-        workspaces: saved.workspaces_count,
-        lastActive: saved.last_active,
-        status: saved.status,
-        initials: saved.initials,
-      };
-      setUserList(prev => [...prev, newUser]);
+      workspaces_count: 0, last_active: 'Just now', status: 'Active', initials,
+    }).then((saved) => {
+      setUserList((prev) => [...prev, {
+        id: saved.id, name: saved.name, email: saved.email, role: saved.role,
+        workspaces: saved.workspaces_count, lastActive: saved.last_active,
+        status: saved.status, initials: saved.initials,
+      }]);
       setInviteSuccess(`Invite sent to ${inviteForm.email}`);
       setInviteForm({ name: '', email: '', role: 'Analyst' });
       setInviteSaving(false);
       setTimeout(() => { setShowInvite(false); setInviteSuccess(''); }, 1500);
     }).catch((e: unknown) => {
       setInviteSaving(false);
-      setInviteError(e instanceof Error ? e.message : 'Failed to send invite. Please try again.');
+      setInviteError(e instanceof Error ? e.message : 'Failed to send invite.');
     });
   }
 
-  function handleToggleUserStatus(userId: string) {
-    const target = userList.find(u => u.id === userId);
+  function handleToggleStatus(userId: string) {
+    const target = userList.find((u) => u.id === userId);
     if (!target) return;
     const newStatus: 'Active' | 'Inactive' = target.status === 'Active' ? 'Inactive' : 'Active';
-    setUserList(prev => prev.map(u => u.id === userId ? { ...u, status: newStatus } : u));
+    setUserList((prev) => prev.map((u) => (u.id === userId ? { ...u, status: newStatus } : u)));
     updateTeamMember(userId, { status: newStatus }).catch(() => {});
-  }
-
-  function toggleUserSelection(userId: string) {
-    setSelectedUsers(prev => {
-      const next = new Set(prev);
-      if (next.has(userId)) next.delete(userId);
-      else next.add(userId);
-      return next;
-    });
   }
 
   async function handleTrelloTest() {
     setTrelloTesting(true);
-    setTrelloTestResult(null);
     try {
       await fetchBATrafficBoard();
-      setTrelloTestResult('Connection successful');
+      setTrelloStatus('Connected');
     } catch {
-      setTrelloTestResult('Connection failed');
+      setTrelloStatus('Disconnected');
     } finally {
       setTrelloTesting(false);
     }
@@ -201,743 +133,309 @@ export default function Admin() {
     setTimeout(() => setTrelloRefreshMsg(null), 3000);
   }
 
-  function toggleAllSelection() {
-    if (selectedUsers.size === paginatedUsers.length) {
-      setSelectedUsers(new Set());
-    } else {
-      setSelectedUsers(new Set(paginatedUsers.map(u => u.id)));
-    }
-  }
+  const activeUsers = userList.filter((u) => u.status === 'Active').length;
 
-  function getStatusDisplay(user: LocalUser): { label: string; color: string; dotColor: string } {
-    if (user.status === 'Active') return { label: 'ACTIVE', color: '#34D399', dotColor: '#34D399' };
-    // Randomly assign PENDING or LOCKED for inactive users
-    const hash = user.id.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
-    if (hash % 2 === 0) return { label: 'PENDING', color: '#F5B544', dotColor: '#F5B544' };
-    return { label: 'LOCKED', color: '#FF6B6B', dotColor: '#FF6B6B' };
-  }
-
-  /* ─── Stats Cards ─── */
-  const statsCards = [
-    {
-      title: 'TOTAL USERS',
-      value: userList.length.toLocaleString(),
-      trend: '+12% vs last month',
-      trendPositive: true,
-      color: '#7877C6',
-      icon: <Users size={16} />,
-    },
-    {
-      title: 'DAILY ACTIVE',
-      value: '892',
-      trend: '+5%',
-      trendPositive: true,
-      color: '#34D399',
-      icon: <CheckCircle size={16} />,
-      sparkline: true,
-    },
-    {
-      title: 'PENDING INVITES',
-      value: '24',
-      sub: '8 expiring soon',
-      link: 'View All',
-      color: '#F5B544',
-      icon: <Mail size={16} />,
-    },
-    {
-      title: 'SECURITY ALERTS',
-      value: '3',
-      sub: '2 unusual logins',
-      link: 'Review',
-      color: '#FF6B6B',
-      icon: <Shield size={16} />,
-      redDot: true,
-    },
-  ];
-
-  /* ─── Role distribution for sidebar chart ─── */
+  // Role distribution
   const roleDistribution = [
-    { label: 'Consultant', color: '#7877C6', pct: 50 },
-    { label: 'Analyst', color: '#F5B544', pct: 20 },
-    { label: 'Admin', color: '#A78BFA', pct: 15 },
-    { label: 'Client', color: '#FF6B6B', pct: 15 },
+    { label: 'Consultant', color: '#7877C6', count: userList.filter((u) => u.role === 'Consultant').length },
+    { label: 'Analyst',    color: '#63E6BE', count: userList.filter((u) => u.role === 'Analyst').length },
+    { label: 'Admin',      color: '#A78BFA', count: userList.filter((u) => u.role === 'Admin').length },
+    { label: 'Manager',    color: '#F0A875', count: userList.filter((u) => u.role === 'Manager').length },
+    { label: 'Viewer',     color: '#7DD3FC', count: userList.filter((u) => u.role === 'Viewer').length },
   ];
 
-  return (<>
-    <div style={{ display: 'flex', height: 'calc(100vh - 60px)', overflow: 'hidden' }}>
-      {/* Left Sidebar — hidden on tablet/mobile */}
-      {!isTablet && (
-        <div style={{
-          width: '220px', minWidth: '220px', borderRight: '1px solid rgba(255,255,255,0.05)',
-          padding: '1rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '2px',
-          background: '#0C0F1A',
-        }}>
-          <div className="sidebar-section-label" style={{ marginBottom: '0.375rem' }}>Administration</div>
-          {adminSections.map(section => (
+  return (
+    <motion.div
+      initial="hidden" animate="show"
+      variants={{ hidden: {}, show: { transition: stagger(0.05, 0.08) } }}
+      className="screen-container"
+    >
+      <motion.div variants={fadeUp} className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="min-w-0">
+          <h1 className="text-[1.5rem] md:text-[1.75rem] font-semibold tracking-[-0.025em] leading-tight text-white">Admin</h1>
+          <p className="text-[0.78rem] text-[color:var(--text-muted)] mt-1">
+            {userList.length} users · {activeUsers} active
+          </p>
+        </div>
+        {activeSection === 'users' && (
+          <button type="button" onClick={() => setShowInvite(true)} className="btn-primary">
+            <Plus size={14} /> Invite User
+          </button>
+        )}
+      </motion.div>
+
+      {/* Section tabs */}
+      <motion.div variants={fadeUp} className="flex items-center gap-1.5 flex-wrap">
+        {SECTIONS.map((s) => {
+          const Icon = s.Icon;
+          const isActive = activeSection === s.id;
+          return (
             <button
-              key={section.id}
-              className={`nav-item ${activeSection === section.id ? 'active' : ''}`}
-              onClick={() => setActiveSection(section.id)}
-              style={{ justifyContent: 'flex-start', background: 'none', width: '100%' }}
+              key={s.id}
+              type="button"
+              onClick={() => setActiveSection(s.id)}
+              className={cn(
+                'flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[0.8rem] font-medium transition-colors border',
+                isActive
+                  ? 'bg-[rgba(120,119,198,0.18)] text-white border-[rgba(120,119,198,0.35)]'
+                  : 'bg-white/[0.025] border-white/[0.06] text-[color:var(--text-muted)] hover:text-white hover:bg-white/[0.05]',
+              )}
             >
-              <span style={{ opacity: activeSection === section.id ? 1 : 0.6 }}>{section.icon}</span>
-              <span>{section.label}</span>
+              <Icon size={13} />
+              {s.label}
             </button>
-          ))}
+          );
+        })}
+      </motion.div>
+
+      {activeSection === 'users' && (
+        <div className={cn('grid gap-4', isMobile ? 'grid-cols-1' : 'grid-cols-[1fr_280px]')}>
+          {/* Users table */}
+          <motion.div variants={fadeUp} className="section-card">
+            <div className="section-card-header flex-wrap gap-2">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {['All', 'Admins', 'Consultants', 'Clients'].map((r) => {
+                  const isActive = roleFilter === r;
+                  return (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setRoleFilter(r)}
+                      className={cn(
+                        'px-2.5 py-1 rounded-full text-[0.72rem] font-medium transition-colors border',
+                        isActive
+                          ? 'bg-[rgba(120,119,198,0.18)] text-white border-[rgba(120,119,198,0.35)]'
+                          : 'bg-white/[0.025] border-white/[0.06] text-[color:var(--text-muted)] hover:text-white',
+                      )}
+                    >
+                      {r}
+                    </button>
+                  );
+                })}
+              </div>
+              <button type="button" className="flex items-center gap-1 text-[0.72rem] text-[color:var(--text-muted)] hover:text-white transition-colors">
+                <Download size={11} /> Export
+              </button>
+            </div>
+            <div className="table-scroll">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>User</th>
+                    <th>Role</th>
+                    <th>Workspaces</th>
+                    <th>Last active</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredUsers.map((user) => (
+                    <tr key={user.id} className="cursor-pointer">
+                      <td>
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#7877C6] to-[#63E6BE] flex items-center justify-center text-[0.65rem] font-bold text-white ring-2 ring-white/10 flex-shrink-0">
+                            {user.initials}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-[0.84rem] font-semibold text-white truncate">{user.name}</div>
+                            <div className="text-[0.7rem] text-[color:var(--text-muted)] truncate">{user.email}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <span
+                          className="text-[0.68rem] font-semibold px-2 py-0.5 rounded-md"
+                          style={{ background: ROLE_TONE[user.role]?.bg ?? 'rgba(148,163,184,0.1)', color: ROLE_TONE[user.role]?.text ?? '#8790A8' }}
+                        >
+                          {ROLE_DISPLAY[user.role] ?? user.role}
+                        </span>
+                      </td>
+                      <td className="tabular-nums">{user.workspaces}</td>
+                      <td className="text-[0.72rem]">{user.lastActive}</td>
+                      <td>
+                        <div className="flex items-center gap-2">
+                          <Badge tone={user.status === 'Active' ? 'success' : 'neutral'}>{user.status}</Badge>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleToggleStatus(user.id); }}
+                            aria-label={user.status === 'Active' ? 'Suspend' : 'Reactivate'}
+                            className="text-[0.66rem] font-semibold text-[color:var(--text-muted)] hover:text-white transition-colors"
+                          >
+                            {user.status === 'Active' ? 'Suspend' : 'Reactivate'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+
+          {/* Side panel: Role distribution + AI Access */}
+          <div className="flex flex-col gap-4">
+            <motion.div variants={fadeUp} className="section-card">
+              <div className="section-card-header">
+                <span className="text-[0.9rem] font-bold text-white">Role Distribution</span>
+              </div>
+              <div className="p-4 space-y-2.5">
+                {roleDistribution.map((r) => {
+                  const pct = userList.length > 0 ? Math.round((r.count / userList.length) * 100) : 0;
+                  return (
+                    <div key={r.label}>
+                      <div className="flex items-center justify-between text-[0.75rem] mb-1">
+                        <span className="text-[color:var(--text-secondary)]">{r.label}</span>
+                        <span className="text-white font-semibold tabular-nums">{r.count}</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${pct}%` }}
+                          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                          className="h-full rounded-full"
+                          style={{ background: r.color, boxShadow: `0 0 8px ${r.color}99` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+
+            <motion.div variants={fadeUp} className="section-card">
+              <div className="section-card-header">
+                <div className="flex items-center gap-2">
+                  <Sparkles size={13} className="text-[#A78BFA]" />
+                  <span className="text-[0.9rem] font-bold text-white">AI Access Auditor</span>
+                </div>
+              </div>
+              <div className="p-4 space-y-2.5">
+                <div className="flex items-start gap-2">
+                  <CheckCircle size={12} className="text-[#34D399] flex-shrink-0 mt-0.5" />
+                  <span className="text-[0.72rem] text-[color:var(--text-secondary)]">All roles reviewed in last 30 days</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Shield size={12} className="text-[#7DD3FC] flex-shrink-0 mt-0.5" />
+                  <span className="text-[0.72rem] text-[color:var(--text-secondary)]">2FA recommended for {Math.floor(userList.length * 0.3)} users</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Key size={12} className="text-[#F0A875] flex-shrink-0 mt-0.5" />
+                  <span className="text-[0.72rem] text-[color:var(--text-secondary)]">3 API keys expire this month</span>
+                </div>
+              </div>
+            </motion.div>
+          </div>
         </div>
       )}
 
-      {/* Main Content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '0.875rem' : '1.5rem' }}>
-
-        {/* Horizontal section pills for tablet/mobile */}
-        {isTablet && (
-          <div style={{
-            display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.75rem',
-            marginBottom: '0.5rem', WebkitOverflowScrolling: 'touch',
-          }}>
-            {adminSections.map(section => (
-              <button
-                key={section.id}
-                onClick={() => setActiveSection(section.id)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '0.375rem',
-                  padding: '6px 14px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 500,
-                  whiteSpace: 'nowrap', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0,
-                  background: activeSection === section.id ? 'rgba(120,119,198,0.15)' : 'rgba(255,255,255,0.04)',
-                  color: activeSection === section.id ? '#7DD3FC' : '#8790A8',
-                  border: activeSection === section.id ? '1px solid rgba(120,119,198,0.3)' : '1px solid rgba(255,255,255,0.08)',
-                }}
-              >
-                {section.icon}
-                <span>{section.label}</span>
-              </button>
-            ))}
+      {activeSection === 'integrations' && (
+        <motion.div variants={fadeUp} className="section-card">
+          <div className="section-card-header">
+            <span className="text-[0.9rem] font-bold text-white">Connected integrations</span>
           </div>
-        )}
-
-        {/* ═══ Users & Roles ═══ */}
-        {activeSection === 'users' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#F8FAFC', margin: 0, marginBottom: '0.25rem' }}>Users & Roles</h2>
-                <p style={{ fontSize: '0.8rem', color: '#8790A8', margin: 0 }}>{userList.length} users · 5 roles</p>
+          <div className="p-4 space-y-3">
+            <div className="flex items-center gap-3 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+              <div className="w-10 h-10 rounded-xl bg-[rgba(120,119,198,0.18)] text-[#A78BFA] flex items-center justify-center ring-1 ring-[rgba(120,119,198,0.3)] flex-shrink-0">
+                <LayoutDashboard size={16} />
               </div>
-              <button className="btn-primary" style={{ height: '34px', fontSize: '0.8rem' }} onClick={() => setShowInvite(true)}>
-                <Plus size={13} /> Invite User
-              </button>
-            </div>
-
-            {/* Stats Row */}
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 1024 ? 4 : width >= 640 ? 2 : 1}, 1fr)`, gap: '0.875rem' }}>
-              {statsCards.map((card) => (
-                <div key={card.title} className="section-card" style={{ padding: '1rem 1.125rem', position: 'relative', overflow: 'hidden' }}>
-                  {/* Icon badge top-right */}
-                  <div style={{
-                    position: 'absolute', top: '0.75rem', right: '0.75rem',
-                    width: '32px', height: '32px', borderRadius: '8px',
-                    background: `${card.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: card.color,
-                  }}>
-                    {card.icon}
-                  </div>
-                  <div style={{ fontSize: '0.62rem', fontWeight: 600, color: '#8790A8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem' }}>
-                    {card.title}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span style={{ fontSize: '1.5rem', fontWeight: 700, color: card.color, lineHeight: 1 }}>
-                      {card.value}
-                    </span>
-                    {card.redDot && (
-                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#FF6B6B', display: 'inline-block', boxShadow: '0 0 6px rgba(255,107,107,0.5)' }} />
-                    )}
-                  </div>
-                  {card.trend && (
-                    <span style={{
-                      display: 'inline-block', marginTop: '0.5rem',
-                      fontSize: '0.62rem', padding: '2px 6px', borderRadius: '9999px',
-                      background: card.trendPositive ? 'rgba(52,211,153,0.12)' : 'rgba(255,107,107,0.12)',
-                      color: card.trendPositive ? '#34D399' : '#FF6B6B',
-                      border: `1px solid ${card.trendPositive ? 'rgba(52,211,153,0.25)' : 'rgba(255,107,107,0.25)'}`,
-                    }}>
-                      {card.trend}
-                    </span>
-                  )}
-                  {card.sparkline && (
-                    <div style={{ marginTop: '0.375rem', display: 'flex', alignItems: 'end', gap: '2px', height: '16px' }}>
-                      {[4,6,5,8,7,10,9,12,11,14].map((h, i) => (
-                        <div key={i} style={{ width: '3px', height: `${h}px`, borderRadius: '1px', background: `${card.color}60` }} />
-                      ))}
-                    </div>
-                  )}
-                  {card.sub && (
-                    <div style={{ marginTop: '0.5rem', fontSize: '0.68rem', color: '#8790A8' }}>
-                      {card.sub}
-                      {card.link && (
-                        <span style={{ color: card.color, marginLeft: '0.5rem', cursor: 'pointer', fontWeight: 500 }}>{card.link}</span>
-                      )}
-                    </div>
-                  )}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-[0.88rem] font-semibold text-white">Trello</span>
+                  <Badge tone={trelloStatus === 'Connected' ? 'success' : trelloStatus === 'Checking' ? 'pending' : 'critical'}>{trelloStatus}</Badge>
                 </div>
-              ))}
-            </div>
-
-            {/* Main 2-column layout */}
-            <div style={{ display: 'grid', gridTemplateColumns: width >= 1024 ? '1fr 300px' : '1fr', gap: '1.25rem' }}>
-              {/* Left: Users Directory */}
-              <div style={{ minWidth: 0 }}>
-                <div className="section-card" style={{ padding: 0 }}>
-                  {/* Table header bar */}
-                  <div style={{ padding: '0.875rem 1.125rem', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F8FAFC' }}>Users Directory</span>
-                      <span style={{
-                        fontSize: '0.62rem', padding: '2px 8px', borderRadius: '9999px',
-                        background: 'rgba(120,119,198,0.1)', color: '#7DD3FC',
-                        border: '1px solid rgba(120,119,198,0.2)',
-                      }}>
-                        {filteredUsers.length.toLocaleString()} total
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      {/* Filter tabs */}
-                      {['All', 'Admins', 'Consultants', 'Clients'].map(tab => (
-                        <button
-                          key={tab}
-                          onClick={() => setRoleFilter(tab)}
-                          style={{
-                            padding: '4px 10px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 500,
-                            background: roleFilter === tab ? 'rgba(120,119,198,0.15)' : 'transparent',
-                            color: roleFilter === tab ? '#7DD3FC' : '#8790A8',
-                            border: roleFilter === tab ? '1px solid rgba(120,119,198,0.25)' : '1px solid transparent',
-                            cursor: 'pointer', fontFamily: 'inherit',
-                          }}
-                        >
-                          {tab}
-                        </button>
-                      ))}
-                      <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.08)', margin: '0 0.25rem' }} />
-                      <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8790A8', display: 'flex', padding: '4px' }}>
-                        <Filter size={14} />
-                      </button>
-                      <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8790A8', display: 'flex', padding: '4px' }}>
-                        <Download size={14} />
-                      </button>
-                    </div>
+                <div className="text-[0.72rem] text-[color:var(--text-muted)]">BA Traffic Board — live task sync from Trello API</div>
+                {trelloRefreshMsg && (
+                  <div className="text-[0.7rem] mt-1" style={{ color: trelloRefreshMsg.includes('success') ? '#63E6BE' : '#FCA5A5' }}>
+                    {trelloRefreshMsg}
                   </div>
-
-                  {/* Bulk action bar */}
-                  {selectedUsers.size > 0 && (
-                    <div style={{
-                      padding: '0.5rem 1.125rem', background: 'rgba(120,119,198,0.06)',
-                      borderBottom: '1px solid rgba(120,119,198,0.15)',
-                      display: 'flex', alignItems: 'center', gap: '0.75rem',
-                    }}>
-                      <span style={{ fontSize: '0.75rem', color: '#7877C6', fontWeight: 600 }}>
-                        {selectedUsers.size} user{selectedUsers.size > 1 ? 's' : ''} selected
-                      </span>
-                      <div style={{ display: 'flex', gap: '0.375rem', marginLeft: 'auto' }}>
-                        <button style={{
-                          padding: '3px 10px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 500,
-                          background: 'rgba(255,255,255,0.06)', color: '#8790A8',
-                          border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', fontFamily: 'inherit',
-                        }}>Change Role</button>
-                        <button style={{
-                          padding: '3px 10px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 500,
-                          background: 'rgba(255,255,255,0.06)', color: '#8790A8',
-                          border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', fontFamily: 'inherit',
-                        }}>Reset Password</button>
-                        <button style={{
-                          padding: '3px 10px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 500,
-                          background: 'rgba(255,107,107,0.1)', color: '#FF6B6B',
-                          border: '1px solid rgba(255,107,107,0.2)', cursor: 'pointer', fontFamily: 'inherit',
-                        }}>Suspend</button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Table */}
-                  <div style={{ overflowX: 'auto' }}>
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          <th style={{ width: '36px' }}>
-                            <div
-                              onClick={toggleAllSelection}
-                              style={{
-                                width: '16px', height: '16px', borderRadius: '3px', cursor: 'pointer',
-                                border: `1.5px solid ${selectedUsers.size === paginatedUsers.length && paginatedUsers.length > 0 ? '#7877C6' : 'rgba(255,255,255,0.2)'}`,
-                                background: selectedUsers.size === paginatedUsers.length && paginatedUsers.length > 0 ? 'rgba(120,119,198,0.3)' : 'transparent',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              }}
-                            >
-                              {selectedUsers.size === paginatedUsers.length && paginatedUsers.length > 0 && <Check size={10} style={{ color: '#7877C6' }} />}
-                            </div>
-                          </th>
-                          <th>User</th>
-                          <th>Role</th>
-                          <th>Status</th>
-                          {!isMobile && <th>Last Activity</th>}
-                          {!isMobile && <th>2FA</th>}
-                          <th></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {paginatedUsers.map(user => {
-                          const statusInfo = getStatusDisplay(user);
-                          const twoFA = has2FA(user.id);
-                          const isSelected = selectedUsers.has(user.id);
-                          return (
-                            <tr key={user.id} style={{ background: isSelected ? 'rgba(120,119,198,0.04)' : undefined }}>
-                              <td style={{ width: '36px' }}>
-                                <div
-                                  onClick={() => toggleUserSelection(user.id)}
-                                  style={{
-                                    width: '16px', height: '16px', borderRadius: '3px', cursor: 'pointer',
-                                    border: `1.5px solid ${isSelected ? '#7877C6' : 'rgba(255,255,255,0.2)'}`,
-                                    background: isSelected ? 'rgba(120,119,198,0.3)' : 'transparent',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  }}
-                                >
-                                  {isSelected && <Check size={10} style={{ color: '#7877C6' }} />}
-                                </div>
-                              </td>
-                              <td>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-                                  <div className="avatar" style={{ width: '30px', height: '30px', fontSize: '0.62rem', flexShrink: 0 }}>
-                                    {(user as { avatar?: string }).avatar ?? user.initials}
-                                  </div>
-                                  <div>
-                                    <div style={{ fontSize: '0.82rem', fontWeight: 500, color: '#F8FAFC', lineHeight: 1.3 }}>{user.name}</div>
-                                    <div style={{ fontSize: '0.68rem', color: '#4E566E', lineHeight: 1.3 }}>{user.email}</div>
-                                  </div>
-                                </div>
-                              </td>
-                              <td>
-                                <span style={{
-                                  fontSize: '0.68rem', padding: '2px 8px', borderRadius: '4px',
-                                  background: roleColors[user.role]?.bg, color: roleColors[user.role]?.text,
-                                  border: `1px solid ${roleColors[user.role]?.text}25`,
-                                  whiteSpace: 'nowrap',
-                                }}>
-                                  {roleDisplayNames[user.role] ?? user.role}
-                                </span>
-                              </td>
-                              <td>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                                  <span style={{
-                                    width: '6px', height: '6px', borderRadius: '50%',
-                                    background: statusInfo.dotColor, display: 'inline-block',
-                                    boxShadow: `0 0 4px ${statusInfo.dotColor}60`,
-                                  }} />
-                                  <span style={{ fontSize: '0.68rem', fontWeight: 600, color: statusInfo.color, letterSpacing: '0.03em' }}>
-                                    {statusInfo.label}
-                                  </span>
-                                </div>
-                              </td>
-                              {!isMobile && (
-                                <td style={{ fontSize: '0.75rem', color: '#8790A8' }}>
-                                  {lastActivityTimes[user.id] ?? user.lastActive}
-                                </td>
-                              )}
-                              {!isMobile && (
-                                <td>
-                                  <Shield size={14} style={{ color: twoFA ? '#34D399' : '#4E566E' }} />
-                                </td>
-                              )}
-                              <td>
-                                <div style={{ display: 'flex', gap: '0.25rem' }}>
-                                  <button
-                                    onClick={() => handleToggleUserStatus(user.id)}
-                                    style={{
-                                      padding: '0.25rem 0.5rem', background: 'rgba(255,255,255,0.04)',
-                                      border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px',
-                                      cursor: 'pointer', fontSize: '0.7rem', color: '#8790A8', fontFamily: 'inherit',
-                                    }}
-                                  >
-                                    {user.status === 'Active' ? 'Suspend' : 'Activate'}
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Pagination */}
-                  <div style={{
-                    padding: '0.75rem 1.125rem', borderTop: '1px solid rgba(255,255,255,0.05)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  }}>
-                    <span style={{ fontSize: '0.72rem', color: '#8790A8' }}>
-                      Showing {Math.min((currentPage - 1) * USERS_PER_PAGE + 1, filteredUsers.length)}-{Math.min(currentPage * USERS_PER_PAGE, filteredUsers.length)} of {filteredUsers.length}
-                    </span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <button
-                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                        disabled={currentPage === 1}
-                        style={{
-                          width: '28px', height: '28px', borderRadius: '6px', display: 'flex',
-                          alignItems: 'center', justifyContent: 'center', cursor: currentPage === 1 ? 'default' : 'pointer',
-                          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                          color: currentPage === 1 ? '#4E566E' : '#8790A8', fontFamily: 'inherit',
-                        }}
-                      >
-                        <ChevronLeft size={14} />
-                      </button>
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                        <button
-                          key={page}
-                          onClick={() => setCurrentPage(page)}
-                          style={{
-                            width: '28px', height: '28px', borderRadius: '6px', display: 'flex',
-                            alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-                            background: page === currentPage ? 'rgba(120,119,198,0.15)' : 'rgba(255,255,255,0.04)',
-                            border: `1px solid ${page === currentPage ? 'rgba(120,119,198,0.3)' : 'rgba(255,255,255,0.08)'}`,
-                            color: page === currentPage ? '#7DD3FC' : '#8790A8',
-                            fontSize: '0.72rem', fontWeight: 500, fontFamily: 'inherit',
-                          }}
-                        >
-                          {page}
-                        </button>
-                      ))}
-                      <button
-                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                        disabled={currentPage === totalPages}
-                        style={{
-                          width: '28px', height: '28px', borderRadius: '6px', display: 'flex',
-                          alignItems: 'center', justifyContent: 'center', cursor: currentPage === totalPages ? 'default' : 'pointer',
-                          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                          color: currentPage === totalPages ? '#4E566E' : '#8790A8', fontFamily: 'inherit',
-                        }}
-                      >
-                        <ChevronRight size={14} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
-
-              {/* Right Sidebar */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-
-                {/* AI Access Auditor */}
-                <div style={{
-                  borderRadius: '12px', padding: '1.125rem', position: 'relative', overflow: 'hidden',
-                  background: 'linear-gradient(135deg, rgba(167,139,250,0.08) 0%, rgba(120,119,198,0.04) 100%)',
-                  border: '1px solid rgba(167,139,250,0.15)',
-                }}>
-                  {/* Purple orb decoration */}
-                  <div style={{
-                    position: 'absolute', top: '-20px', right: '-20px', width: '80px', height: '80px',
-                    borderRadius: '50%', background: 'radial-gradient(circle, rgba(167,139,250,0.2) 0%, transparent 70%)',
-                    filter: 'blur(10px)',
-                  }} />
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem', position: 'relative' }}>
-                    <Sparkles size={14} style={{ color: '#A78BFA' }} />
-                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#F8FAFC' }}>AI Access Auditor</span>
-                  </div>
-                  <p style={{ fontSize: '0.65rem', color: '#8790A8', margin: '0 0 0.875rem 0', position: 'relative' }}>
-                    Automated permission and security analysis
-                  </p>
-
-                  {/* Alert 1: Stale Permissions */}
-                  <div style={{
-                    padding: '0.75rem', borderRadius: '8px', marginBottom: '0.625rem',
-                    background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.05)',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.375rem' }}>
-                      <AlertTriangle size={12} style={{ color: '#FF6B6B' }} />
-                      <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#F8FAFC' }}>Stale Permissions</span>
-                    </div>
-                    <p style={{ fontSize: '0.65rem', color: '#8790A8', margin: '0 0 0.5rem 0', lineHeight: 1.4 }}>
-                      3 users with &apos;Admin&apos; roles haven&apos;t accessed sensitive modules in 90+ days.
-                    </p>
-                    <button style={{
-                      padding: '4px 10px', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 500,
-                      background: 'rgba(255,107,107,0.12)', color: '#FF6B6B',
-                      border: '1px solid rgba(255,107,107,0.25)', cursor: 'pointer', fontFamily: 'inherit',
-                    }}>
-                      Review & Downgrade
-                    </button>
-                  </div>
-
-                  {/* Alert 2: Role Optimization */}
-                  <div style={{
-                    padding: '0.75rem', borderRadius: '8px',
-                    background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.05)',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.375rem' }}>
-                      <Info size={12} style={{ color: '#7DD3FC' }} />
-                      <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#F8FAFC' }}>Role Optimization</span>
-                    </div>
-                    <p style={{ fontSize: '0.65rem', color: '#8790A8', margin: '0 0 0.5rem 0', lineHeight: 1.4 }}>
-                      Based on usage patterns, create a new &apos;Project Lead&apos; role to consolidate 15 custom permission sets.
-                    </p>
-                    <button style={{
-                      padding: '4px 10px', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 500,
-                      background: 'rgba(52,211,153,0.12)', color: '#34D399',
-                      border: '1px solid rgba(52,211,153,0.25)', cursor: 'pointer', fontFamily: 'inherit',
-                    }}>
-                      Generate Role
-                    </button>
-                  </div>
-                </div>
-
-                {/* Role Distribution */}
-                <div className="section-card" style={{ padding: '1rem 1.125rem' }}>
-                  <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#F8FAFC', marginBottom: '0.875rem' }}>Role Distribution</div>
-
-                  {/* Simple donut via CSS conic-gradient */}
-                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.875rem' }}>
-                    <div style={{
-                      width: '90px', height: '90px', borderRadius: '50%',
-                      background: `conic-gradient(
-                        #7877C6 0% 50%,
-                        #F5B544 50% 70%,
-                        #A78BFA 70% 85%,
-                        #FF6B6B 85% 100%
-                      )`,
-                      position: 'relative',
-                    }}>
-                      <div style={{
-                        position: 'absolute', inset: '18px', borderRadius: '50%',
-                        background: '#0C0F1A',
-                      }} />
-                    </div>
-                  </div>
-
-                  {/* Legend */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.375rem' }}>
-                    {roleDistribution.map(r => (
-                      <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                        <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: r.color, flexShrink: 0 }} />
-                        <span style={{ fontSize: '0.65rem', color: '#8790A8' }}>{r.label}</span>
-                        <span style={{ fontSize: '0.65rem', color: '#8790A8', marginLeft: 'auto' }}>{r.pct}%</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Security & Access */}
-                <div className="section-card" style={{ padding: '0.75rem 0' }}>
-                  <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#F8FAFC', padding: '0 1.125rem', marginBottom: '0.5rem' }}>Security & Access</div>
-                  {[
-                    { icon: <Lock size={14} />, title: 'Audit Logs', desc: 'Track all system changes' },
-                    { icon: <Key size={14} />, title: 'SSO & SAML', desc: 'Identity provider settings' },
-                    { icon: <Shield size={14} />, title: 'MFA Policies', desc: 'Enforce 2-factor auth' },
-                  ].map((item) => (
-                    <div
-                      key={item.title}
-                      onClick={item.title === 'Audit Logs' ? () => setActiveSection('security') : undefined}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '0.75rem',
-                        padding: '0.625rem 1.125rem', cursor: 'pointer',
-                        transition: 'background 0.15s',
-                      }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                    >
-                      <div style={{
-                        width: '28px', height: '28px', borderRadius: '6px',
-                        background: 'rgba(148,163,184,0.08)', display: 'flex',
-                        alignItems: 'center', justifyContent: 'center', color: '#8790A8', flexShrink: 0,
-                      }}>
-                        {item.icon}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '0.78rem', fontWeight: 500, color: '#F8FAFC' }}>{item.title}</div>
-                        <div style={{ fontSize: '0.62rem', color: '#4E566E' }}>{item.desc}</div>
-                      </div>
-                      <ChevronRight size={14} style={{ color: '#4E566E', flexShrink: 0 }} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ═══ Integrations ═══ */}
-        {activeSection === 'integrations' && (
-          <div>
-            <div style={{ marginBottom: '1.25rem' }}>
-              <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#F8FAFC', margin: 0, marginBottom: '0.25rem' }}>Integrations</h2>
-              <p style={{ fontSize: '0.8rem', color: '#8790A8', margin: 0 }}>
-                {integrations.filter(i => i.status === 'Connected').length} connected · {integrations.filter(i => i.status === 'Disconnected').length} available
-              </p>
-            </div>
-
-            {['Storage', 'Communication', 'Project Management', 'Knowledge', 'Development', 'AI'].map(category => {
-              const catItems = integrations.filter(i => i.category === category);
-              if (!catItems.length) return null;
-              return (
-                <div key={category} style={{ marginBottom: '1.5rem' }}>
-                  <div style={{ fontSize: '0.72rem', color: '#4E566E', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.75rem' }}>{category}</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 900 ? 3 : width >= 600 ? 2 : 1}, 1fr)`, gap: '0.75rem' }}>
-                    {catItems.map(integration => (
-                      <div key={integration.name} className="elevated-card" style={{ padding: '1rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.625rem' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-                            <span style={{ display: 'flex', color: 'inherit' }}>{integration.logo}</span>
-                            <div>
-                              <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#F8FAFC' }}>{integration.name}</div>
-                              <div style={{ fontSize: '0.68rem', color: '#4E566E' }}>{integration.desc}</div>
-                            </div>
-                          </div>
-                          <span style={{
-                            fontSize: '0.65rem', padding: '2px 6px', borderRadius: '9999px',
-                            background: integration.status === 'Connected' ? 'rgba(52,211,153,0.12)' : 'rgba(148,163,184,0.08)',
-                            color: integration.status === 'Connected' ? '#34D399' : '#8790A8',
-                            border: `1px solid ${integration.status === 'Connected' ? 'rgba(52,211,153,0.2)' : 'rgba(148,163,184,0.1)'}`,
-                          }}>
-                            {integration.status}
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', gap: '0.5rem', position: 'relative' }}>
-                          {integration.status === 'Connected' ? (
-                            <>
-                              <button
-                                className="btn-ghost"
-                                style={{ flex: 1, height: '26px', fontSize: '0.7rem', justifyContent: 'center' }}
-                                onClick={() => { if (integration.name === 'Trello') setShowTrelloConfig(v => !v); }}
-                              >
-                                <Settings size={10} /> Configure
-                              </button>
-                              <button
-                                className="btn-ghost"
-                                style={{ height: '26px', fontSize: '0.7rem', padding: '0 0.5rem' }}
-                                onClick={() => { if (integration.name === 'Trello') handleTrelloRefresh(); }}
-                              >
-                                <RefreshCw size={10} />
-                              </button>
-                            </>
-                          ) : (
-                            <button className="btn-primary" style={{ flex: 1, height: '26px', fontSize: '0.7rem', justifyContent: 'center' }}>
-                              <Plus size={10} /> Connect
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Trello refresh toast */}
-                        {integration.name === 'Trello' && trelloRefreshMsg && (
-                          <div style={{
-                            marginTop: '0.5rem', padding: '6px 10px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 500,
-                            background: trelloRefreshMsg.includes('successful') ? 'rgba(52,211,153,0.12)' : 'rgba(255,107,107,0.12)',
-                            color: trelloRefreshMsg.includes('successful') ? '#34D399' : '#FF6B6B',
-                            border: `1px solid ${trelloRefreshMsg.includes('successful') ? 'rgba(52,211,153,0.25)' : 'rgba(255,107,107,0.25)'}`,
-                          }}>
-                            {trelloRefreshMsg}
-                          </div>
-                        )}
-
-                        {/* Trello config panel */}
-                        {integration.name === 'Trello' && showTrelloConfig && (
-                          <div style={{
-                            marginTop: '0.75rem', padding: '0.875rem', borderRadius: '10px',
-                            background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)',
-                          }}>
-                            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#F8FAFC', marginBottom: '0.625rem' }}>Trello Configuration</div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', fontSize: '0.72rem' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span style={{ color: '#8790A8' }}>Board ID</span>
-                                <span style={{ color: '#C0C6D6', fontFamily: 'monospace', fontSize: '0.68rem' }}>66c5d907fffd4029f08565a4</span>
-                              </div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span style={{ color: '#8790A8' }}>API Status</span>
-                                <span style={{ color: '#34D399', fontWeight: 600 }}>Connected</span>
-                              </div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span style={{ color: '#8790A8' }}>Last synced</span>
-                                <span style={{ color: '#C0C6D6' }}>{new Date().toLocaleTimeString()}</span>
-                              </div>
-                            </div>
-                            <button
-                              onClick={handleTrelloTest}
-                              disabled={trelloTesting}
-                              style={{
-                                marginTop: '0.75rem', padding: '5px 12px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 500,
-                                background: 'rgba(120,119,198,0.12)', color: '#7DD3FC',
-                                border: '1px solid rgba(120,119,198,0.25)', cursor: trelloTesting ? 'wait' : 'pointer',
-                                fontFamily: 'inherit', width: '100%',
-                              }}
-                            >
-                              {trelloTesting ? 'Testing...' : 'Test Connection'}
-                            </button>
-                            {trelloTestResult && (
-                              <div style={{
-                                marginTop: '0.5rem', padding: '5px 10px', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 500, textAlign: 'center',
-                                background: trelloTestResult.includes('successful') ? 'rgba(52,211,153,0.12)' : 'rgba(255,107,107,0.12)',
-                                color: trelloTestResult.includes('successful') ? '#34D399' : '#FF6B6B',
-                                border: `1px solid ${trelloTestResult.includes('successful') ? 'rgba(52,211,153,0.25)' : 'rgba(255,107,107,0.25)'}`,
-                              }}>
-                                {trelloTestResult}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* ═══ Security (Audit Logs) ═══ */}
-      </div>
-    </div>
-
-    {/* ── Invite User Modal ──────────────────────────────────── */}
-    {showInvite && (
-      <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
-        onClick={e => { if (e.target === e.currentTarget) setShowInvite(false); }}>
-        <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', borderRadius: '14px', padding: '1.75rem', width: '100%', maxWidth: isMobile ? 'calc(100% - 1rem)' : '440px', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}
-          onClick={e => e.stopPropagation()}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
-            <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Invite User</h2>
-            <button onClick={() => { setShowInvite(false); setInviteError(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px', display: 'flex' }}><X size={16} /></button>
-          </div>
-          {inviteSuccess ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1rem', background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: '8px', color: '#34D399', fontSize: '0.85rem' }}>
-              <Check size={16} /> {inviteSuccess}
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {inviteError && (
-                <div style={{ padding: '0.625rem 0.875rem', background: 'rgba(255,107,107,0.1)', border: '1px solid rgba(255,107,107,0.25)', borderRadius: '8px', color: '#FCA5A5', fontSize: '0.78rem' }}>
-                  {inviteError}
-                </div>
-              )}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.375rem' }}>Full Name *</label>
-                <input className="input-field" style={{ width: '100%' }} placeholder="e.g. Sarah Ahmed" value={inviteForm.name} onChange={e => setInviteForm(f => ({ ...f, name: e.target.value }))} />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.375rem' }}>Email Address *</label>
-                <input className="input-field" style={{ width: '100%' }} type="email" placeholder="e.g. sarah@firm.com" value={inviteForm.email} onChange={e => setInviteForm(f => ({ ...f, email: e.target.value }))} />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.375rem' }}>Role</label>
-                <select className="input-field" style={{ width: '100%' }} value={inviteForm.role} onChange={e => setInviteForm(f => ({ ...f, role: e.target.value }))}>
-                  {Object.keys(roleColors).map(r => <option key={r}>{r}</option>)}
-                </select>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
-                <button className="btn-ghost" onClick={() => { setShowInvite(false); setInviteError(''); }}>Cancel</button>
-                <button className="btn-primary" onClick={handleInviteUser} disabled={inviteSaving || !inviteForm.name || !inviteForm.email}>
-                  {inviteSaving ? 'Sending\u2026' : 'Send Invite'}
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <button
+                  type="button" onClick={handleTrelloRefresh}
+                  className="p-2 rounded-lg text-[color:var(--text-muted)] hover:text-white hover:bg-white/[0.06] transition-colors"
+                  title="Sync"
+                >
+                  <RefreshCw size={13} />
+                </button>
+                <button
+                  type="button" onClick={handleTrelloTest}
+                  disabled={trelloTesting}
+                  className="text-[0.72rem] font-semibold px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[color:var(--text-secondary)] hover:text-white hover:bg-white/[0.08] transition-colors"
+                >
+                  {trelloTesting ? 'Testing…' : 'Test'}
                 </button>
               </div>
             </div>
-          )}
-        </div>
-      </div>
-    )}
-  </>);
+          </div>
+        </motion.div>
+      )}
+
+      {/* Invite modal */}
+      {showInvite && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowInvite(false); setInviteSuccess(''); setInviteError(''); } }}
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 26 }}
+            className="glass-elevated w-full max-w-md rounded-2xl p-6"
+          >
+            <div className="flex items-start justify-between mb-5">
+              <div>
+                <h2 className="text-[1.05rem] font-semibold text-white tracking-tight">Invite User</h2>
+                <p className="text-[0.76rem] text-[color:var(--text-muted)] mt-0.5">Send an email invite to join your team.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setShowInvite(false); setInviteSuccess(''); setInviteError(''); }}
+                className="w-8 h-8 rounded-lg bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-[color:var(--text-muted)] hover:bg-white/[0.08] hover:text-white transition-colors"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            {inviteSuccess && (
+              <div className="flex items-center gap-2 p-3 mb-4 rounded-xl bg-[rgba(52,211,153,0.1)] border border-[rgba(52,211,153,0.25)] text-[#34D399] text-[0.8rem]">
+                <Check size={14} /> {inviteSuccess}
+              </div>
+            )}
+            {inviteError && (
+              <div className="flex items-center gap-2 p-3 mb-4 rounded-xl bg-[rgba(255,107,107,0.08)] border border-[rgba(255,107,107,0.2)] text-[#FCA5A5] text-[0.78rem]">
+                <AlertTriangle size={13} /> {inviteError}
+              </div>
+            )}
+
+            <div className="space-y-3.5">
+              <div>
+                <label className="block text-[0.7rem] font-semibold tracking-[0.08em] uppercase text-[color:var(--text-muted)] mb-1.5">Full Name</label>
+                <input className="input-field" placeholder="e.g. Sarah Ahmed" value={inviteForm.name} onChange={(e) => setInviteForm((f) => ({ ...f, name: e.target.value }))} />
+              </div>
+              <div>
+                <label className="block text-[0.7rem] font-semibold tracking-[0.08em] uppercase text-[color:var(--text-muted)] mb-1.5">Email</label>
+                <input className="input-field" placeholder="sarah@firm.com" value={inviteForm.email} onChange={(e) => setInviteForm((f) => ({ ...f, email: e.target.value }))} />
+              </div>
+              <div>
+                <label className="block text-[0.7rem] font-semibold tracking-[0.08em] uppercase text-[color:var(--text-muted)] mb-1.5">Role</label>
+                <select className="input-field" value={inviteForm.role} onChange={(e) => setInviteForm((f) => ({ ...f, role: e.target.value }))}>
+                  {['Admin', 'Manager', 'Consultant', 'Analyst', 'Viewer'].map((r) => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button type="button" className="btn-ghost" onClick={() => { setShowInvite(false); setInviteError(''); }}>Cancel</button>
+                <button type="button" className="btn-primary min-w-[140px] justify-center" onClick={handleInvite} disabled={inviteSaving || !inviteForm.name || !inviteForm.email}>
+                  {inviteSaving ? 'Sending…' : (<><Mail size={13} /> Send Invite</>)}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </motion.div>
+  );
 }

@@ -1,326 +1,225 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useLayout } from '../hooks/useLayout';
 import {
   RefreshCw, Loader2, AlertCircle, Search, ExternalLink,
-  Calendar, Tag, User, List, Clock,
+  Calendar, User,
 } from 'lucide-react';
-import { fetchBATrafficBoard, type BACard } from '../lib/trello';
-
-// ── Helpers ───────────────────────────────────────────────────
+import { motion } from 'motion/react';
+import { useLayout } from '../hooks/useLayout';
+import { fetchBATrafficBoard, type BACard, type TrelloList } from '../lib/trello';
+import { Badge, cn, fadeUp, stagger } from '../components/ui';
 
 function fmtDate(d: string | null | undefined): string {
   if (!d) return '—';
   const dt = new Date(d);
   if (isNaN(dt.getTime())) return '—';
-  return dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' });
+  return dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 }
 
 function isOverdue(dueDate: string): boolean {
   return new Date(dueDate) < new Date();
 }
 
-// ── Label Badge ───────────────────────────────────────────────
-
-const LABEL_COLORS: Record<string, { bg: string; color: string; border: string }> = {
-  automation: { bg: 'rgba(99,102,241,0.15)', color: '#818CF8', border: 'rgba(99,102,241,0.3)' },
-  default:    { bg: 'rgba(148,163,184,0.1)',  color: '#8790A8', border: 'rgba(148,163,184,0.2)' },
-};
-
-function LabelBadge({ name }: { name: string }) {
-  const isAutomation = name.toLowerCase() === 'automation';
-  const meta = isAutomation ? LABEL_COLORS.automation : LABEL_COLORS.default;
-  return (
-    <span style={{
-      fontSize: '0.6rem', fontWeight: 700, padding: '2px 7px',
-      borderRadius: '9999px', background: meta.bg, color: meta.color,
-      border: `1px solid ${meta.border}`, whiteSpace: 'nowrap',
-      letterSpacing: '0.03em', textTransform: 'uppercase',
-    }}>
-      {name}
-    </span>
-  );
-}
-
-// ── Card Component ────────────────────────────────────────────
-
-function TrelloCardItem({ card }: { card: BACard }) {
-  const overdue = card.dueDate && !card.dueComplete && isOverdue(card.dueDate);
-
-  return (
-    <div style={{
-      background: 'rgba(255,255,255,0.03)',
-      border: '1px solid rgba(255,255,255,0.07)',
-      borderRadius: '12px',
-      padding: '1rem',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '0.625rem',
-      transition: 'border-color 0.2s, background 0.2s',
-    }}
-      onMouseEnter={e => {
-        (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(99,102,241,0.35)';
-        (e.currentTarget as HTMLDivElement).style.background = 'rgba(99,102,241,0.04)';
-      }}
-      onMouseLeave={e => {
-        (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.07)';
-        (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.03)';
-      }}
-    >
-      {/* Title + external link */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem' }}>
-        <h3 style={{
-          margin: 0, fontSize: '0.875rem', fontWeight: 600,
-          color: '#E2E8F0', lineHeight: 1.4, flex: 1,
-        }}>
-          {card.name}
-        </h3>
-        <a
-          href={card.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          title="Open in Trello"
-          style={{ color: '#4E566E', flexShrink: 0, marginTop: '2px' }}
-          onClick={e => e.stopPropagation()}
-        >
-          <ExternalLink size={14} />
-        </a>
-      </div>
-
-      {/* Description */}
-      {card.desc && (
-        <p style={{
-          margin: 0, fontSize: '0.75rem', color: '#8790A8',
-          lineHeight: 1.5, display: '-webkit-box',
-          WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-        }}>
-          {card.desc}
-        </p>
-      )}
-
-      {/* Labels */}
-      {card.labels.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-          {card.labels.map(l => <LabelBadge key={l} name={l} />)}
-        </div>
-      )}
-
-      {/* Meta row */}
-      <div style={{
-        display: 'flex', flexWrap: 'wrap', gap: '0.75rem',
-        fontSize: '0.7rem', color: '#4E566E',
-        borderTop: '1px solid rgba(255,255,255,0.05)',
-        paddingTop: '0.5rem', marginTop: 'auto',
-      }}>
-        {/* List */}
-        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <List size={11} />
-          {card.listName}
-        </span>
-
-        {/* Due date */}
-        {card.dueDate && (
-          <span style={{
-            display: 'flex', alignItems: 'center', gap: '4px',
-            color: card.dueComplete ? '#34D399' : overdue ? '#FCA5A5' : '#4E566E',
-          }}>
-            <Calendar size={11} />
-            {card.dueComplete ? '✓ ' : ''}{fmtDate(card.dueDate)}
-          </span>
-        )}
-
-        {/* Members */}
-        {card.members.length > 0 && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <User size={11} />
-            {card.members.join(', ')}
-          </span>
-        )}
-
-        {/* Last activity */}
-        <span style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: 'auto' }}>
-          <Clock size={11} />
-          {fmtDate(card.lastActivity)}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-// ── Main Screen ────────────────────────────────────────────────
-
 export default function TrelloCards() {
   const { isMobile } = useLayout();
   const [cards, setCards] = useState<BACard[]>([]);
+  const [lists, setLists] = useState<TrelloList[]>([]);
   const [boardName, setBoardName] = useState('');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const [syncing, setSyncing] = useState(false);
+  const [lastSynced, setLastSynced] = useState<Date | null>(null);
   const [search, setSearch] = useState('');
-  const [lastFetched, setLastFetched] = useState<Date | null>(null);
+  const [activeList, setActiveList] = useState<string>('');
 
-  async function fetchCards() {
-    setLoading(true);
-    setError(null);
+  async function load() {
     try {
       const data = await fetchBATrafficBoard();
-      // Filter cards that have the "automation" label
-      const automationCards = data.cards.filter(c =>
-        c.labels.some(l => l.toLowerCase() === 'automation')
-      );
-      setCards(automationCards);
+      setCards(data.cards);
+      setLists(data.lists);
       setBoardName(data.boardName);
-      setLastFetched(new Date());
+      setLastSynced(new Date());
+      setError('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch Trello cards');
-    } finally {
-      setLoading(false);
+      setError(err instanceof Error ? err.message : 'Failed to load Trello board');
     }
   }
 
-  useEffect(() => { fetchCards(); }, []);
+  useEffect(() => {
+    setLoading(true);
+    load().finally(() => setLoading(false));
+  }, []);
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return cards;
-    const q = search.toLowerCase();
-    return cards.filter(c =>
-      c.name.toLowerCase().includes(q) ||
-      c.desc.toLowerCase().includes(q) ||
-      c.listName.toLowerCase().includes(q) ||
-      c.members.some(m => m.toLowerCase().includes(q))
-    );
-  }, [cards, search]);
+  async function handleSync() {
+    setSyncing(true);
+    await load();
+    setSyncing(false);
+  }
+
+  const uniqueLists = useMemo(() => [...new Set(cards.map((c) => c.listName))].sort(), [cards]);
+
+  const filtered = useMemo(() => cards.filter((c) => {
+    if (activeList && c.listName !== activeList) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return (
+        c.name.toLowerCase().includes(q) ||
+        c.client.toLowerCase().includes(q) ||
+        c.members.some((m) => m.toLowerCase().includes(q)) ||
+        c.labels.some((l) => l.toLowerCase().includes(q))
+      );
+    }
+    return true;
+  }), [cards, activeList, search]);
 
   return (
-    <div style={{ padding: isMobile ? '0.875rem' : '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-
+    <motion.div
+      initial="hidden" animate="show"
+      variants={{ hidden: {}, show: { transition: stagger(0.05, 0.08) } }}
+      className="screen-container"
+    >
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#F8FAFC' }}>
-            Trello — Automation Cards
-          </h1>
-          <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: '#4E566E' }}>
-            {boardName ? `Board: ${boardName}` : 'Cards labelled "automation"'}
-            {lastFetched && ` · Last synced ${lastFetched.toLocaleTimeString()}`}
+      <motion.div variants={fadeUp} className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="min-w-0">
+          <h1 className="text-[1.5rem] md:text-[1.75rem] font-semibold tracking-[-0.025em] leading-tight text-white">Trello Cards</h1>
+          <p className="text-[0.78rem] text-[color:var(--text-muted)] mt-1">
+            {boardName ? `${boardName} · ` : ''}{cards.length} cards · {lists.length} lists
+            {lastSynced && <> · Synced {lastSynced.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</>}
           </p>
         </div>
-        <button
-          onClick={fetchCards}
-          disabled={loading}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '6px',
-            padding: '0.5rem 1rem', borderRadius: '8px',
-            background: 'rgba(99,102,241,0.12)', color: '#818CF8',
-            border: '1px solid rgba(99,102,241,0.25)',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            fontSize: '0.8rem', fontWeight: 600, opacity: loading ? 0.6 : 1,
-          }}
-        >
-          <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-          Refresh
-        </button>
-      </div>
-
-      {/* Stats */}
-      {!loading && !error && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
-          {[
-            { label: 'Total Cards', value: cards.length, color: '#818CF8' },
-            { label: 'Open', value: cards.filter(c => !c.dueComplete).length, color: '#7DD3FC' },
-            { label: 'Completed', value: cards.filter(c => c.dueComplete).length, color: '#34D399' },
-            { label: 'Overdue', value: cards.filter(c => c.dueDate && !c.dueComplete && isOverdue(c.dueDate)).length, color: '#FCA5A5' },
-          ].map(s => (
-            <div key={s.label} style={{
-              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
-              borderRadius: '10px', padding: '0.75rem 1rem',
-            }}>
-              <div style={{ fontSize: '1.375rem', fontWeight: 700, color: s.color }}>{s.value}</div>
-              <div style={{ fontSize: '0.7rem', color: '#4E566E', marginTop: '2px' }}>{s.label}</div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Search */}
-      {!loading && !error && cards.length > 0 && (
-        <div style={{ position: 'relative', maxWidth: '360px' }}>
-          <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#4E566E' }} />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search cards…"
-            style={{
-              width: '100%', paddingLeft: '32px', paddingRight: '12px',
-              paddingTop: '0.5rem', paddingBottom: '0.5rem',
-              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: '8px', color: '#E2E8F0', fontSize: '0.8rem',
-              outline: 'none', boxSizing: 'border-box',
-            }}
-          />
-        </div>
-      )}
-
-      {/* Loading */}
-      {loading && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', padding: '3rem 0', color: '#4E566E' }}>
-          <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', color: '#818CF8' }} />
-          <span style={{ fontSize: '0.875rem' }}>Fetching Trello cards…</span>
-        </div>
-      )}
-
-      {/* Error */}
-      {!loading && error && (
-        <div style={{
-          background: 'rgba(255,107,107,0.08)', border: '1px solid rgba(255,107,107,0.2)',
-          borderRadius: '10px', padding: '1.25rem',
-          display: 'flex', alignItems: 'flex-start', gap: '0.75rem',
-        }}>
-          <AlertCircle size={18} style={{ color: '#FCA5A5', flexShrink: 0, marginTop: '1px' }} />
-          <div>
-            <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#FCA5A5' }}>Failed to load cards</div>
-            <div style={{ fontSize: '0.8rem', color: '#8790A8', marginTop: '4px' }}>{error}</div>
-            <button
-              onClick={fetchCards}
-              style={{
-                marginTop: '0.75rem', padding: '0.375rem 0.875rem',
-                background: 'rgba(255,107,107,0.12)', border: '1px solid rgba(255,107,107,0.25)',
-                borderRadius: '6px', color: '#FCA5A5', fontSize: '0.75rem',
-                fontWeight: 600, cursor: 'pointer',
-              }}
-            >
-              Retry
-            </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative flex items-center gap-2 rounded-full bg-white/[0.04] border border-white/[0.08] backdrop-blur-md px-3.5 h-[38px] w-full sm:w-[240px]">
+            <Search size={14} className="text-[color:var(--text-muted)] flex-shrink-0" />
+            <input
+              type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search cards…"
+              className="flex-1 bg-transparent border-0 outline-none text-[0.83rem] text-white placeholder:text-[color:var(--text-faint)] min-w-0"
+            />
           </div>
+          <button type="button" onClick={handleSync} disabled={syncing} className="btn-ghost h-[38px]">
+            <RefreshCw size={13} className={syncing ? 'animate-spin' : ''} />
+            {syncing ? 'Syncing…' : 'Sync'}
+          </button>
+        </div>
+      </motion.div>
+
+      {/* List filter pills */}
+      {uniqueLists.length > 0 && (
+        <motion.div variants={fadeUp} className="flex items-center gap-1.5 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setActiveList('')}
+            className={cn(
+              'px-3 py-1.5 rounded-full text-[0.76rem] font-medium transition-colors border',
+              activeList === ''
+                ? 'bg-[rgba(120,119,198,0.18)] text-white border-[rgba(120,119,198,0.35)]'
+                : 'bg-white/[0.025] border-white/[0.06] text-[color:var(--text-muted)] hover:text-white',
+            )}
+          >
+            All lists ({cards.length})
+          </button>
+          {uniqueLists.map((l) => {
+            const count = cards.filter((c) => c.listName === l).length;
+            const isActive = activeList === l;
+            return (
+              <button
+                key={l}
+                type="button"
+                onClick={() => setActiveList(l)}
+                className={cn(
+                  'px-3 py-1.5 rounded-full text-[0.76rem] font-medium transition-colors border',
+                  isActive
+                    ? 'bg-[rgba(120,119,198,0.18)] text-white border-[rgba(120,119,198,0.35)]'
+                    : 'bg-white/[0.025] border-white/[0.06] text-[color:var(--text-muted)] hover:text-white',
+                )}
+              >
+                {l} <span className="text-[color:var(--text-faint)]">({count})</span>
+              </button>
+            );
+          })}
+        </motion.div>
+      )}
+
+      {loading && (
+        <div className="flex items-center justify-center gap-2 py-14 text-[color:var(--text-muted)] text-[0.82rem]">
+          <Loader2 size={15} className="animate-spin" /> Loading Trello board…
         </div>
       )}
 
-      {/* Empty state */}
-      {!loading && !error && cards.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '3rem 0', color: '#4E566E' }}>
-          <Tag size={32} style={{ opacity: 0.3, marginBottom: '0.75rem' }} />
-          <div style={{ fontSize: '0.875rem' }}>No cards found with the "automation" label</div>
+      {!loading && error && (
+        <div className="flex items-center gap-2 p-4 rounded-xl bg-[rgba(255,107,107,0.08)] border border-[rgba(255,107,107,0.22)] text-[#FCA5A5] text-[0.82rem]">
+          <AlertCircle size={14} /> {error}
+          <button className="btn-ghost ml-auto h-[30px] text-[0.72rem]" onClick={handleSync}>Retry</button>
         </div>
       )}
 
-      {/* No search results */}
-      {!loading && !error && cards.length > 0 && filtered.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '2rem 0', color: '#4E566E', fontSize: '0.875rem' }}>
-          No cards match "<strong style={{ color: '#8790A8' }}>{search}</strong>"
+      {!loading && !error && filtered.length === 0 && (
+        <div className="section-card p-12 flex flex-col items-center gap-2 text-center">
+          <div className="text-[0.92rem] font-semibold text-white">No cards found</div>
+          <div className="text-[0.76rem] text-[color:var(--text-muted)]">Try clearing filters or re-syncing.</div>
         </div>
       )}
 
-      {/* Cards grid */}
       {!loading && !error && filtered.length > 0 && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? '100%' : '300px'}, 1fr))`,
-          gap: '0.875rem',
-        }}>
-          {filtered.map(card => <TrelloCardItem key={card.id} card={card} />)}
-        </div>
-      )}
+        <motion.div
+          variants={{ hidden: {}, show: { transition: stagger(0.03, 0.04) } }}
+          className="grid gap-3"
+          style={{ gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(260px, 1fr))' }}
+        >
+          {filtered.map((card) => {
+            const overdue = card.dueDate && !card.dueComplete && isOverdue(card.dueDate);
+            return (
+              <motion.a
+                key={card.id}
+                variants={fadeUp}
+                whileHover={{ y: -2, transition: { type: 'spring', stiffness: 320, damping: 24 } }}
+                href={card.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group rounded-2xl bg-white/[0.025] border border-white/[0.06] hover:border-white/[0.14] hover:bg-white/[0.04] transition-colors p-4 flex flex-col gap-2"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="text-[0.88rem] font-semibold text-white leading-snug flex-1">{card.name}</h3>
+                  <ExternalLink size={12} className="text-[color:var(--text-faint)] group-hover:text-white transition-colors flex-shrink-0 mt-1" />
+                </div>
 
-      {/* Spin keyframe */}
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </div>
+                <div className="flex items-center gap-2 text-[0.7rem] text-[color:var(--text-muted)] flex-wrap">
+                  <span className="font-semibold text-[color:var(--text-secondary)] truncate">{card.listName}</span>
+                  {card.client && (<><span>·</span><span className="truncate">{card.client}</span></>)}
+                </div>
+
+                {card.labels.length > 0 && (
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {card.labels.slice(0, 4).map((l) => (
+                      <span key={l} className="text-[0.6rem] font-semibold px-1.5 py-0.5 rounded bg-white/[0.05] text-[color:var(--text-muted)] uppercase tracking-[0.04em]">
+                        {l}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between text-[0.7rem] pt-1.5 border-t border-white/[0.04]">
+                  {card.members.length > 0 ? (
+                    <span className="flex items-center gap-1 text-[color:var(--text-muted)] truncate">
+                      <User size={10} />{card.members.slice(0, 2).join(', ')}{card.members.length > 2 && ` +${card.members.length - 2}`}
+                    </span>
+                  ) : <span />}
+                  {card.dueDate && (
+                    <span className={cn('flex items-center gap-1', overdue ? 'text-[#FCA5A5] font-semibold' : card.dueComplete ? 'text-[#63E6BE]' : 'text-[color:var(--text-muted)]')}>
+                      <Calendar size={10} />{fmtDate(card.dueDate)}
+                    </span>
+                  )}
+                </div>
+
+                {overdue && (
+                  <div className="mt-1">
+                    <Badge tone="critical">Overdue</Badge>
+                  </div>
+                )}
+              </motion.a>
+            );
+          })}
+        </motion.div>
+      )}
+    </motion.div>
   );
 }
