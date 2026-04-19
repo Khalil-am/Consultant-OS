@@ -368,8 +368,6 @@ export default function MeetingDetail() {
         padding: '1.5rem',
         position: 'relative', overflow: 'hidden',
       }}>
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(90deg, ${tc}, transparent)` }} />
-        <div style={{ position: 'absolute', top: -30, right: -30, width: 120, height: 120, borderRadius: '50%', background: `radial-gradient(circle, ${tc}08 0%, transparent 70%)`, pointerEvents: 'none' }} />
 
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
           {/* Icon */}
