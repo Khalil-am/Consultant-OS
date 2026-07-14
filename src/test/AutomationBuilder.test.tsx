@@ -3908,3 +3908,216 @@ describe('AutomationBuilder – Node Search', () => {
     expect(screen.getByRole('button', { name: /flow node: Validate/i })).toBeInTheDocument();
   });
 });
+
+// ────────────────────────────────────────────────────────────────────────────
+describe('AutomationBuilder – Interactive Destinations', () => {
+  async function goToDestinations() {
+    renderBuilder();
+    await screen.findByText('Meeting Minutes Generator');
+    await userEvent.click(screen.getByRole('button', { name: /builder tab: Destinations/i }));
+    await waitFor(() => expect(screen.getByText('Output Destinations')).toBeInTheDocument());
+  }
+
+  it('navigates to Destinations tab', async () => {
+    await goToDestinations();
+    expect(screen.getByText('Output Destinations')).toBeInTheDocument();
+  });
+
+  it('shows all 5 destination options', async () => {
+    await goToDestinations();
+    const checkboxes = screen.getAllByRole('checkbox', { name: /toggle destination/i });
+    expect(checkboxes.length).toBe(5);
+  });
+
+  it('Save to Workspace is checked by default', async () => {
+    await goToDestinations();
+    const cb = screen.getByRole('checkbox', { name: /toggle destination: Save to Workspace/i });
+    expect(cb).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('Push to Jira is unchecked by default', async () => {
+    await goToDestinations();
+    const cb = screen.getByRole('checkbox', { name: /toggle destination: Push to Jira/i });
+    expect(cb).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('clicking a destination toggles it', async () => {
+    await goToDestinations();
+    const cb = screen.getByRole('checkbox', { name: /toggle destination: Push to Jira/i });
+    expect(cb).toHaveAttribute('aria-checked', 'false');
+    await userEvent.click(cb);
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: /toggle destination: Push to Jira/i })).toHaveAttribute('aria-checked', 'true'));
+  });
+
+  it('toggling a destination persists to localStorage', async () => {
+    await goToDestinations();
+    const cb = screen.getByRole('checkbox', { name: /toggle destination: Push to Jira/i });
+    await userEvent.click(cb);
+    await waitFor(() => {
+      const stored = JSON.parse(localStorage.getItem('ab_destinations_auto-1') ?? '[]');
+      const jira = stored.find((d: { id: string }) => d.id === 'jira');
+      expect(jira?.checked).toBe(true);
+    });
+  });
+
+  it('unchecking a checked destination disables it', async () => {
+    await goToDestinations();
+    const cb = screen.getByRole('checkbox', { name: /toggle destination: Save to Workspace/i });
+    expect(cb).toHaveAttribute('aria-checked', 'true');
+    await userEvent.click(cb);
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: /toggle destination: Save to Workspace/i })).toHaveAttribute('aria-checked', 'false'));
+  });
+
+  it('shows active destination count', async () => {
+    await goToDestinations();
+    expect(screen.getByText(/\d+ active/i)).toBeInTheDocument();
+  });
+
+  it('destinations load from localStorage if previously saved', async () => {
+    localStorage.setItem('ab_destinations_auto-1', JSON.stringify([
+      { id: 'workspace', label: 'Save to Workspace', detail: 'Documents library', checked: false, color: '#0EA5E9' },
+      { id: 'word', label: 'Export as Word', detail: 'Microsoft Word .docx', checked: false, color: '#0EA5E9' },
+      { id: 'pdf', label: 'Export as PDF', detail: 'PDF with Consultant OS branding', checked: false, color: '#8B5CF6' },
+      { id: 'sharepoint', label: 'Sync to SharePoint', detail: 'NCA Programme folder', checked: true, color: '#F59E0B' },
+      { id: 'jira', label: 'Push to Jira', detail: 'Create requirements tickets', checked: false, color: '#10B981' },
+    ]));
+    await goToDestinations();
+    const sharepoint = screen.getByRole('checkbox', { name: /toggle destination: Sync to SharePoint/i });
+    expect(sharepoint).toHaveAttribute('aria-checked', 'true');
+    const workspace = screen.getByRole('checkbox', { name: /toggle destination: Save to Workspace/i });
+    expect(workspace).toHaveAttribute('aria-checked', 'false');
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+describe('AutomationBuilder – Interactive Notifications', () => {
+  async function goToNotifications() {
+    renderBuilder();
+    await screen.findByText('Meeting Minutes Generator');
+    await userEvent.click(screen.getByRole('button', { name: /builder tab: Notifications/i }));
+    await waitFor(() => expect(screen.getByText('Notification Rules')).toBeInTheDocument());
+  }
+
+  it('navigates to Notifications tab', async () => {
+    await goToNotifications();
+    expect(screen.getByText('Notification Rules')).toBeInTheDocument();
+  });
+
+  it('shows all 5 notification options', async () => {
+    await goToNotifications();
+    const switches = screen.getAllByRole('switch', { name: /toggle notification/i });
+    expect(switches.length).toBe(5);
+  });
+
+  it('Email on Success is enabled by default', async () => {
+    await goToNotifications();
+    const sw = screen.getByRole('switch', { name: /toggle notification: Email on Success/i });
+    expect(sw).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('Slack Notification is disabled by default', async () => {
+    await goToNotifications();
+    const sw = screen.getByRole('switch', { name: /toggle notification: Slack Notification/i });
+    expect(sw).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('clicking a notification toggle switches it on', async () => {
+    await goToNotifications();
+    const sw = screen.getByRole('switch', { name: /toggle notification: Slack Notification/i });
+    await userEvent.click(sw);
+    await waitFor(() => expect(screen.getByRole('switch', { name: /toggle notification: Slack Notification/i })).toHaveAttribute('aria-checked', 'true'));
+  });
+
+  it('toggling a notification persists to localStorage', async () => {
+    await goToNotifications();
+    const sw = screen.getByRole('switch', { name: /toggle notification: Slack Notification/i });
+    await userEvent.click(sw);
+    await waitFor(() => {
+      const stored = JSON.parse(localStorage.getItem('ab_notifications_auto-1') ?? '[]');
+      const slack = stored.find((n: { id: string }) => n.id === 'slack');
+      expect(slack?.enabled).toBe(true);
+    });
+  });
+
+  it('toggling an enabled notification disables it', async () => {
+    await goToNotifications();
+    const sw = screen.getByRole('switch', { name: /toggle notification: Email on Success/i });
+    expect(sw).toHaveAttribute('aria-checked', 'true');
+    await userEvent.click(sw);
+    await waitFor(() => expect(screen.getByRole('switch', { name: /toggle notification: Email on Success/i })).toHaveAttribute('aria-checked', 'false'));
+  });
+
+  it('shows enabled count text', async () => {
+    await goToNotifications();
+    expect(screen.getByText(/\d+ enabled/i)).toBeInTheDocument();
+  });
+
+  it('notifications load from localStorage if previously saved', async () => {
+    localStorage.setItem('ab_notifications_auto-1', JSON.stringify([
+      { id: 'email_success', label: 'Email on Success', detail: 'Send to assigned consultant', enabled: false },
+      { id: 'email_error', label: 'Email on Error', detail: 'Alert to workspace admin', enabled: false },
+      { id: 'slack', label: 'Slack Notification', detail: '#automation-runs channel', enabled: true },
+      { id: 'teams', label: 'Teams Message', detail: 'Project team channel', enabled: false },
+      { id: 'in_app', label: 'In-App Alert', detail: 'Show in notification centre', enabled: false },
+    ]));
+    await goToNotifications();
+    const slack = screen.getByRole('switch', { name: /toggle notification: Slack Notification/i });
+    expect(slack).toHaveAttribute('aria-checked', 'true');
+    const email = screen.getByRole('switch', { name: /toggle notification: Email on Success/i });
+    expect(email).toHaveAttribute('aria-checked', 'false');
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+describe('AutomationBuilder – Run Statistics', () => {
+  async function goToLogs() {
+    renderBuilder();
+    await screen.findByText('Meeting Minutes Generator');
+    await userEvent.click(screen.getByRole('button', { name: /builder tab: Logs/i }));
+    await waitFor(() => expect(screen.getByLabelText('Run statistics')).toBeInTheDocument());
+  }
+
+  it('navigates to Logs tab and shows run statistics', async () => {
+    await goToLogs();
+    expect(screen.getByLabelText('Run statistics')).toBeInTheDocument();
+  });
+
+  it('shows Total Runs stat', async () => {
+    await goToLogs();
+    expect(screen.getByLabelText('Stat: Total Runs')).toBeInTheDocument();
+  });
+
+  it('shows Success Rate stat', async () => {
+    await goToLogs();
+    expect(screen.getByLabelText('Stat: Success Rate')).toBeInTheDocument();
+  });
+
+  it('shows Avg Duration stat', async () => {
+    await goToLogs();
+    expect(screen.getByLabelText('Stat: Avg Duration')).toBeInTheDocument();
+  });
+
+  it('Total Runs shows correct count (5 mock logs)', async () => {
+    await goToLogs();
+    const totalStat = screen.getByLabelText('Stat: Total Runs');
+    expect(totalStat).toHaveTextContent('5');
+  });
+
+  it('Success Rate stat shows percentage', async () => {
+    await goToLogs();
+    const rate = screen.getByLabelText('Stat: Success Rate');
+    expect(rate.textContent).toMatch(/%/);
+  });
+
+  it('Avg Duration stat shows seconds', async () => {
+    await goToLogs();
+    const dur = screen.getByLabelText('Stat: Avg Duration');
+    expect(dur.textContent).toMatch(/s/);
+  });
+
+  it('run stats panel is visible above recent runs list', async () => {
+    await goToLogs();
+    expect(screen.getByLabelText('Run statistics')).toBeInTheDocument();
+    expect(screen.getByText('Recent Runs')).toBeInTheDocument();
+  });
+});

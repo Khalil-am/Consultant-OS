@@ -95,6 +95,69 @@ export default function AutomationBuilder() {
   const [nodeTypeFilter, setNodeTypeFilter] = useState<string>('All');
   const [nodeSearch, setNodeSearch] = useState('');
 
+  // ── Interactive destinations ────────────────────────────────
+  const DEST_KEY = `ab_destinations_${id ?? 'default'}`;
+  const defaultDestinations = [
+    { id: 'workspace', label: 'Save to Workspace', detail: 'Documents library', checked: true, color: '#0EA5E9' },
+    { id: 'word', label: 'Export as Word', detail: 'Microsoft Word .docx', checked: true, color: '#0EA5E9' },
+    { id: 'pdf', label: 'Export as PDF', detail: 'PDF with Consultant OS branding', checked: true, color: '#8B5CF6' },
+    { id: 'sharepoint', label: 'Sync to SharePoint', detail: 'NCA Programme folder', checked: false, color: '#F59E0B' },
+    { id: 'jira', label: 'Push to Jira', detail: 'Create requirements tickets', checked: false, color: '#10B981' },
+  ];
+  const [destinations, setDestinations] = useState(() => {
+    try {
+      const saved = localStorage.getItem(DEST_KEY);
+      if (saved) return JSON.parse(saved) as typeof defaultDestinations;
+    } catch { /* ignore */ }
+    return defaultDestinations;
+  });
+
+  function toggleDestination(destId: string) {
+    setDestinations(prev => {
+      const next = prev.map(d => d.id === destId ? { ...d, checked: !d.checked } : d);
+      try { localStorage.setItem(DEST_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }
+
+  // ── Interactive notifications ──────────────────────────────
+  const NOTIF_KEY = `ab_notifications_${id ?? 'default'}`;
+  const defaultNotifications = [
+    { id: 'email_success', label: 'Email on Success', detail: 'Send to assigned consultant', enabled: true },
+    { id: 'email_error', label: 'Email on Error', detail: 'Alert to workspace admin', enabled: true },
+    { id: 'slack', label: 'Slack Notification', detail: '#automation-runs channel', enabled: false },
+    { id: 'teams', label: 'Teams Message', detail: 'Project team channel', enabled: true },
+    { id: 'in_app', label: 'In-App Alert', detail: 'Show in notification centre', enabled: true },
+  ];
+  const [notifications, setNotifications] = useState(() => {
+    try {
+      const saved = localStorage.getItem(NOTIF_KEY);
+      if (saved) return JSON.parse(saved) as typeof defaultNotifications;
+    } catch { /* ignore */ }
+    return defaultNotifications;
+  });
+
+  function toggleNotification(notifId: string) {
+    setNotifications(prev => {
+      const next = prev.map(n => n.id === notifId ? { ...n, enabled: !n.enabled } : n);
+      try { localStorage.setItem(NOTIF_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }
+
+  // ── Run statistics ─────────────────────────────────────────
+  const runStats = {
+    total: recentLogs.length,
+    success: recentLogs.filter(l => l.status === 'Success').length,
+    warning: recentLogs.filter(l => l.status === 'Warning').length,
+    error: recentLogs.filter(l => l.status === 'Error').length,
+    successRate: recentLogs.length > 0 ? Math.round(recentLogs.filter(l => l.status === 'Success').length / recentLogs.length * 100) : 0,
+    avgDuration: (() => {
+      const durations = recentLogs.map(l => parseInt(l.duration)).filter(n => !isNaN(n));
+      return durations.length > 0 ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) : 0;
+    })(),
+  };
+
   function handleSaveNotes() {
     try {
       const existing = JSON.parse(localStorage.getItem(storageKey) ?? '{}');
@@ -627,24 +690,27 @@ export default function AutomationBuilder() {
             {/* Destinations */}
             {activeTab === 'Destinations' && (
               <div>
-                <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#94A3B8', marginBottom: '0.875rem' }}>Output Destinations</div>
-                {[
-                  { label: 'Save to Workspace', detail: 'Documents library', checked: true, color: '#0EA5E9' },
-                  { label: 'Export as Word', detail: 'Microsoft Word .docx', checked: true, color: '#0EA5E9' },
-                  { label: 'Export as PDF', detail: 'PDF with Consultant OS branding', checked: true, color: '#8B5CF6' },
-                  { label: 'Sync to SharePoint', detail: 'NCA Programme folder', checked: false, color: '#F59E0B' },
-                  { label: 'Push to Jira', detail: 'Create requirements tickets', checked: false, color: '#10B981' },
-                ].map((dest, i) => (
-                  <div key={i} style={{
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.875rem' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#94A3B8' }}>Output Destinations</div>
+                  <span style={{ fontSize: '0.65rem', color: '#475569' }}>{destinations.filter(d => d.checked).length} active</span>
+                </div>
+                {destinations.map(dest => (
+                  <div key={dest.id} style={{
                     display: 'flex', alignItems: 'center', gap: '0.75rem',
                     padding: '0.625rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)',
-                  }}>
-                    <div style={{
-                      width: '16px', height: '16px', borderRadius: '4px',
-                      background: dest.checked ? `${dest.color}20` : 'rgba(255,255,255,0.04)',
-                      border: `1px solid ${dest.checked ? dest.color + '50' : 'rgba(255,255,255,0.1)'}`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                    }}>
+                    cursor: 'pointer',
+                  }} onClick={() => toggleDestination(dest.id)}>
+                    <div
+                      role="checkbox"
+                      aria-checked={dest.checked}
+                      aria-label={`Toggle destination: ${dest.label}`}
+                      style={{
+                        width: '16px', height: '16px', borderRadius: '4px',
+                        background: dest.checked ? `${dest.color}20` : 'rgba(255,255,255,0.04)',
+                        border: `1px solid ${dest.checked ? dest.color + '50' : 'rgba(255,255,255,0.1)'}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                      }}
+                    >
                       {dest.checked && <Check size={10} style={{ color: dest.color }} />}
                     </div>
                     <div style={{ flex: 1 }}>
@@ -659,15 +725,12 @@ export default function AutomationBuilder() {
             {/* Notifications */}
             {activeTab === 'Notifications' && (
               <div>
-                <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#94A3B8', marginBottom: '0.875rem' }}>Notification Rules</div>
-                {[
-                  { label: 'Email on Success', detail: 'Send to assigned consultant', enabled: true },
-                  { label: 'Email on Error', detail: 'Alert to workspace admin', enabled: true },
-                  { label: 'Slack Notification', detail: '#automation-runs channel', enabled: false },
-                  { label: 'Teams Message', detail: 'Project team channel', enabled: true },
-                  { label: 'In-App Alert', detail: 'Show in notification centre', enabled: true },
-                ].map((notif, i) => (
-                  <div key={i} style={{
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.875rem' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#94A3B8' }}>Notification Rules</div>
+                  <span style={{ fontSize: '0.65rem', color: '#475569' }}>{notifications.filter(n => n.enabled).length} enabled</span>
+                </div>
+                {notifications.map(notif => (
+                  <div key={notif.id} style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     padding: '0.625rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)',
                   }}>
@@ -675,12 +738,19 @@ export default function AutomationBuilder() {
                       <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#94A3B8' }}>{notif.label}</div>
                       <div style={{ fontSize: '0.68rem', color: '#334155' }}>{notif.detail}</div>
                     </div>
-                    <div style={{
-                      width: '32px', height: '18px', borderRadius: '9999px',
-                      background: notif.enabled ? 'rgba(0,212,255,0.3)' : 'rgba(255,255,255,0.08)',
-                      border: `1px solid ${notif.enabled ? 'rgba(0,212,255,0.5)' : 'rgba(255,255,255,0.12)'}`,
-                      cursor: 'pointer', position: 'relative',
-                    }}>
+                    <button
+                      role="switch"
+                      aria-checked={notif.enabled}
+                      aria-label={`Toggle notification: ${notif.label}`}
+                      onClick={() => toggleNotification(notif.id)}
+                      style={{
+                        width: '32px', height: '18px', borderRadius: '9999px',
+                        background: notif.enabled ? 'rgba(0,212,255,0.3)' : 'rgba(255,255,255,0.08)',
+                        border: `1px solid ${notif.enabled ? 'rgba(0,212,255,0.5)' : 'rgba(255,255,255,0.12)'}`,
+                        cursor: 'pointer', position: 'relative', flexShrink: 0,
+                        padding: 0, outline: 'none',
+                      }}
+                    >
                       <div style={{
                         position: 'absolute',
                         width: '12px', height: '12px', borderRadius: '9999px',
@@ -689,7 +759,7 @@ export default function AutomationBuilder() {
                         left: notif.enabled ? '17px' : '2px',
                         transition: 'left 0.2s',
                       }} />
-                    </div>
+                    </button>
                   </div>
                 ))}
               </div>
@@ -698,6 +768,19 @@ export default function AutomationBuilder() {
             {/* Logs */}
             {activeTab === 'Logs' && (
               <div>
+                {/* Run statistics */}
+                <div aria-label="Run statistics" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginBottom: '1rem' }}>
+                  {[
+                    { label: 'Total Runs', value: runStats.total, color: '#94A3B8' },
+                    { label: 'Success Rate', value: `${runStats.successRate}%`, color: '#10B981' },
+                    { label: 'Avg Duration', value: `${runStats.avgDuration}s`, color: '#0EA5E9' },
+                  ].map(stat => (
+                    <div key={stat.label} aria-label={`Stat: ${stat.label}`} style={{ padding: '0.5rem 0.625rem', borderRadius: '6px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>
+                      <div style={{ fontSize: '1rem', fontWeight: 700, color: stat.color }}>{stat.value}</div>
+                      <div style={{ fontSize: '0.62rem', color: '#475569', marginTop: '1px' }}>{stat.label}</div>
+                    </div>
+                  ))}
+                </div>
                 {/* Live run output */}
                 {(running || runOutput || runError) && (
                   <div style={{ marginBottom: '1rem', padding: '0.875rem', borderRadius: '0.5rem', background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)' }}>
