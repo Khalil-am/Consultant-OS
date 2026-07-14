@@ -202,7 +202,7 @@ export default function Tasks() {
   const [listFilter, setListFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('All');
   const [sortBy, setSortBy] = useState<'default' | 'priority' | 'due_date' | 'client' | 'assignee' | 'name' | 'label' | 'status'>('default');
-  const [dueDateFilter, setDueDateFilter] = useState<'All' | 'Due Today' | 'Due This Week' | 'No Due Date'>('All');
+  const [dueDateFilter, setDueDateFilter] = useState<'All' | 'Due Today' | 'Due in 3 Days' | 'Due This Week' | 'No Due Date'>('All');
   const [assigneeFilter, setAssigneeFilter] = useState<string>('All');
   const [paymentOnly, setPaymentOnly] = useState(false);
   const [clientFilter, setClientFilter] = useState<string>('All');
@@ -387,6 +387,11 @@ export default function Tasks() {
         if (!c.dueDate) return false;
         const dd = c.dueDate.slice(0, 10);
         if (dueDateFilter === 'Due Today' && dd !== todayStr) return false;
+        if (dueDateFilter === 'Due in 3 Days') {
+          const in3Days = new Date(); in3Days.setDate(in3Days.getDate() + 3);
+          const in3Str = in3Days.toISOString().slice(0, 10);
+          if (dd < todayStr || dd > in3Str) return false;
+        }
         if (dueDateFilter === 'Due This Week' && (dd < weekStart || dd > weekEnd)) return false;
       }
       if (assigneeFilter !== 'All' && !c.members.includes(assigneeFilter)) return false;
@@ -626,7 +631,7 @@ export default function Tasks() {
 
       {/* Due-date quick filters */}
       <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-        {(['All', 'Due Today', 'Due This Week', 'No Due Date'] as const).map(df => (
+        {(['All', 'Due Today', 'Due in 3 Days', 'Due This Week', 'No Due Date'] as const).map(df => (
           <button
             key={df}
             className={`btn-ghost${dueDateFilter === df ? ' active' : ''}`}

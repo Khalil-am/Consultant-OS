@@ -6091,3 +6091,106 @@ describe('Tasks – Bulk Selection', () => {
     });
   });
 });
+
+// ────────────────────────────────────────────────────────────
+describe('Tasks – Due in 3 Days Filter', () => {
+  function daysFromNow(n: number): string {
+    const d = new Date();
+    d.setDate(d.getDate() + n);
+    return d.toISOString();
+  }
+
+  const dueSoonCard = {
+    ...mockCard,
+    id: 'due-soon-1',
+    name: 'Due In 2 Days Task',
+    dueDate: daysFromNow(2),
+    dueComplete: false,
+    listName: 'In Progress',
+  };
+  const dueNextWeekCard = {
+    ...mockCard,
+    id: 'due-next-week',
+    name: 'Due Next Week Task',
+    dueDate: daysFromNow(7),
+    dueComplete: false,
+    listName: 'Backlog',
+  };
+  const noDueDateCard = {
+    ...mockCard,
+    id: 'no-due-date',
+    name: 'No Due Date Task',
+    dueDate: null,
+    dueComplete: false,
+    listName: 'Backlog',
+  };
+
+  beforeEach(() => {
+    mockFetchBATrafficBoard.mockResolvedValue({
+      cards: [dueSoonCard, dueNextWeekCard, noDueDateCard],
+      lists: [mockList],
+      boardName: 'Test Board',
+    });
+  });
+
+  it('renders "Due in 3 Days" filter button', async () => {
+    renderTasks();
+    await screen.findByText('Due In 2 Days Task');
+    expect(screen.getByRole('button', { name: /filter tasks by due date: due in 3 days/i })).toBeInTheDocument();
+  });
+
+  it('"Due in 3 Days" button is aria-pressed false by default', async () => {
+    renderTasks();
+    await screen.findByText('Due In 2 Days Task');
+    const btn = screen.getByRole('button', { name: /filter tasks by due date: due in 3 days/i });
+    expect(btn).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('clicking "Due in 3 Days" sets aria-pressed to true', async () => {
+    renderTasks();
+    await screen.findByText('Due In 2 Days Task');
+    const btn = screen.getByRole('button', { name: /filter tasks by due date: due in 3 days/i });
+    await userEvent.click(btn);
+    expect(btn).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('filter shows only tasks due within 3 days', async () => {
+    renderTasks();
+    await screen.findByText('Due In 2 Days Task');
+    await userEvent.click(screen.getByRole('button', { name: /filter tasks by due date: due in 3 days/i }));
+    await waitFor(() => {
+      expect(screen.getByText('Due In 2 Days Task')).toBeInTheDocument();
+      expect(screen.queryByText('Due Next Week Task')).not.toBeInTheDocument();
+    });
+  });
+
+  it('filter hides tasks with no due date', async () => {
+    renderTasks();
+    await screen.findByText('No Due Date Task');
+    await userEvent.click(screen.getByRole('button', { name: /filter tasks by due date: due in 3 days/i }));
+    await waitFor(() => {
+      expect(screen.queryByText('No Due Date Task')).not.toBeInTheDocument();
+    });
+  });
+
+  it('clicking All restores all tasks after due-in-3-days filter', async () => {
+    renderTasks();
+    await screen.findByText('Due In 2 Days Task');
+    await userEvent.click(screen.getByRole('button', { name: /filter tasks by due date: due in 3 days/i }));
+    await userEvent.click(screen.getByRole('button', { name: /filter tasks by due date: all/i }));
+    await waitFor(() => {
+      expect(screen.getByText('Due Next Week Task')).toBeInTheDocument();
+      expect(screen.getByText('No Due Date Task')).toBeInTheDocument();
+    });
+  });
+
+  it('"Due in 3 Days" filter button comes between "Due Today" and "Due This Week"', async () => {
+    renderTasks();
+    await screen.findByText('Due In 2 Days Task');
+    const todayBtn = screen.getByRole('button', { name: /filter tasks by due date: due today/i });
+    const in3Btn = screen.getByRole('button', { name: /filter tasks by due date: due in 3 days/i });
+    const weekBtn = screen.getByRole('button', { name: /filter tasks by due date: due this week/i });
+    expect(todayBtn.compareDocumentPosition(in3Btn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(in3Btn.compareDocumentPosition(weekBtn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
