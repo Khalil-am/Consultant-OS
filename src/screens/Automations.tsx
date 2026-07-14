@@ -4,7 +4,7 @@ import { useLayout } from '../hooks/useLayout';
 import {
   Search, Star, Play, Settings2, TrendingUp, Clock, Zap, CheckCircle,
   ArrowRight, Loader2, ClipboardList, Video, Monitor, Building2,
-  BarChart2, Brain, History,
+  BarChart2, Brain, History, ClipboardCopy, Download, FileText,
 } from 'lucide-react';
 import { automations as initialAutomations } from '../data/mockData';
 import { insertAutomationRun, insertActivity, getAutomationRuns } from '../lib/db';
@@ -42,6 +42,7 @@ export default function Automations() {
   const { width, isMobile } = useLayout();
   const [activeCategory, setActiveCategory] = useState('All');
   const [search, setSearch] = useState('');
+  const [autoSort, setAutoSort] = useState<'name' | 'category' | 'success' | 'lastRun' | 'runCount' | 'status' | 'starred'>('name');
   const [automations, setAutomations] = useState(() => {
     try {
       const savedCounts = localStorage.getItem('automation_run_counts');
@@ -65,6 +66,14 @@ export default function Automations() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [recentRuns, setRecentRuns] = useState<AutomationRunRow[]>([]);
   const [showRunHistory, setShowRunHistory] = useState(false);
+  const [starredOnly, setStarredOnly] = useState(false);
+  const [neverRunOnly, setNeverRunOnly] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'All' | 'Active' | 'Inactive'>('All');
+  const [highSuccessOnly, setHighSuccessOnly] = useState(false);
+  const [minRunsFilter, setMinRunsFilter] = useState<0 | 1 | 5 | 10>(0);
+  const [summaryCopied, setSummaryCopied] = useState(false);
+  const [automationsCsvExported, setAutomationsCsvExported] = useState(false);
+  const [automationsTxtExported, setAutomationsTxtExported] = useState(false);
 
   // Count-up timer while running
   useEffect(() => {
@@ -134,14 +143,98 @@ export default function Automations() {
     ? (automations.reduce((sum, a) => sum + a.successRate, 0) / automations.length).toFixed(1)
     : '0';
 
-  const filtered = automations.filter(a => {
-    const matchCat  = activeCategory === 'All' || a.category === activeCategory;
-    const q = search.toLowerCase();
-    const matchSearch = a.name.toLowerCase().includes(q) ||
-      a.description.toLowerCase().includes(q) ||
-      a.category.toLowerCase().includes(q);
-    return matchCat && matchSearch;
-  });
+  const filtered = (() => {
+    const base = automations.filter(a => {
+      const matchCat  = activeCategory === 'All' || a.category === activeCategory;
+      const q = search.toLowerCase();
+      const matchSearch = a.name.toLowerCase().includes(q) ||
+        a.description.toLowerCase().includes(q) ||
+        a.category.toLowerCase().includes(q);
+      const matchStarred = !starredOnly || starred.has(a.id);
+      const matchStatus = statusFilter === 'All' || a.status === statusFilter;
+      const matchNeverRun = !neverRunOnly || (a.runCount ?? 0) === 0;
+      const matchHighSuccess = !highSuccessOnly || (a.successRate ?? 0) >= 90;
+      const matchMinRuns = (a.runCount ?? 0) >= minRunsFilter;
+      return matchCat && matchSearch && matchStarred && matchStatus && matchNeverRun && matchHighSuccess && matchMinRuns;
+    });
+    if (autoSort === 'category') return [...base].sort((a, b) => a.category.localeCompare(b.category));
+    if (autoSort === 'success') return [...base].sort((a, b) => (b.successRate ?? 0) - (a.successRate ?? 0));
+    if (autoSort === 'runCount') return [...base].sort((a, b) => (b.runCount ?? 0) - (a.runCount ?? 0));
+    if (autoSort === 'lastRun') return [...base].sort((a, b) => {
+      const aRun = recentRuns.find(r => r.automation_id === a.id)?.run_at ?? '';
+      const bRun = recentRuns.find(r => r.automation_id === b.id)?.run_at ?? '';
+      return bRun.localeCompare(aRun);
+    });
+    if (autoSort === 'status') return [...base].sort((a, b) => (a.status ?? '').localeCompare(b.status ?? ''));
+    if (autoSort === 'starred') return [...base].sort((a, b) => (b.starred ? 1 : 0) - (a.starred ? 1 : 0));
+    return [...base].sort((a, b) => a.name.localeCompare(b.name));
+  })();
+
+  function handleExportAutomationsCSV(automationsToExport: typeof filtered) {
+    if (automationsToExport.length === 0) return;
+    const headers = ['Name', 'Category', 'Status', 'Run Count', 'Success Rate', 'Last Run'];
+    const rows = automationsToExport.map(a => [
+      `"${a.name.replace(/"/g, '""')}"`,
+      a.category,
+      a.status,
+      String(a.runCount),
+      `${a.successRate}%`,
+      `"${(a.lastRun ?? '').replace(/"/g, '""')}"`,
+    ].join(','));
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `automations_export.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setAutomationsCsvExported(true);
+    setTimeout(() => setAutomationsCsvExported(false), 2000);
+  }
+
+  function handleExportAutomationsTxt(automationsToExport: typeof filtered) {
+    if (automationsToExport.length === 0) return;
+    const lines = [
+      `Automations Export – Consultant OS`,
+      `Total: ${automationsToExport.length}`,
+      '',
+      ...automationsToExport.map(a => [
+        `Name: ${a.name}`,
+        `Category: ${a.category} | Status: ${a.status}`,
+        `Runs: ${a.runCount} | Success Rate: ${a.successRate}%`,
+        a.lastRun ? `Last Run: ${a.lastRun}` : null,
+        '',
+      ].filter(Boolean).join('\n')),
+    ].join('\n');
+    const blob = new Blob([lines], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `automations_export.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setAutomationsTxtExported(true);
+    setTimeout(() => setAutomationsTxtExported(false), 2000);
+  }
+
+  function handleCopyAutomationSummary() {
+    const lines = [
+      `Automation Summary – Consultant OS`,
+      `Total Automations: ${totalAutomations}`,
+      `Active: ${activeCount}`,
+      `Total Runs: ${totalRuns.toLocaleString()}`,
+      `Avg Success Rate: ${avgSuccessRate}%`,
+    ].join('\n');
+    navigator.clipboard.writeText(lines).then(() => {
+      setSummaryCopied(true);
+      setTimeout(() => setSummaryCopied(false), 2000);
+    }).catch(() => {});
+  }
 
   const toggleStar = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -206,6 +299,8 @@ export default function Automations() {
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
+                aria-label={`Category: ${cat}`}
+                aria-pressed={isActive}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '0.35rem',
                   padding: '0.35rem 0.75rem', borderRadius: '7px', border: 'none', cursor: 'pointer',
@@ -233,6 +328,7 @@ export default function Automations() {
           <Search size={13} style={{ color: '#475569', flexShrink: 0 }} />
           <input
             type="text"
+            aria-label="Search automations"
             placeholder="Search automations..."
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -242,6 +338,167 @@ export default function Automations() {
             }}
           />
         </div>
+
+        {/* Sort */}
+        <select
+          aria-label="Sort automations"
+          value={autoSort}
+          onChange={e => setAutoSort(e.target.value as typeof autoSort)}
+          style={{
+            height: '36px', borderRadius: '8px', background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.08)', fontSize: '0.78rem', color: '#94A3B8',
+            paddingLeft: '0.5rem', paddingRight: '1.25rem', fontFamily: 'inherit', cursor: 'pointer',
+          }}
+        >
+          <option value="name">Name</option>
+          <option value="category">Category</option>
+          <option value="success">Success Rate</option>
+          <option value="lastRun">Last Run</option>
+          <option value="runCount">Run Count</option>
+          <option value="status">Status</option>
+          <option value="starred">Starred First</option>
+        </select>
+
+        {/* Status quick filters */}
+        {(['All', 'Active', 'Inactive'] as const).map(sf => (
+          <button
+            key={sf}
+            onClick={() => setStatusFilter(sf)}
+            aria-label={`Filter automations by status: ${sf}`}
+            aria-pressed={statusFilter === sf}
+            style={{
+              padding: '0 0.75rem', height: '36px', borderRadius: '8px',
+              border: statusFilter === sf ? '1px solid rgba(0,212,255,0.4)' : '1px solid rgba(255,255,255,0.08)',
+              background: statusFilter === sf ? 'rgba(0,212,255,0.1)' : 'rgba(255,255,255,0.04)',
+              color: statusFilter === sf ? '#00D4FF' : '#475569',
+              cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: statusFilter === sf ? 700 : 500,
+              transition: 'all 0.15s', flexShrink: 0, whiteSpace: 'nowrap',
+            }}
+          >
+            {sf}
+          </button>
+        ))}
+
+        {/* Starred Only Toggle */}
+        <button
+          onClick={() => setStarredOnly(v => !v)}
+          aria-label="Starred Only"
+          aria-pressed={starredOnly}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '0.35rem',
+            padding: '0 0.75rem', height: '36px', borderRadius: '8px',
+            border: starredOnly ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.08)',
+            background: starredOnly ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.04)',
+            color: starredOnly ? '#F59E0B' : '#475569',
+            cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 600,
+            transition: 'all 0.15s', flexShrink: 0,
+          }}
+        >
+          <Star size={13} style={{ fill: starredOnly ? '#F59E0B' : 'none', color: starredOnly ? '#F59E0B' : '#475569' }} />
+          Starred
+        </button>
+
+        {/* Never Run Toggle */}
+        <button
+          onClick={() => setNeverRunOnly(v => !v)}
+          aria-label="Never Run Only"
+          aria-pressed={neverRunOnly}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '0.35rem',
+            padding: '0 0.75rem', height: '36px', borderRadius: '8px',
+            border: neverRunOnly ? '1px solid rgba(239,68,68,0.4)' : '1px solid rgba(255,255,255,0.08)',
+            background: neverRunOnly ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.04)',
+            color: neverRunOnly ? '#FCA5A5' : '#475569',
+            cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 600,
+            transition: 'all 0.15s', flexShrink: 0,
+          }}
+        >
+          <History size={13} /> Never Run
+        </button>
+
+        {/* Min Runs Filter */}
+        <select
+          aria-label="Minimum runs filter"
+          value={minRunsFilter}
+          onChange={e => setMinRunsFilter(Number(e.target.value) as 0 | 1 | 5 | 10)}
+          style={{ height: '36px', fontSize: '0.78rem', padding: '0 0.625rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#CBD5E1', fontFamily: 'inherit', cursor: 'pointer', outline: 'none', minWidth: 100 }}
+        >
+          <option value={0}>Any Runs</option>
+          <option value={1}>1+ Runs</option>
+          <option value={5}>5+ Runs</option>
+          <option value={10}>10+ Runs</option>
+        </select>
+
+        {/* High Success Toggle */}
+        <button
+          onClick={() => setHighSuccessOnly(v => !v)}
+          aria-label="High Success Only"
+          aria-pressed={highSuccessOnly}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '0.35rem',
+            padding: '0 0.75rem', height: '36px', borderRadius: '8px',
+            border: highSuccessOnly ? '1px solid rgba(16,185,129,0.4)' : '1px solid rgba(255,255,255,0.08)',
+            background: highSuccessOnly ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.04)',
+            color: highSuccessOnly ? '#34D399' : '#475569',
+            cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 600,
+            transition: 'all 0.15s', flexShrink: 0,
+          }}
+        >
+          ✓ High Success
+        </button>
+
+        {/* Export CSV */}
+        <button
+          onClick={() => handleExportAutomationsCSV(filtered)}
+          disabled={filtered.length === 0}
+          aria-label="Export automations to CSV"
+          style={{
+            display: 'flex', alignItems: 'center', gap: '0.35rem',
+            padding: '0 0.75rem', height: '36px', borderRadius: '8px',
+            border: automationsCsvExported ? '1px solid rgba(16,185,129,0.4)' : '1px solid rgba(255,255,255,0.08)',
+            background: automationsCsvExported ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.04)',
+            color: automationsCsvExported ? '#10B981' : '#475569',
+            cursor: filtered.length === 0 ? 'not-allowed' : 'pointer', fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 600,
+            transition: 'all 0.15s', flexShrink: 0,
+          }}
+        >
+          <Download size={13} /> {automationsCsvExported ? 'Exported!' : 'Export CSV'}
+        </button>
+
+        {/* Export TXT */}
+        <button
+          onClick={() => handleExportAutomationsTxt(filtered)}
+          disabled={filtered.length === 0}
+          aria-label="Export automations to TXT"
+          style={{
+            display: 'flex', alignItems: 'center', gap: '0.35rem',
+            padding: '0 0.75rem', height: '36px', borderRadius: '8px',
+            border: automationsTxtExported ? '1px solid rgba(16,185,129,0.4)' : '1px solid rgba(255,255,255,0.08)',
+            background: automationsTxtExported ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.04)',
+            color: automationsTxtExported ? '#10B981' : '#475569',
+            cursor: filtered.length === 0 ? 'not-allowed' : 'pointer', fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 600,
+            transition: 'all 0.15s', flexShrink: 0,
+          }}
+        >
+          <FileText size={13} /> {automationsTxtExported ? 'Exported!' : 'Export TXT'}
+        </button>
+
+        {/* Copy Summary */}
+        <button
+          onClick={handleCopyAutomationSummary}
+          aria-label="Copy automation summary to clipboard"
+          style={{
+            display: 'flex', alignItems: 'center', gap: '0.35rem',
+            padding: '0 0.75rem', height: '36px', borderRadius: '8px',
+            border: summaryCopied ? '1px solid rgba(16,185,129,0.4)' : '1px solid rgba(255,255,255,0.08)',
+            background: summaryCopied ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.04)',
+            color: summaryCopied ? '#10B981' : '#475569',
+            cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 600,
+            transition: 'all 0.15s', flexShrink: 0,
+          }}
+        >
+          <ClipboardCopy size={13} /> {summaryCopied ? 'Copied!' : 'Summary'}
+        </button>
       </div>
 
       {/* Automation Grid */}
@@ -312,6 +569,8 @@ export default function Automations() {
                   {/* Star */}
                   <button
                     onClick={e => toggleStar(auto.id, e)}
+                    aria-label={`Star ${auto.name}`}
+                    aria-pressed={isStarred}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', flexShrink: 0 }}
                   >
                     <Star size={15} style={{ color: isStarred ? '#F59E0B' : '#334155', fill: isStarred ? '#F59E0B' : 'none', transition: 'all 0.15s' }} />
@@ -379,6 +638,7 @@ export default function Automations() {
                       e.stopPropagation();
                       handleRun(auto.id);
                     }}
+                    aria-label={`Run Now: ${auto.name}`}
                     disabled={!!runningId}
                     style={{
                       flex: 1, height: '34px', borderRadius: '8px', border: 'none', cursor: runningId ? 'default' : 'pointer',
@@ -406,6 +666,7 @@ export default function Automations() {
                   </button>
                   <button
                     onClick={e => { e.stopPropagation(); navigate(`/automations/${auto.id}`); }}
+                    aria-label={`Settings for ${auto.name}`}
                     style={{
                       width: '34px', height: '34px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)',
                       cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -435,6 +696,8 @@ export default function Automations() {
         <div style={{ borderRadius: '12px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
           <button
             onClick={() => setShowRunHistory(v => !v)}
+            aria-label="Toggle Recent Runs"
+            aria-expanded={showRunHistory}
             style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.875rem 1.125rem', background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', fontFamily: 'inherit' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', fontWeight: 600 }}>

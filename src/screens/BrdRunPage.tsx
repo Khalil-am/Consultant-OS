@@ -7,6 +7,7 @@ import {
   ChevronRight, Download, Eye, RefreshCw, BarChart2, X, Loader,
   Zap, Shield, GitCompare, RotateCcw, Play,
   Inbox, Search, Brain, PenLine, Package, Trophy, Globe, Code2,
+  ClipboardCopy,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -45,6 +46,31 @@ interface RunState {
     resolved: number;
     remainingGaps: string[];
   };
+}
+
+// ─── Run History ──────────────────────────────────────────────────────────────
+
+const RUN_HISTORY_KEY = 'brd_run_history';
+
+interface RunHistoryEntry {
+  id: string;
+  date: string;
+  fileName: string;
+  template: string;
+  qualityScore: number;
+  coverageScore: number;
+  sectionsGenerated: number;
+}
+
+function loadRunHistory(): RunHistoryEntry[] {
+  try {
+    const raw = localStorage.getItem(RUN_HISTORY_KEY);
+    return raw ? JSON.parse(raw) as RunHistoryEntry[] : [];
+  } catch { return []; }
+}
+
+function saveRunHistory(entries: RunHistoryEntry[]) {
+  try { localStorage.setItem(RUN_HISTORY_KEY, JSON.stringify(entries.slice(0, 10))); } catch { /* ignore */ }
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -130,6 +156,7 @@ function DropZone({
             <div style={{ fontSize: '0.68rem', color: '#475569' }}>{(file.size / 1024).toFixed(1)} KB · {label}</div>
           </div>
           <button onClick={e => { e.stopPropagation(); onClear(); }}
+            aria-label="Clear selected file"
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', display: 'flex', padding: '0.25rem' }}>
             <X size={14} />
           </button>
@@ -177,16 +204,125 @@ export default function BrdRunPage() {
   const [strictMatch, setStrictMatch] = useState(false);
   const [notes, setNotes] = useState('');
 
+  // Run history
+  const [runHistory, setRunHistory] = useState<RunHistoryEntry[]>(() => loadRunHistory());
+
   // Run state
   const [screen, setScreen] = useState<'config' | 'progress' | 'output'>('config');
   const [run, setRun] = useState<RunState | null>(null);
   const [outputTab, setOutputTab] = useState<OutputTab>('preview');
   const [regeneratingSection, setRegeneratingSection] = useState<string | null>(null);
   const [aiContent, setAiContent] = useState<Record<string, string>>({});
+  const [sectionSearch, setSectionSearch] = useState('');
   const [aiGenerating, setAiGenerating] = useState(false);
   const [savedToDocuments, setSavedToDocuments] = useState(false);
   const [savingToDocuments, setSavingToDocuments] = useState(false);
+  const [copiedRunId, setCopiedRunId] = useState(false);
+  const [brdStatsCopied, setBrdStatsCopied] = useState(false);
+  const [sectionsCsvExported, setSectionsCsvExported] = useState(false);
+  const [runHistoryExported, setRunHistoryExported] = useState(false);
+  const [runHistoryTxtExported, setRunHistoryTxtExported] = useState(false);
+  const [runHistorySearch, setRunHistorySearch] = useState('');
+  const [runHistorySort, setRunHistorySort] = useState<'date' | 'quality' | 'coverage' | 'filename' | 'sections' | 'template'>('date');
+  const [coverageMin, setCoverageMin] = useState<number>(0);
+  const [qualityMin, setQualityMin] = useState<number>(0);
+  const [runQualityTier, setRunQualityTier] = useState<'All' | 'High' | 'Medium' | 'Low'>('All');
+  const [showAllRunHistory, setShowAllRunHistory] = useState(false);
+  const [showWordCounts, setShowWordCounts] = useState(false);
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  function handleExportRunHistoryCSV(entries: RunHistoryEntry[]) {
+    if (entries.length === 0) return;
+    const headers = ['Run ID', 'Date', 'File Name', 'Template', 'Quality Score', 'Coverage Score', 'Sections Generated'];
+    const rows = entries.map(e => [
+      e.id,
+      e.date,
+      `"${e.fileName.replace(/"/g, '""')}"`,
+      `"${e.template.replace(/"/g, '""')}"`,
+      `${e.qualityScore}%`,
+      `${e.coverageScore}%`,
+      e.sectionsGenerated,
+    ].join(','));
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `brd_run_history.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setRunHistoryExported(true);
+    setTimeout(() => setRunHistoryExported(false), 2000);
+  }
+
+  function handleExportRunHistoryTxt(entries: RunHistoryEntry[]) {
+    if (entries.length === 0) return;
+    const lines = [
+      `BRD Run History – Consultant OS`,
+      `Total Runs: ${entries.length}`,
+      ``,
+      ...entries.map(e => [
+        `  Run ID: ${e.id}`,
+        `  Date: ${e.date}  File: ${e.fileName}  Template: ${e.template}`,
+        `  Quality: ${e.qualityScore}%  Coverage: ${e.coverageScore}%  Sections: ${e.sectionsGenerated}`,
+      ].join('\n')),
+    ].join('\n');
+    const blob = new Blob([lines], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `brd_run_history.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setRunHistoryTxtExported(true);
+    setTimeout(() => setRunHistoryTxtExported(false), 2000);
+  }
+
+  function handleExportSectionTitlesCSV() {
+    const headers = ['#', 'Section Title'];
+    const rows = CANONICAL_SECTIONS.map((title, i) => `${i + 1},"${title.replace(/"/g, '""')}"`);
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `brd_sections_${brdFile?.name?.replace(/\.[^/.]+$/, '').replace(/\s+/g, '_') ?? 'document'}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setSectionsCsvExported(true);
+    setTimeout(() => setSectionsCsvExported(false), 2000);
+  }
+
+  function handleCopyRunId() {
+    if (!run) return;
+    navigator.clipboard.writeText(run.runId).then(() => {
+      setCopiedRunId(true);
+      setTimeout(() => setCopiedRunId(false), 2000);
+    }).catch(() => {});
+  }
+
+  function handleCopyBrdStats() {
+    if (!run) return;
+    const lines = [
+      `BRD Run Stats – ${brdFile?.name ?? 'Document'}`,
+      `Run ID: ${run.runId}`,
+      `Quality Score: ${run.qualityScore}%`,
+      `Coverage: ${run.comparison.sampleCoverage}%`,
+      `Sections: ${CANONICAL_SECTIONS.length}`,
+      `Status: ${run.status}`,
+    ].join('\n');
+    navigator.clipboard.writeText(lines).then(() => {
+      setBrdStatsCopied(true);
+      setTimeout(() => setBrdStatsCopied(false), 2000);
+    }).catch(() => {});
+  }
 
   // Simulate pipeline progression for demo
   const simulateRun = () => {
@@ -246,6 +382,21 @@ export default function BrdRunPage() {
 
       if (status === 'completed') {
         clearInterval(progressIntervalRef.current!);
+        // Save to run history (localStorage)
+        const historyEntry: RunHistoryEntry = {
+          id: runId,
+          date: new Date().toLocaleDateString('en-GB'),
+          fileName: brdFile?.name ?? 'Unknown file',
+          template: PROMPT_TEMPLATES.find(t => t.id === selectedTemplate)?.name ?? 'BRD Standard',
+          qualityScore: 91,
+          coverageScore: 87,
+          sectionsGenerated: CANONICAL_SECTIONS.length,
+        };
+        setRunHistory(prev => {
+          const next = [historyEntry, ...prev.filter(e => e.id !== historyEntry.id)];
+          saveRunHistory(next);
+          return next;
+        });
         // Persist run record and activity to DB (best-effort)
         const templateLabel = PROMPT_TEMPLATES.find(t => t.id === selectedTemplate)?.name ?? 'BRD Standard';
         insertAutomationRun({
@@ -369,7 +520,8 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
       <div style={{ padding: '1.5rem', maxWidth: 820, margin: '0 auto' }}>
         {/* Back */}
         <button onClick={() => navigate('/automations')}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8rem', fontFamily: 'inherit', marginBottom: '1.25rem' }}>
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8rem', fontFamily: 'inherit', marginBottom: '1.25rem' }}
+          aria-label="Back to Automations">
           <ArrowLeft size={14} /> Automations
         </button>
 
@@ -405,6 +557,7 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
                   <FileText size={13} style={{ color: '#A78BFA', flexShrink: 0 }} />
                   <span style={{ fontSize: '0.78rem', color: '#94A3B8', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
                   <button onClick={() => setSampleFiles(prev => prev.filter((_, j) => j !== i))}
+                    aria-label={`Remove sample file: ${f.name}`}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569' }}><X size={12} /></button>
                 </div>
               ))}
@@ -422,6 +575,9 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
               <div style={{ fontSize: '0.72rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.75rem', fontWeight: 600 }}>Prompt Template</div>
               {PROMPT_TEMPLATES.map(t => (
                 <div key={t.id} onClick={() => setSelectedTemplate(t.id)}
+                  role="radio"
+                  aria-label={`Template: ${t.name}`}
+                  aria-checked={selectedTemplate === t.id}
                   style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', padding: '0.625rem 0.75rem', borderRadius: 6, background: selectedTemplate === t.id ? 'rgba(0,212,255,0.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${selectedTemplate === t.id ? 'rgba(0,212,255,0.3)' : 'rgba(255,255,255,0.06)'}`, cursor: 'pointer', marginBottom: '0.375rem', transition: 'all 0.15s' }}>
                   <div style={{ width: 14, height: 14, borderRadius: '50%', background: selectedTemplate === t.id ? 'rgba(0,212,255,0.3)' : 'transparent', border: `2px solid ${selectedTemplate === t.id ? '#00D4FF' : '#334155'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     {selectedTemplate === t.id && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#00D4FF' }} />}
@@ -440,6 +596,7 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
                 <div>
                   <div style={{ fontSize: '0.68rem', color: '#475569', marginBottom: '3px' }}>Language</div>
                   <select value={language} onChange={e => setLanguage(e.target.value as typeof language)}
+                    aria-label="Output language"
                     style={{ width: '100%', padding: '0.375rem 0.5rem', borderRadius: 6, fontSize: '0.78rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#94A3B8', fontFamily: 'inherit' }}>
                     <option value="en">English</option>
                     <option value="ar">Arabic</option>
@@ -450,6 +607,7 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
                 <div>
                   <div style={{ fontSize: '0.68rem', color: '#475569', marginBottom: '3px' }}>Output Format</div>
                   <select value={outputFormat} onChange={e => setOutputFormat(e.target.value as typeof outputFormat)}
+                    aria-label="Output format"
                     style={{ width: '100%', padding: '0.375rem 0.5rem', borderRadius: 6, fontSize: '0.78rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#94A3B8', fontFamily: 'inherit' }}>
                     <option value="both">DOCX + PDF</option>
                     <option value="docx">DOCX only</option>
@@ -479,7 +637,7 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
             {/* Notes */}
             <div className="section-card" style={{ padding: '1.125rem' }}>
               <div style={{ fontSize: '0.72rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.5rem', fontWeight: 600 }}>Special Instructions</div>
-              <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any specific requirements, focus areas, or constraints for the LLM..."
+              <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any specific requirements, focus areas, or constraints for the LLM..." aria-label="Special instructions"
                 style={{ width: '100%', minHeight: 70, padding: '0.625rem 0.75rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, color: '#94A3B8', fontSize: '0.78rem', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }} />
             </div>
           </div>
@@ -487,12 +645,149 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
 
         {/* Run Button */}
         <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-          <button className="btn-ghost" onClick={() => navigate('/automations')} style={{ height: 40, fontSize: '0.85rem' }}>Cancel</button>
+          <button className="btn-ghost" onClick={() => navigate('/automations')} style={{ height: 40, fontSize: '0.85rem' }} aria-label="Cancel BRD run">Cancel</button>
           <button className="btn-primary" onClick={handleStartRun} disabled={!brdFile}
-            style={{ height: 40, fontSize: '0.85rem', opacity: brdFile ? 1 : 0.4, cursor: brdFile ? 'pointer' : 'not-allowed', gap: '0.5rem', padding: '0 1.5rem' }}>
+            style={{ height: 40, fontSize: '0.85rem', opacity: brdFile ? 1 : 0.4, cursor: brdFile ? 'pointer' : 'not-allowed', gap: '0.5rem', padding: '0 1.5rem' }}
+            aria-label="Run BRD Generation">
             <Play size={14} /> Run BRD Generation
           </button>
         </div>
+
+        {/* Recent Run History */}
+        {runHistory.length > 0 && (
+          <div style={{ marginTop: '2rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '1.25rem' }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Clock size={12} /> Recent Runs</span>
+              <div style={{ display: 'flex', gap: '0.3rem' }}>
+                <button
+                  className="btn-ghost"
+                  aria-label="Export run history to CSV"
+                  onClick={() => handleExportRunHistoryCSV(runHistory)}
+                  style={{ fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.3rem', height: '26px', padding: '0 0.5rem' }}
+                >
+                  <Download size={11} /> {runHistoryExported ? 'Exported!' : 'Export CSV'}
+                </button>
+                <button
+                  className="btn-ghost"
+                  aria-label="Export run history to TXT"
+                  onClick={() => handleExportRunHistoryTxt(runHistory)}
+                  style={{ fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.3rem', height: '26px', padding: '0 0.5rem' }}
+                >
+                  <FileText size={11} /> {runHistoryTxtExported ? 'Exported!' : 'Export TXT'}
+                </button>
+              </div>
+            </div>
+            {/* Run history sort */}
+            <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '0.5rem' }}>
+              {(['date', 'quality', 'coverage', 'filename', 'sections', 'template'] as const).map(s => (
+                <button
+                  key={s}
+                  onClick={() => setRunHistorySort(s)}
+                  aria-label={`Sort run history by ${s}`}
+                  aria-pressed={runHistorySort === s}
+                  style={{
+                    fontSize: '0.62rem', fontWeight: 600, padding: '2px 7px', borderRadius: '5px', textTransform: 'capitalize',
+                    background: runHistorySort === s ? 'rgba(0,212,255,0.1)' : 'rgba(255,255,255,0.04)',
+                    color: runHistorySort === s ? '#00D4FF' : '#475569',
+                    border: runHistorySort === s ? '1px solid rgba(0,212,255,0.25)' : '1px solid rgba(255,255,255,0.08)',
+                    cursor: 'pointer', fontFamily: 'inherit',
+                  }}
+                >
+                  {s === 'date' ? 'Latest' : s === 'quality' ? 'Quality' : s === 'coverage' ? 'Coverage' : s === 'filename' ? 'Filename' : s === 'sections' ? 'Sections' : 'Template'}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.375rem' }}>
+              <span style={{ fontSize: '0.62rem', color: '#475569' }}>Min coverage:</span>
+              {([0, 50, 70, 90] as const).map(pct => (
+                <button
+                  key={pct}
+                  onClick={() => setCoverageMin(pct)}
+                  aria-label={`Coverage threshold: ${pct}%`}
+                  aria-pressed={coverageMin === pct}
+                  style={{
+                    fontSize: '0.6rem', fontWeight: 600, padding: '2px 6px', borderRadius: '5px',
+                    background: coverageMin === pct ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.04)',
+                    color: coverageMin === pct ? '#34D399' : '#475569',
+                    border: coverageMin === pct ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,255,255,0.08)',
+                    cursor: 'pointer', fontFamily: 'inherit',
+                  }}
+                >{pct}%</button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.375rem' }}>
+              <span style={{ fontSize: '0.62rem', color: '#475569' }}>Min quality:</span>
+              {([0, 50, 70, 90] as const).map(pct => (
+                <button
+                  key={pct}
+                  onClick={() => setQualityMin(pct)}
+                  aria-label={`Quality threshold: ${pct}%`}
+                  aria-pressed={qualityMin === pct}
+                  style={{
+                    fontSize: '0.6rem', fontWeight: 600, padding: '2px 6px', borderRadius: '5px',
+                    background: qualityMin === pct ? 'rgba(0,212,255,0.12)' : 'rgba(255,255,255,0.04)',
+                    color: qualityMin === pct ? '#00D4FF' : '#475569',
+                    border: qualityMin === pct ? '1px solid rgba(0,212,255,0.3)' : '1px solid rgba(255,255,255,0.08)',
+                    cursor: 'pointer', fontFamily: 'inherit',
+                  }}
+                >{pct}%</button>
+              ))}
+            </div>
+            {runHistory.length > 3 && (
+              <div style={{ position: 'relative', marginBottom: '0.5rem' }}>
+                <Search size={11} style={{ position: 'absolute', left: '0.5rem', top: '50%', transform: 'translateY(-50%)', color: '#475569', pointerEvents: 'none' }} />
+                <input
+                  type="text"
+                  aria-label="Search run history"
+                  placeholder="Search runs…"
+                  value={runHistorySearch}
+                  onChange={e => setRunHistorySearch(e.target.value)}
+                  style={{ width: '100%', boxSizing: 'border-box', paddingLeft: '1.75rem', paddingRight: '0.5rem', height: '28px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: '6px', color: '#CBD5E1', fontSize: '0.72rem', fontFamily: 'inherit', outline: 'none' }}
+                />
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '0.3rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+              {(['All', 'High', 'Medium', 'Low'] as const).map(tier => (
+                <button key={tier} onClick={() => setRunQualityTier(tier)} aria-label={`Filter run history by quality: ${tier}`} aria-pressed={runQualityTier === tier}
+                  style={{ fontSize: '0.68rem', padding: '0.12rem 0.45rem', borderRadius: '0.25rem', border: `1px solid ${runQualityTier === tier ? 'rgba(0,212,255,0.3)' : 'rgba(255,255,255,0.08)'}`, background: runQualityTier === tier ? 'rgba(0,212,255,0.1)' : 'transparent', color: runQualityTier === tier ? '#00D4FF' : '#475569', cursor: 'pointer', fontFamily: 'inherit' }}>
+                  {tier === 'All' ? 'All Quality' : `${tier} Quality`}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }} aria-label="Run history list">
+              {(showAllRunHistory
+                ? [...runHistory]
+                : [...runHistory].slice(0, 5)
+              )
+              .sort((a, b) => runHistorySort === 'quality' ? b.qualityScore - a.qualityScore : runHistorySort === 'coverage' ? b.coverageScore - a.coverageScore : runHistorySort === 'filename' ? a.fileName.localeCompare(b.fileName) : runHistorySort === 'sections' ? b.sectionsGenerated - a.sectionsGenerated : runHistorySort === 'template' ? a.template.localeCompare(b.template) : 0)
+              .filter(entry => entry.coverageScore >= coverageMin)
+              .filter(entry => entry.qualityScore >= qualityMin)
+              .filter(entry => runQualityTier === 'All' ? true : runQualityTier === 'High' ? entry.qualityScore >= 80 : runQualityTier === 'Medium' ? entry.qualityScore >= 50 && entry.qualityScore < 80 : entry.qualityScore < 50)
+              .filter(entry => !runHistorySearch.trim() || entry.fileName.toLowerCase().includes(runHistorySearch.toLowerCase()) || entry.template.toLowerCase().includes(runHistorySearch.toLowerCase())).map(entry => (
+                <div key={entry.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.625rem 0.875rem', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <CheckCircle size={13} style={{ color: '#10B981', flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#CBD5E1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.fileName}</div>
+                    <div style={{ fontSize: '0.68rem', color: '#475569', marginTop: '0.125rem' }}>{entry.template} · {entry.date}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+                    <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(16,185,129,0.1)', color: '#34D399' }}>Q: {entry.qualityScore}%</span>
+                    <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(0,212,255,0.08)', color: '#00D4FF' }}>C: {entry.coverageScore}%</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {runHistory.length > 5 && (
+              <button
+                aria-label={showAllRunHistory ? 'Show fewer run history entries' : 'Show all run history entries'}
+                onClick={() => setShowAllRunHistory(v => !v)}
+                style={{ marginTop: '0.5rem', fontSize: '0.7rem', background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}
+              >
+                {showAllRunHistory ? '▲ Show less' : `▼ Show all ${runHistory.length} runs`}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     );
   }
@@ -587,7 +882,7 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
         {run.status !== 'completed' && !isFailed && (
           <div style={{ textAlign: 'center' }}>
             <button className="btn-ghost" onClick={() => { clearInterval(progressIntervalRef.current!); navigate('/automations'); }}
-              style={{ fontSize: '0.78rem', height: 34 }}>
+              style={{ fontSize: '0.78rem', height: 34 }} aria-label="Cancel Run">
               Cancel Run
             </button>
           </div>
@@ -611,13 +906,23 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
         {/* Header */}
         <div style={{ padding: '0.875rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)', background: '#0C1220', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <button onClick={() => navigate('/automations')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8rem', fontFamily: 'inherit' }}>
+            <button onClick={() => navigate('/automations')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8rem', fontFamily: 'inherit' }} aria-label="Back to Automations">
               <ArrowLeft size={14} /> Automations
             </button>
             <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.08)' }} />
             <div>
               <h2 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#F1F5F9', margin: 0 }}>BRD Generated · {brdFile?.name}</h2>
-              <p style={{ fontSize: '0.68rem', color: '#475569', margin: 0 }}>Run {run.runId} · {CANONICAL_SECTIONS.length} sections · n8n + Claude</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                <p style={{ fontSize: '0.68rem', color: '#475569', margin: 0 }}>Run {run.runId} · {CANONICAL_SECTIONS.length} sections · n8n + Claude</p>
+                <button
+                  onClick={handleCopyRunId}
+                  aria-label="Copy Run ID to clipboard"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: copiedRunId ? '#34D399' : '#475569', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.65rem', padding: '1px 4px', borderRadius: '3px', fontFamily: 'inherit' }}
+                >
+                  <ClipboardCopy size={10} />
+                  {copiedRunId ? 'Copied!' : 'Copy ID'}
+                </button>
+              </div>
             </div>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -634,10 +939,27 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
                 border: `1px solid ${savedToDocuments ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.08)'}`,
                 opacity: savingToDocuments ? 0.7 : 1,
               }}
+              aria-label={savedToDocuments ? 'Saved to Docs' : 'Save to Docs'}
             >
               {savedToDocuments ? <><CheckCircle size={12} /> Saved</> : savingToDocuments ? <>Saving…</> : <><FileText size={12} /> Save to Docs</>}
             </button>
-            <button className="btn-primary" style={{ height: 34, fontSize: '0.78rem', marginLeft: '0.5rem' }} onClick={() => setScreen('config')}>
+            <button
+              onClick={handleCopyBrdStats}
+              className="btn-ghost"
+              style={{ height: 34, fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}
+              aria-label="Copy BRD stats to clipboard"
+            >
+              <ClipboardCopy size={12} /> {brdStatsCopied ? 'Copied!' : 'Copy Stats'}
+            </button>
+            <button
+              onClick={handleExportSectionTitlesCSV}
+              className="btn-ghost"
+              style={{ height: 34, fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}
+              aria-label="Export BRD section titles to CSV"
+            >
+              <Download size={12} /> {sectionsCsvExported ? 'Exported!' : 'Sections CSV'}
+            </button>
+            <button className="btn-primary" style={{ height: 34, fontSize: '0.78rem', marginLeft: '0.5rem' }} onClick={() => setScreen('config')} aria-label="New Run">
               <Play size={12} /> New Run
             </button>
           </div>
@@ -648,7 +970,9 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
           {tabs.map(tab => (
             <button key={tab.id} className={`tab-underline ${outputTab === tab.id ? 'active' : ''}`}
               onClick={() => setOutputTab(tab.id)}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.78rem', padding: '0.625rem 0.625rem', marginRight: '1rem' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.78rem', padding: '0.625rem 0.625rem', marginRight: '1rem' }}
+              aria-label={`Output tab: ${tab.label}`}
+              aria-pressed={outputTab === tab.id}>
               {tab.icon}{tab.label}
             </button>
           ))}
@@ -660,8 +984,29 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
           {/* Preview */}
           {outputTab === 'preview' && (
             <div>
-              <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '0.78rem', color: '#475569' }}>{CANONICAL_SECTIONS.length} sections generated · {Math.round(run.qualityScore * 100)}% quality score</span>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <button
+                    onClick={() => setShowWordCounts(v => !v)}
+                    aria-label="Toggle word counts"
+                    aria-pressed={showWordCounts}
+                    style={{
+                      height: 30, padding: '0 0.625rem', borderRadius: 6, fontSize: '0.72rem', fontFamily: 'inherit',
+                      background: showWordCounts ? 'rgba(14,165,233,0.15)' : 'rgba(255,255,255,0.04)',
+                      border: showWordCounts ? '1px solid rgba(14,165,233,0.3)' : '1px solid rgba(255,255,255,0.08)',
+                      color: showWordCounts ? '#38BDF8' : '#64748B', cursor: 'pointer',
+                    }}
+                  >Word Count</button>
+                  <input
+                    type="text"
+                    aria-label="Search sections"
+                  placeholder="Search sections…"
+                  value={sectionSearch}
+                  onChange={e => setSectionSearch(e.target.value)}
+                  style={{ height: 30, padding: '0 0.625rem', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#94A3B8', fontSize: '0.78rem', fontFamily: 'inherit', width: 180 }}
+                  />
+                </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: '1.25rem' }}>
                 {/* TOC */}
@@ -685,14 +1030,21 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
                       AI is generating section content…
                     </div>
                   )}
-                  {CANONICAL_SECTIONS.map((sectionName, i) => {
+                  {CANONICAL_SECTIONS.filter(s => !sectionSearch.trim() || s.toLowerCase().includes(sectionSearch.toLowerCase())).map((sectionName, i) => {
                     const confidence = 0.85 + ((i * 7) % 12) / 100;
                     const content = aiContent[sectionName];
+                    const wordCount = content ? content.trim().split(/\s+/).length : 0;
+                    const isCollapsed = collapsedSections.has(sectionName);
                     return (
                       <div key={i} className="section-card" style={{ padding: '1.125rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isCollapsed ? 0 : '0.75rem' }}>
                           <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#F1F5F9', margin: 0 }}>{sectionName}</h3>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            {showWordCounts && (
+                              <span aria-label={`Word count for ${sectionName}`} style={{ fontSize: '0.65rem', color: '#94A3B8', background: 'rgba(255,255,255,0.05)', padding: '1px 6px', borderRadius: 3, border: '1px solid rgba(255,255,255,0.1)' }}>
+                                {wordCount} words
+                              </span>
+                            )}
                             {content && (
                               <span style={{ fontSize: '0.65rem', color: '#00D4FF', background: 'rgba(0,212,255,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid rgba(0,212,255,0.2)' }}>
                                 AI
@@ -702,26 +1054,42 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
                               {Math.round(confidence * 100)}% conf.
                             </span>
                             <button className="btn-ghost" style={{ height: 24, padding: '0 0.5rem', fontSize: '0.65rem' }}
-                              onClick={() => handleRegenerateSection(sectionName)}>
+                              onClick={() => handleRegenerateSection(sectionName)}
+                              aria-label={`Regenerate section: ${sectionName}`}>
                               <RotateCcw size={10} /> Regen
+                            </button>
+                            <button
+                              className="btn-ghost"
+                              style={{ height: 24, padding: '0 0.5rem', fontSize: '0.65rem' }}
+                              onClick={() => setCollapsedSections(prev => {
+                                const next = new Set(prev);
+                                if (next.has(sectionName)) next.delete(sectionName);
+                                else next.add(sectionName);
+                                return next;
+                              })}
+                              aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} section: ${sectionName}`}
+                              aria-expanded={!isCollapsed}>
+                              <ChevronRight size={10} style={{ transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)', transition: 'transform 0.15s' }} />
                             </button>
                           </div>
                         </div>
-                        <div style={{ fontSize: '0.8rem', color: content ? '#94A3B8' : '#64748B', lineHeight: 1.7 }}>
-                          {regeneratingSection === sectionName ? (
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#475569', fontSize: '0.75rem' }}>
-                              <Loader size={12} style={{ animation: 'spin 1s linear infinite' }} /> Regenerating…
-                            </span>
-                          ) : content ? (
-                            content
-                          ) : (
-                            <em style={{ color: '#334155', fontSize: '0.73rem' }}>
-                              {aiGenerating
-                                ? 'Generating…'
-                                : 'AI content unavailable — add VITE_OPENROUTER_API_KEY to .env.local to enable generation.'}
-                            </em>
-                          )}
-                        </div>
+                        {!isCollapsed && (
+                          <div style={{ fontSize: '0.8rem', color: content ? '#94A3B8' : '#64748B', lineHeight: 1.7 }}>
+                            {regeneratingSection === sectionName ? (
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#475569', fontSize: '0.75rem' }}>
+                                <Loader size={12} style={{ animation: 'spin 1s linear infinite' }} /> Regenerating…
+                              </span>
+                            ) : content ? (
+                              content
+                            ) : (
+                              <em style={{ color: '#334155', fontSize: '0.73rem' }}>
+                                {aiGenerating
+                                  ? 'Generating…'
+                                  : 'AI content unavailable — add VITE_OPENROUTER_API_KEY to .env.local to enable generation.'}
+                              </em>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -849,6 +1217,7 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
                       <div style={{ fontSize: '0.72rem', color: '#475569' }}>{item.sublabel}</div>
                     </div>
                     <button className="btn-primary" style={{ height: 32, fontSize: '0.75rem', padding: '0 0.875rem' }}
+                      aria-label={`Download BRD as ${item.format}`}
                       onClick={() => {
                         const hasAi = Object.keys(aiContent).length > 0;
                         const text = hasAi

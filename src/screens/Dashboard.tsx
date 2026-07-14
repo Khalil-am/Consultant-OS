@@ -5,7 +5,7 @@ import {
   TrendingUp, TrendingDown, Upload, Video, Sparkles, ArrowRight,
   Bot, Check, X, RefreshCw, Eye,
   Calendar, BarChart3, DollarSign, Target, Activity,
-  Brain, Layers, Users, ChevronRight, UserPlus, ListTodo,
+  Brain, Layers, Users, ChevronRight, UserPlus, ListTodo, ClipboardCopy, Download,
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip,
@@ -128,9 +128,41 @@ export default function Dashboard() {
   });
   const [recommendations, setRecommendations] = useState(initialRecommendations);
   const [uploadDrag, setUploadDrag] = useState(false);
+  const [notifDismissed, setNotifDismissed] = useState<Set<number>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('dashboard_notif_dismissed') ?? '[]') as number[]); } catch { return new Set(); }
+  });
+  const pendingHighUrgency = approvals.filter(a => a.status === 'pending' && a.urgency === 'High' && !notifDismissed.has(a.id));
+  const notifCount = pendingHighUrgency.length;
+
+  function dismissNotif(id: number) {
+    setNotifDismissed(prev => {
+      const next = new Set([...prev, id]);
+      try { localStorage.setItem('dashboard_notif_dismissed', JSON.stringify([...next])); } catch { /* ignore */ }
+      return next;
+    });
+  }
+
+  function dismissAllNotifs() {
+    const allIds = approvals.filter(a => a.status === 'pending' && a.urgency === 'High').map(a => a.id);
+    setNotifDismissed(prev => {
+      const next = new Set([...prev, ...allIds]);
+      try { localStorage.setItem('dashboard_notif_dismissed', JSON.stringify([...next])); } catch { /* ignore */ }
+      return next;
+    });
+  }
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [activityFilter, setActivityFilter] = useState<string>('All');
+  const [activityUserFilter, setActivityUserFilter] = useState<string>('All');
+  const [taskPriorityFilter, setTaskPriorityFilter] = useState<'All' | 'Overdue' | 'High' | 'Medium'>('All');
+  const [milestoneStatusFilter, setMilestoneStatusFilter] = useState<'All' | 'On Track' | 'At Risk' | 'Delayed'>('All');
+  const [milestoneWorkspaceFilter, setMilestoneWorkspaceFilter] = useState<string>('All');
+  const [milestoneSort, setMilestoneSort] = useState<'due_date' | 'name' | 'status' | 'value' | 'owner'>('due_date');
+  const [activityCopied, setActivityCopied] = useState(false);
+  const [activityCsvExported, setActivityCsvExported] = useState(false);
+  const [kpiCopied, setKpiCopied] = useState(false);
+  const [kpiCsvExported, setKpiCsvExported] = useState(false);
+  const [dashboardTxtExported, setDashboardTxtExported] = useState(false);
   const [completedDecisions, setCompletedDecisions] = useState<Set<string>>(() => {
     try {
       const saved = localStorage.getItem('dashboard_completed_decisions');
@@ -208,6 +240,96 @@ export default function Dashboard() {
   };
   const dismissRec = (id: number) => setRecommendations(prev => prev.filter(r => r.id !== id));
   const handleRefresh = () => { setRefreshing(true); setTimeout(() => setRefreshing(false), 1200); };
+  const handleCopyKpiSummary = () => {
+    const portfolio = totalContract > 0 ? fmtSAR(totalContract) : 'SAR 23.4M';
+    const recognized = totalContract > 0 ? fmtSAR(totalSpent) : 'SAR 12.1M';
+    const lines = [
+      'Dashboard KPI Summary – Consultant OS',
+      `Portfolio Value: ${portfolio}`,
+      `Revenue Recognized: ${recognized}`,
+      `Active Workspaces: ${workspaceFinancials.length || 8}`,
+    ].join('\n');
+    navigator.clipboard.writeText(lines).then(() => {
+      setKpiCopied(true);
+      setTimeout(() => setKpiCopied(false), 2000);
+    }).catch(() => {});
+  };
+  const handleExportKpiCSV = () => {
+    const headers = ['KPI', 'Value', 'Sub-Value', 'Trend'];
+    const rows = computedKPIs.map(kpi => [
+      `"${kpi.label.replace(/"/g, '""')}"`,
+      `"${kpi.value.replace(/"/g, '""')}"`,
+      `"${kpi.subValue.replace(/"/g, '""')}"`,
+      `"${kpi.trend.replace(/"/g, '""')}"`,
+    ].join(','));
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `dashboard_kpis.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setKpiCsvExported(true);
+    setTimeout(() => setKpiCsvExported(false), 2000);
+  };
+  const handleCopyActivityLog = () => {
+    const text = filteredActivities.slice(0, 12).map(a => `[${a.time}] ${a.user} ${a.action}${a.target ? ` — ${a.target}` : ''}`).join('\n');
+    navigator.clipboard.writeText(text || 'No activity to copy.').then(() => {
+      setActivityCopied(true);
+      setTimeout(() => setActivityCopied(false), 2000);
+    }).catch(() => {});
+  };
+  const handleExportActivityCSV = () => {
+    if (filteredActivities.length === 0) return;
+    const headers = ['Time', 'User', 'Action', 'Target', 'Type'];
+    const rows = filteredActivities.map(a => [
+      `"${(a.time ?? '').replace(/"/g, '""')}"`,
+      `"${(a.user ?? '').replace(/"/g, '""')}"`,
+      `"${(a.action ?? '').replace(/"/g, '""')}"`,
+      `"${(a.target ?? '').replace(/"/g, '""')}"`,
+      a.type ?? '',
+    ].join(','));
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const aEl = document.createElement('a');
+    aEl.href = url;
+    aEl.download = `activity_log.csv`;
+    document.body.appendChild(aEl);
+    aEl.click();
+    document.body.removeChild(aEl);
+    URL.revokeObjectURL(url);
+    setActivityCsvExported(true);
+    setTimeout(() => setActivityCsvExported(false), 2000);
+  };
+  const handleExportDashboardTxt = () => {
+    const kpiLines = computedKPIs.map(k => `  ${k.label}: ${k.value}${k.unit ?? ''} (${k.trend})`);
+    const activityLines = filteredActivities.slice(0, 12).map(a => `  [${a.time}] ${a.user} ${a.action}${a.target ? ` — ${a.target}` : ''}`);
+    const lines = [
+      `Dashboard Summary – Consultant OS`,
+      '',
+      `Portfolio KPIs`,
+      ...kpiLines,
+      '',
+      `Recent Activity (${filteredActivities.length} events)`,
+      ...activityLines,
+    ].join('\n');
+    const blob = new Blob([lines], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `dashboard_summary.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setDashboardTxtExported(true);
+    setTimeout(() => setDashboardTxtExported(false), 2000);
+  };
+
   const markDecisionComplete = (id: string) => setCompletedDecisions(prev => {
     const next = new Set([...prev, id]);
     try { localStorage.setItem('dashboard_completed_decisions', JSON.stringify([...next])); } catch { /* ignore */ }
@@ -215,7 +337,11 @@ export default function Dashboard() {
   });
 
   const activityTypes = ['All', 'Document', 'Meeting', 'Automation', 'Task'];
-  const filteredActivities = activityFilter === 'All' ? activities : activities.filter(a => a.type === activityFilter.toLowerCase());
+  const activityUserOptions = ['All', ...Array.from(new Set(activities.map(a => a.user).filter(Boolean))).sort()];
+  const filteredActivities = activities.filter(a =>
+    (activityFilter === 'All' || a.type === activityFilter.toLowerCase()) &&
+    (activityUserFilter === 'All' || a.user === activityUserFilter)
+  );
 
   const quickActions = [
     { icon: <Upload size={18} />, label: 'Upload Doc', color: '#0EA5E9', bg: 'rgba(14,165,233,0.08)', border: 'rgba(14,165,233,0.18)', action: () => setShowUploadModal(true) },
@@ -231,7 +357,21 @@ export default function Dashboard() {
   const p = isMobile ? '0.875rem' : '1.5rem';
   const gap = isMobile ? '0.875rem' : '1.25rem';
 
-  const upcomingMilestones = [...milestones].filter(m => m.status !== 'Completed').slice(0, 5);
+  const wsNameById = Object.fromEntries(workspaces.map(w => [w.id, w.name]));
+  const milestoneWorkspaceOptions = ['All', ...Array.from(new Set(milestones.map(m => wsNameById[m.workspace_id]).filter(Boolean))).sort()];
+
+  const upcomingMilestones = (() => {
+    const base = [...milestones]
+      .filter(m => m.status !== 'Completed')
+      .filter(m => milestoneStatusFilter === 'All' || m.status === milestoneStatusFilter)
+      .filter(m => milestoneWorkspaceFilter === 'All' || wsNameById[m.workspace_id] === milestoneWorkspaceFilter);
+    if (milestoneSort === 'name') base.sort((a, b) => (a.title ?? '').localeCompare(b.title ?? ''));
+    else if (milestoneSort === 'status') base.sort((a, b) => (a.status ?? '').localeCompare(b.status ?? ''));
+    else if (milestoneSort === 'value') base.sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+    else if (milestoneSort === 'owner') base.sort((a, b) => (a.owner ?? '').localeCompare(b.owner ?? ''));
+    else base.sort((a, b) => (a.due_date ?? '').localeCompare(b.due_date ?? ''));
+    return base.slice(0, 5);
+  })();
   const activeBoardDecisions = boardDecisions.filter(d => d.status !== 'Closed' && !completedDecisions.has(d.id));
 
   const totalContract = workspaceFinancials.reduce((s, w) => s + w.contract_value, 0);
@@ -242,6 +382,13 @@ export default function Dashboard() {
   const activeWorkspaces = workspaces.filter(w => w.status === 'Active');
   const openTasks = tasks.filter(t => t.status !== 'Completed');
   const overdueTasks = tasks.filter(t => t.status === 'Overdue');
+  const filteredPriorityTasks = openTasks.filter(t => {
+    if (taskPriorityFilter === 'All') return true;
+    if (taskPriorityFilter === 'Overdue') return t.status === 'Overdue';
+    if (taskPriorityFilter === 'High') return t.priority === 'High';
+    if (taskPriorityFilter === 'Medium') return t.priority === 'Medium';
+    return true;
+  }).slice(0, 5);
   const completedTaskCount = tasks.filter(t => t.status === 'Completed').length;
   const openRisks = risks.filter(r => r.status === 'Open');
   const criticalRisks = openRisks.filter(r => r.severity === 'Critical' || r.severity === 'High');
@@ -393,7 +540,7 @@ export default function Dashboard() {
             {/* Period switcher */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '2px', background: 'rgba(255,255,255,0.04)', borderRadius: '10px', padding: '3px', border: '1px solid rgba(255,255,255,0.07)' }}>
               {(['today', 'week', 'month'] as Period[]).map(pv => (
-                <button key={pv} onClick={() => setPeriod(pv)} style={{
+                <button key={pv} onClick={() => setPeriod(pv)} aria-label={`Period: ${pv}`} aria-pressed={period === pv} style={{
                   padding: '0.3rem 0.9rem', borderRadius: '7px', border: 'none', cursor: 'pointer',
                   fontSize: '0.78rem', fontWeight: 600, fontFamily: 'inherit',
                   transition: 'all 0.2s',
@@ -411,12 +558,21 @@ export default function Dashboard() {
               background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
               cursor: 'pointer', color: '#64748B', fontSize: '0.78rem', fontFamily: 'inherit',
               transition: 'all 0.2s',
-            }}>
+            }} aria-label="Refresh dashboard">
               <RefreshCw size={13} style={{ animation: refreshing ? 'spin 0.8s linear infinite' : 'none' }} />
               {!isMobile && 'Refresh'}
             </button>
-            <button onClick={() => navigate('/reports')} className="btn-ghost" style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+            <button onClick={() => navigate('/reports')} className="btn-ghost" style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }} aria-label="View Reports">
               <Eye size={13} /> {!isMobile && 'View Reports'}
+            </button>
+            <button onClick={handleCopyKpiSummary} className="btn-ghost" style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }} aria-label="Copy KPI summary to clipboard">
+              <ClipboardCopy size={13} /> {!isMobile && (kpiCopied ? 'Copied!' : 'KPI Summary')}
+            </button>
+            <button onClick={handleExportKpiCSV} className="btn-ghost" style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }} aria-label="Export KPI data to CSV">
+              <Download size={13} /> {!isMobile && (kpiCsvExported ? 'Exported!' : 'Export KPIs')}
+            </button>
+            <button onClick={handleExportDashboardTxt} className="btn-ghost" style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }} aria-label="Export dashboard summary to TXT">
+              <FileText size={13} /> {!isMobile && (dashboardTxtExported ? 'Exported!' : 'Export TXT')}
             </button>
           </div>
         </div>
@@ -576,6 +732,7 @@ export default function Dashboard() {
               cursor: 'pointer', transition: 'all 0.2s', color: action.color,
               fontFamily: 'inherit', position: 'relative', overflow: 'hidden',
             }}
+            aria-label={`Quick action: ${action.label}`}
               onMouseEnter={e => {
                 e.currentTarget.style.transform = 'translateY(-4px)';
                 e.currentTarget.style.boxShadow = `0 16px 32px ${action.color}25, 0 0 0 1px ${action.color}30`;
@@ -625,6 +782,7 @@ export default function Dashboard() {
             }}
               onMouseEnter={e => { e.currentTarget.style.background = 'rgba(14,165,233,0.16)'; }}
               onMouseLeave={e => { e.currentTarget.style.background = 'rgba(14,165,233,0.08)'; }}
+              aria-label="All Workspaces"
             >
               All Workspaces <ChevronRight size={13} />
             </button>
@@ -678,12 +836,53 @@ export default function Dashboard() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {/* Milestones */}
           <div style={{ background: '#0C1220', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', overflow: 'hidden' }}>
-            <div style={{ padding: '0.875rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ padding: '0.875rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <div style={{ padding: '0.35rem', borderRadius: '6px', background: 'rgba(245,158,11,0.12)', color: '#F59E0B' }}>
                   <Target size={13} />
                 </div>
                 <span style={{ fontSize: '0.825rem', fontWeight: 700, color: '#F1F5F9' }}>Milestones</span>
+              </div>
+              <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                {(['All', 'On Track', 'At Risk', 'Delayed'] as const).map(s => (
+                  <button
+                    key={s}
+                    onClick={() => setMilestoneStatusFilter(s)}
+                    aria-label={`Filter milestones by status: ${s}`}
+                    aria-pressed={milestoneStatusFilter === s}
+                    style={{
+                      fontSize: '0.6rem', fontWeight: 600, padding: '2px 7px', borderRadius: '5px',
+                      background: milestoneStatusFilter === s ? 'rgba(245,158,11,0.15)' : 'transparent',
+                      color: milestoneStatusFilter === s ? '#F59E0B' : '#475569',
+                      border: milestoneStatusFilter === s ? '1px solid rgba(245,158,11,0.3)' : '1px solid transparent',
+                      cursor: 'pointer', fontFamily: 'inherit',
+                    }}
+                  >
+                    {s}
+                  </button>
+                ))}
+                {milestoneWorkspaceOptions.length > 2 && (
+                  <select
+                    aria-label="Filter milestones by workspace"
+                    value={milestoneWorkspaceFilter}
+                    onChange={e => setMilestoneWorkspaceFilter(e.target.value)}
+                    style={{ fontSize: '0.6rem', height: '22px', borderRadius: '5px', border: '1px solid rgba(255,255,255,0.1)', background: milestoneWorkspaceFilter !== 'All' ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.04)', color: milestoneWorkspaceFilter !== 'All' ? '#F59E0B' : '#94A3B8', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }}
+                  >
+                    {milestoneWorkspaceOptions.map(w => <option key={w} value={w}>{w === 'All' ? 'All Workspaces' : w}</option>)}
+                  </select>
+                )}
+                <select
+                  aria-label="Sort milestones"
+                  value={milestoneSort}
+                  onChange={e => setMilestoneSort(e.target.value as typeof milestoneSort)}
+                  style={{ fontSize: '0.6rem', height: '22px', borderRadius: '5px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: '#94A3B8', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }}
+                >
+                  <option value="due_date">Due Date</option>
+                  <option value="name">Name</option>
+                  <option value="status">Status</option>
+                  <option value="value">Value</option>
+                  <option value="owner">Owner</option>
+                </select>
               </div>
             </div>
             <div>
@@ -901,6 +1100,7 @@ export default function Dashboard() {
               onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(0,212,255,0.3)'; e.currentTarget.style.color = '#00D4FF'; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#94A3B8'; }}
               onClick={() => navigate('/workspaces')}
+              aria-label="View financial details"
             >
               Details <ArrowRight size={11} />
             </button>
@@ -993,6 +1193,72 @@ export default function Dashboard() {
         </button>
       </div>
 
+      {/* ── Priority Tasks Quick View ─────────────────────────────────── */}
+      {hasLiveData && (
+        <div className="section-card" style={{ overflow: 'hidden' }}>
+          <div className="section-card-header">
+            <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>Priority Tasks</span>
+            <div style={{ display: 'flex', gap: '4px' }}>
+              {(['All', 'Overdue', 'High', 'Medium'] as const).map(f => (
+                <button
+                  key={f}
+                  onClick={() => setTaskPriorityFilter(f)}
+                  aria-label={`Filter priority tasks: ${f}`}
+                  aria-pressed={taskPriorityFilter === f}
+                  style={{
+                    padding: '3px 8px', borderRadius: '5px', fontSize: '0.68rem', fontWeight: 500,
+                    background: taskPriorityFilter === f ? 'rgba(14,165,233,0.15)' : 'transparent',
+                    color: taskPriorityFilter === f ? '#38BDF8' : '#64748B',
+                    border: taskPriorityFilter === f ? '1px solid rgba(14,165,233,0.25)' : '1px solid transparent',
+                    cursor: 'pointer', fontFamily: 'inherit',
+                  }}
+                >{f}</button>
+              ))}
+            </div>
+          </div>
+          {filteredPriorityTasks.length === 0 ? (
+            <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>No tasks match this filter</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {filteredPriorityTasks.map(t => (
+                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.625rem 1rem', borderBottom: '1px solid var(--border-subtle)' }}>
+                  <span style={{
+                    fontSize: '0.65rem', fontWeight: 600, padding: '2px 6px', borderRadius: '4px',
+                    background: t.status === 'Overdue' ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)',
+                    color: t.status === 'Overdue' ? '#FCA5A5' : '#FCD34D',
+                  }}>{t.status}</span>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-primary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
+                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', flexShrink: 0 }}>{t.workspace_id}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Workspace RAG Summary ────────────────────────────────────── */}
+      {hasLiveData && ragStatuses.length > 0 && (
+        <div className="section-card" style={{ overflow: 'hidden' }}>
+          <div className="section-card-header">
+            <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>Workspace Health (RAG)</span>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{ragStatuses.length} workspace{ragStatuses.length !== 1 ? 's' : ''}</span>
+          </div>
+          <div style={{ display: 'flex', gap: '1rem', padding: '0.875rem 1.25rem', flexWrap: 'wrap' }}>
+            {(['Green', 'Amber', 'Red'] as const).map(color => {
+              const count = ragStatuses.filter(r => r.rag === color).length;
+              const hex = color === 'Green' ? '#10B981' : color === 'Amber' ? '#F59E0B' : '#EF4444';
+              return (
+                <div key={color} aria-label={`RAG ${color} count: ${count}`} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.875rem', borderRadius: '8px', background: `rgba(${color === 'Green' ? '16,185,129' : color === 'Amber' ? '245,158,11' : '239,68,68'},0.08)`, border: `1px solid ${hex}30` }}>
+                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: hex, flexShrink: 0 }} />
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: hex }}>{count}</span>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{color}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* ── AI Recommendations + Approvals ───────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: width >= 768 ? '1fr 1fr' : '1fr', gap: '1rem' }}>
 
@@ -1042,6 +1308,7 @@ export default function Dashboard() {
                 }}
                   onMouseEnter={e => { e.currentTarget.style.color = '#94A3B8'; e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }}
                   onMouseLeave={e => { e.currentTarget.style.color = '#334155'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                  aria-label={`Dismiss: ${rec.title}`}
                 >
                   <X size={11} />
                 </button>
@@ -1060,6 +1327,7 @@ export default function Dashboard() {
                     }}
                       onMouseEnter={e => { e.currentTarget.style.color = '#C4B5FD'; }}
                       onMouseLeave={e => { e.currentTarget.style.color = '#A78BFA'; }}
+                      aria-label={rec.action}
                     >
                       {rec.action} <ArrowRight size={11} />
                     </button>
@@ -1078,10 +1346,39 @@ export default function Dashboard() {
                 <CheckSquare size={13} />
               </div>
               <span style={{ fontSize: '0.825rem', fontWeight: 700, color: '#F1F5F9' }}>Pending Approvals</span>
+              {notifCount > 0 && (
+                <span
+                  aria-label={`${notifCount} high urgency approval${notifCount > 1 ? 's' : ''} need attention`}
+                  style={{
+                    minWidth: 18, height: 18, borderRadius: '9999px', fontSize: '0.6rem', fontWeight: 800,
+                    background: '#EF4444', color: '#fff', display: 'inline-flex', alignItems: 'center',
+                    justifyContent: 'center', padding: '0 5px', boxShadow: '0 0 8px rgba(239,68,68,0.5)',
+                    animation: 'pulseDot 2s ease-in-out infinite',
+                  }}
+                >
+                  {notifCount}
+                </span>
+              )}
             </div>
-            <span style={{ fontSize: '0.65rem', padding: '2px 8px', borderRadius: '99px', background: 'rgba(245,158,11,0.12)', color: '#FCD34D', border: '1px solid rgba(245,158,11,0.2)', fontWeight: 700 }}>
-              {approvals.filter(a => a.status === 'pending').length} pending
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              {notifCount > 0 && (
+                <button
+                  aria-label="Dismiss all high urgency notifications"
+                  onClick={dismissAllNotifs}
+                  style={{
+                    fontSize: '0.65rem', padding: '2px 8px', borderRadius: '99px',
+                    background: 'rgba(239,68,68,0.1)', color: '#FCA5A5',
+                    border: '1px solid rgba(239,68,68,0.25)', fontWeight: 600,
+                    cursor: 'pointer', fontFamily: 'inherit',
+                  }}
+                >
+                  Dismiss All
+                </button>
+              )}
+              <span style={{ fontSize: '0.65rem', padding: '2px 8px', borderRadius: '99px', background: 'rgba(245,158,11,0.12)', color: '#FCD34D', border: '1px solid rgba(245,158,11,0.2)', fontWeight: 700 }}>
+                {approvals.filter(a => a.status === 'pending').length} pending
+              </span>
+            </div>
           </div>
           <div>
             {approvals.map((item, i) => (
@@ -1110,8 +1407,10 @@ export default function Dashboard() {
                   </span>
                 </div>
                 {item.status === 'pending' && (
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button onClick={() => handleApprove(item.id)} style={{
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <button
+                      aria-label={`Approve ${item.title}`}
+                      onClick={() => handleApprove(item.id)} style={{
                       flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
                       padding: '0.375rem', borderRadius: '7px', border: '1px solid rgba(16,185,129,0.2)',
                       cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.72rem', fontWeight: 700,
@@ -1122,7 +1421,9 @@ export default function Dashboard() {
                     >
                       <Check size={12} /> Approve
                     </button>
-                    <button onClick={() => handleReject(item.id)} style={{
+                    <button
+                      aria-label={`Reject ${item.title}`}
+                      onClick={() => handleReject(item.id)} style={{
                       flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
                       padding: '0.375rem', borderRadius: '7px', border: '1px solid rgba(239,68,68,0.18)',
                       cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.72rem', fontWeight: 700,
@@ -1133,6 +1434,20 @@ export default function Dashboard() {
                     >
                       <X size={12} /> Reject
                     </button>
+                    {item.urgency === 'High' && !notifDismissed.has(item.id) && (
+                      <button
+                        aria-label={`Dismiss notification for ${item.title}`}
+                        onClick={() => dismissNotif(item.id)}
+                        style={{
+                          padding: '0.375rem 0.625rem', borderRadius: '7px', border: '1px solid rgba(148,163,184,0.12)',
+                          cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.67rem', fontWeight: 600,
+                          background: 'transparent', color: '#475569', transition: 'all 0.15s',
+                        }}
+                        title="Dismiss notification"
+                      >
+                        Dismiss
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -1220,18 +1535,53 @@ export default function Dashboard() {
               </div>
               <span style={{ fontSize: '0.825rem', fontWeight: 700, color: '#F1F5F9' }}>Activity Feed</span>
             </div>
-            <div style={{ display: 'flex', gap: '2px', background: 'rgba(255,255,255,0.03)', padding: '2px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
-              {activityTypes.map(t => (
-                <button key={t} onClick={() => setActivityFilter(t)} style={{
-                  padding: '0.25rem 0.625rem', borderRadius: '6px', border: 'none',
-                  cursor: 'pointer', fontSize: '0.72rem', fontFamily: 'inherit', fontWeight: 600,
-                  transition: 'all 0.15s',
-                  background: activityFilter === t ? 'rgba(0,212,255,0.12)' : 'transparent',
-                  color: activityFilter === t ? '#00D4FF' : '#64748B',
-                }}>
-                  {t}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '2px', background: 'rgba(255,255,255,0.03)', padding: '2px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                {activityTypes.map(t => (
+                  <button key={t} onClick={() => setActivityFilter(t)}
+                    aria-label={`Filter activity: ${t}`}
+                    aria-pressed={activityFilter === t}
+                    style={{
+                      padding: '0.25rem 0.625rem', borderRadius: '6px', border: 'none',
+                      cursor: 'pointer', fontSize: '0.72rem', fontFamily: 'inherit', fontWeight: 600,
+                      transition: 'all 0.15s',
+                      background: activityFilter === t ? 'rgba(0,212,255,0.12)' : 'transparent',
+                      color: activityFilter === t ? '#00D4FF' : '#64748B',
+                    }}>
+                    {t}
+                  </button>
+                ))}
+              </div>
+              {activityUserOptions.length > 1 && (
+                <select
+                  aria-label="Filter activity by user"
+                  value={activityUserFilter}
+                  onChange={e => setActivityUserFilter(e.target.value)}
+                  style={{ height: '28px', fontSize: '0.7rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)', background: activityUserFilter !== 'All' ? 'rgba(0,212,255,0.07)' : 'rgba(255,255,255,0.03)', color: activityUserFilter !== 'All' ? '#00D4FF' : '#64748B', fontFamily: 'inherit', cursor: 'pointer', outline: 'none', paddingLeft: '4px', paddingRight: '4px' }}
+                >
+                  <option value="All">All Users</option>
+                  {activityUserOptions.slice(1).map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+              )}
+              <div style={{ display: 'flex', gap: '0.375rem' }}>
+                <button
+                  onClick={handleCopyActivityLog}
+                  aria-label="Copy activity log to clipboard"
+                  style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '0.25rem 0.5rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.03)', cursor: 'pointer', color: activityCopied ? '#34D399' : '#64748B', fontSize: '0.72rem', fontFamily: 'inherit' }}
+                >
+                  <ClipboardCopy size={11} />
+                  {activityCopied ? 'Copied!' : 'Copy'}
                 </button>
-              ))}
+                <button
+                  onClick={handleExportActivityCSV}
+                  aria-label="Export activity log to CSV"
+                  disabled={filteredActivities.length === 0}
+                  style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '0.25rem 0.5rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.03)', cursor: filteredActivities.length === 0 ? 'not-allowed' : 'pointer', color: activityCsvExported ? '#34D399' : '#64748B', fontSize: '0.72rem', fontFamily: 'inherit' }}
+                >
+                  <Download size={11} />
+                  {activityCsvExported ? 'Exported!' : 'CSV'}
+                </button>
+              </div>
             </div>
           </div>
           <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
@@ -1332,6 +1682,7 @@ export default function Dashboard() {
               }}
                 onMouseEnter={e => { e.currentTarget.style.color = '#94A3B8'; }}
                 onMouseLeave={e => { e.currentTarget.style.color = '#64748B'; }}
+                aria-label="Close upload modal"
               >
                 <X size={16} />
               </button>

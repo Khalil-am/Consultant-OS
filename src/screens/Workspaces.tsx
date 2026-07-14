@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, Plus, Grid3X3, List, FileText, Video, CheckSquare,
   ChevronRight, TrendingUp, TrendingDown, DollarSign, RefreshCw,
   X, AlertCircle, Briefcase, CalendarDays, MoreVertical,
-  AlertTriangle, Pencil, Trash2,
+  AlertTriangle, Pencil, Trash2, Archive, Copy, Download, ClipboardCopy,
 } from 'lucide-react';
 import { useLayout } from '../hooks/useLayout';
 import {
@@ -77,7 +77,7 @@ const defaultForm: NewWorkspaceForm = {
   name: '', client: '', sector: 'Government', type: 'Client', language: 'EN', description: '',
 };
 
-// ── Label component for form fields ──────────────────────────────────────────
+// â”€â”€ Label component for form fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
     <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B', display: 'block', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
@@ -94,6 +94,29 @@ const inputStyle: React.CSSProperties = {
   transition: 'border-color 0.15s',
 };
 
+function exportWorkspacesCSV(workspaces: WorkspaceRow[]) {
+  const headers = ['Name', 'Client', 'Type', 'Sector', 'Language', 'Status', 'Progress'];
+  const rows = workspaces.map(ws => [
+    `"${ws.name.replace(/"/g, '""')}"`,
+    `"${ws.client.replace(/"/g, '""')}"`,
+    ws.type,
+    `"${ws.sector}"`,
+    ws.language,
+    ws.status,
+    `${ws.progress ?? 0}%`,
+  ].join(','));
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `workspaces_export_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 export default function Workspaces() {
   const navigate = useNavigate();
   const { width, isMobile } = useLayout();
@@ -106,8 +129,10 @@ export default function Workspaces() {
   const [refreshing, setRefreshing] = useState(false);
 
   const [activeFilter, setActiveFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState<'All' | 'Active' | 'Completed' | 'On Hold'>('All');
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [sortBy, setSortBy] = useState<'default' | 'name' | 'progress' | 'status' | 'contributors' | 'language' | 'client' | 'sector' | 'budget'>('default');
 
   const [showNewModal, setShowNewModal] = useState(false);
   const [form, setForm] = useState<NewWorkspaceForm>(defaultForm);
@@ -123,6 +148,117 @@ export default function Workspaces() {
   // Delete workspace state
   const [deletingWorkspace, setDeletingWorkspace] = useState<WorkspaceRow | null>(null);
   const [deleteConfirming, setDeleteConfirming] = useState(false);
+
+  // Duplicate workspace state
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const [duplicateToast, setDuplicateToast] = useState<string | null>(null);
+
+  async function handleDuplicateWorkspace(ws: WorkspaceRow, e: React.MouseEvent) {
+    e.stopPropagation();
+    setDuplicatingId(ws.id);
+    try {
+      const newId = `ws-${Date.now()}`;
+      const duplicated = await createWorkspace({
+        id: newId,
+        name: `Copy of ${ws.name}`,
+        client: ws.client,
+        type: ws.type,
+        sector: ws.sector,
+        sector_color: ws.sector_color,
+        status: 'Active',
+        language: ws.language,
+        progress: 0,
+        contributors: ws.contributors,
+        tasks_count: 0,
+        docs_count: 0,
+        meetings_count: 0,
+        last_activity: new Date().toISOString().slice(0, 10),
+        description: ws.description,
+      });
+      setWorkspaces(prev => [duplicated, ...prev]);
+      setDuplicateToast(`"Copy of ${ws.name}" created`);
+      setTimeout(() => setDuplicateToast(null), 3000);
+    } catch { } finally { setDuplicatingId(null); }
+  }
+
+  // Archive workspace state
+  const ARCHIVED_WS_KEY = 'archived_workspaces';
+  const [archivedIds, setArchivedIds] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(ARCHIVED_WS_KEY) ?? '[]') as string[]); } catch { return new Set(); }
+  });
+  const [showArchived, setShowArchived] = useState(false);
+  const [budgetOverrunOnly, setBudgetOverrunOnly] = useState(false);
+  const [sectorFilter, setSectorFilter] = useState<string>('All');
+  const [languageFilter, setLanguageFilter] = useState<'All' | 'EN' | 'AR'>('All');
+  const [starredWorkspaces, setStarredWorkspaces] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('workspaces_starred') ?? '[]')); } catch { return new Set(); }
+  });
+  const [starredWorkspacesOnly, setStarredWorkspacesOnly] = useState(false);
+  const [wsSummaryCopied, setWsSummaryCopied] = useState(false);
+  const [wsTxtExported, setWsTxtExported] = useState(false);
+
+  function handleToggleStarWorkspace(wsId: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    setStarredWorkspaces(prev => {
+      const next = new Set(prev);
+      if (next.has(wsId)) next.delete(wsId);
+      else next.add(wsId);
+      try { localStorage.setItem('workspaces_starred', JSON.stringify([...next])); } catch { /* ignore */ }
+      return next;
+    });
+  }
+
+  function handleCopyWorkspaceSummary() {
+    const lines = [
+      `Workspace Summary – Consultant OS`,
+      `Total Workspaces: ${workspaces.length}`,
+      `Active: ${workspaces.filter(w => w.status === 'Active').length}`,
+      `Completed: ${workspaces.filter(w => w.status === 'Completed').length}`,
+      `On Hold: ${workspaces.filter(w => w.status === 'On Hold').length}`,
+      `Avg Progress: ${workspaces.length > 0 ? Math.round(workspaces.reduce((s, w) => s + (w.progress ?? 0), 0) / workspaces.length) : 0}%`,
+    ].join('\n');
+    navigator.clipboard.writeText(lines).then(() => {
+      setWsSummaryCopied(true);
+      setTimeout(() => setWsSummaryCopied(false), 2000);
+    }).catch(() => {});
+  }
+
+  function handleExportWorkspacesTxt(workspacesToExport: WorkspaceRow[]) {
+    if (workspacesToExport.length === 0) return;
+    const lines = [
+      `Workspaces Export – Consultant OS`,
+      `Total: ${workspacesToExport.length}`,
+      '',
+      ...workspacesToExport.map(w => [
+        `Name: ${w.name}`,
+        `Client: ${w.client}`,
+        `Type: ${w.type} | Sector: ${w.sector}`,
+        `Status: ${w.status} | Progress: ${w.progress ?? 0}%`,
+        `Language: ${w.language}`,
+        '',
+      ].join('\n')),
+    ].join('\n');
+    const blob = new Blob([lines], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `workspaces_export.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setWsTxtExported(true);
+    setTimeout(() => setWsTxtExported(false), 2000);
+  }
+
+  function toggleArchiveWorkspace(id: string) {
+    setArchivedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      try { localStorage.setItem(ARCHIVED_WS_KEY, JSON.stringify([...next])); } catch { /* ignore */ }
+      return next;
+    });
+  }
 
   const loadData = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -147,12 +283,34 @@ export default function Workspaces() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  const filtered = workspaces.filter(ws => {
-    const matchFilter = activeFilter === 'All' || ws.type === activeFilter;
-    const matchSearch = ws.name.toLowerCase().includes(search.toLowerCase()) ||
-      ws.client.toLowerCase().includes(search.toLowerCase());
-    return matchFilter && matchSearch;
-  });
+  const sectorOptions = useMemo(() => ['All', ...Array.from(new Set(workspaces.map(ws => ws.sector).filter(Boolean))).sort()], [workspaces]);
+
+  const filtered = (() => {
+    const base = workspaces.filter(ws => {
+      const matchFilter = activeFilter === 'All' || ws.type === activeFilter;
+      const matchStatus = statusFilter === 'All' || ws.status === statusFilter;
+      const matchSearch = ws.name.toLowerCase().includes(search.toLowerCase()) ||
+        ws.client.toLowerCase().includes(search.toLowerCase());
+      const matchArchived = showArchived ? archivedIds.has(ws.id) : !archivedIds.has(ws.id);
+      const matchBudget = !budgetOverrunOnly || financials.some(f => f.workspace_id === ws.id && f.variance > 0);
+      const matchSector = sectorFilter === 'All' || ws.sector === sectorFilter;
+      const matchStarred = !starredWorkspacesOnly || starredWorkspaces.has(ws.id);
+      const matchLanguage = languageFilter === 'All' || ws.language === languageFilter;
+      return matchFilter && matchStatus && matchSearch && matchArchived && matchBudget && matchSector && matchStarred && matchLanguage;
+    });
+    if (sortBy === 'name') return [...base].sort((a, b) => a.name.localeCompare(b.name));
+    if (sortBy === 'progress') return [...base].sort((a, b) => (b.progress ?? 0) - (a.progress ?? 0));
+    if (sortBy === 'status') return [...base].sort((a, b) => a.status.localeCompare(b.status));
+    if (sortBy === 'contributors') return [...base].sort((a, b) => (b.contributors?.length ?? 0) - (a.contributors?.length ?? 0));
+    if (sortBy === 'language') return [...base].sort((a, b) => (a.language ?? '').localeCompare(b.language ?? ''));
+    if (sortBy === 'client') return [...base].sort((a, b) => (a.client ?? '').localeCompare(b.client ?? ''));
+    if (sortBy === 'sector') return [...base].sort((a, b) => (a.sector ?? '').localeCompare(b.sector ?? ''));
+    if (sortBy === 'budget') {
+      const contractByWs = Object.fromEntries(financials.map(f => [f.workspace_id, f.contract_value]));
+      return [...base].sort((a, b) => (contractByWs[b.id] ?? 0) - (contractByWs[a.id] ?? 0));
+    }
+    return base;
+  })();
 
   const gridCols = width >= 1200 ? 3 : width >= 768 ? 2 : 1;
 
@@ -235,13 +393,13 @@ export default function Workspaces() {
     setEditError('');
   };
 
-  // ── Loading state ──────────────────────────────────────────────────────────
+  // â”€â”€ Loading state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (loading) {
     return (
       <div style={{ padding: isMobile ? '0.875rem' : '1.5rem', background: '#080C18', minHeight: '100%' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '1.75rem' }}>
           <div style={{ width: 18, height: 18, border: '2px solid #00D4FF', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
-          <span style={{ fontSize: '0.82rem', color: '#475569', fontWeight: 500 }}>Loading workspaces…</span>
+          <span style={{ fontSize: '0.82rem', color: '#475569', fontWeight: 500 }}>Loading workspacesâ€¦</span>
         </div>
         <LoadingSkeleton />
         <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
@@ -249,7 +407,7 @@ export default function Workspaces() {
     );
   }
 
-  // ── Error state ────────────────────────────────────────────────────────────
+  // â”€â”€ Error state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (error) {
     return (
       <div style={{ padding: isMobile ? '0.875rem' : '1.5rem', background: '#080C18', minHeight: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', paddingTop: '5rem' }}>
@@ -266,7 +424,7 @@ export default function Workspaces() {
   return (
     <div style={{ padding: isMobile ? '0.875rem' : '1.5rem', display: 'flex', flexDirection: 'column', gap: isMobile ? '0.875rem' : '1.25rem', background: '#080C18', minHeight: '100%' }}>
 
-      {/* ── Portfolio Banner ────────────────────────────────────────────── */}
+      {/* â”€â”€ Portfolio Banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div style={{
         background: 'linear-gradient(135deg, #0C1628 0%, #080C18 55%, #0D0C20 100%)',
         border: '1px solid rgba(0,212,255,0.12)',
@@ -297,7 +455,7 @@ export default function Workspaces() {
             <div style={{ fontSize: '0.82rem', color: '#64748B', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
               <span style={{ color: '#00D4FF', fontWeight: 700 }}>{workspaces.filter(w => w.status === 'Active').length}</span>
               <span>active engagements</span>
-              <span style={{ color: '#1E3A5F' }}>·</span>
+              <span style={{ color: '#1E3A5F' }}>Â·</span>
               <span>Portfolio health</span>
               <span style={{ color: healthScore >= 80 ? '#10B981' : healthScore >= 60 ? '#F59E0B' : '#EF4444', fontWeight: 800 }}>
                 {healthScore}%
@@ -320,7 +478,7 @@ export default function Workspaces() {
         </div>
       </div>
 
-      {/* ── Financial Stats Row ─────────────────────────────────────────── */}
+      {/* â”€â”€ Financial Stats Row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 768 ? 4 : width >= 480 ? 2 : 1}, 1fr)`, gap: '0.875rem' }}>
         {[
           { label: 'Total Contract Value', value: fmtSAR(totalContract), icon: <DollarSign size={15} />, color: '#00D4FF', trend: `${workspaces.length} engagements`, trendUp: true },
@@ -364,7 +522,7 @@ export default function Workspaces() {
         ))}
       </div>
 
-      {/* ── Toolbar ─────────────────────────────────────────────────────── */}
+      {/* â”€â”€ Toolbar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.875rem', flexWrap: 'wrap' }}>
         {/* Filter tabs */}
         <div style={{
@@ -377,13 +535,16 @@ export default function Workspaces() {
             const count = tab === 'All' ? workspaces.length : workspaces.filter(w => w.type === tab).length;
             const active = activeFilter === tab;
             return (
-              <button key={tab} onClick={() => setActiveFilter(tab)} style={{
-                padding: '0.3rem 0.875rem', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                fontSize: '0.78rem', fontFamily: 'inherit', fontWeight: 600, transition: 'all 0.15s',
-                background: active ? 'rgba(0,212,255,0.12)' : 'transparent',
-                color: active ? '#00D4FF' : '#64748B',
-                whiteSpace: 'nowrap',
-                boxShadow: active ? '0 0 12px rgba(0,212,255,0.1)' : 'none',
+              <button key={tab} onClick={() => setActiveFilter(tab)}
+                aria-label={`Filter: ${tab}`}
+                aria-pressed={active}
+                style={{
+                  padding: '0.3rem 0.875rem', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                  fontSize: '0.78rem', fontFamily: 'inherit', fontWeight: 600, transition: 'all 0.15s',
+                  background: active ? 'rgba(0,212,255,0.12)' : 'transparent',
+                  color: active ? '#00D4FF' : '#64748B',
+                  whiteSpace: 'nowrap',
+                  boxShadow: active ? '0 0 12px rgba(0,212,255,0.1)' : 'none',
               }}>
                 {tab}
                 <span style={{ marginLeft: '5px', fontSize: '0.65rem', opacity: 0.7, color: active ? '#00D4FF' : '#475569' }}>
@@ -393,6 +554,87 @@ export default function Workspaces() {
             );
           })}
         </div>
+
+        {/* Status quick filters */}
+        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+          {(['All', 'Active', 'Completed', 'On Hold'] as const).map(sf => (
+            <button
+              key={sf}
+              aria-label={`Filter workspaces by status: ${sf}`}
+              aria-pressed={statusFilter === sf}
+              onClick={() => setStatusFilter(sf)}
+              style={{
+                height: '28px', fontSize: '0.72rem', padding: '0 0.625rem', borderRadius: '9px',
+                border: `1px solid ${statusFilter === sf ? 'rgba(0,212,255,0.35)' : 'rgba(255,255,255,0.09)'}`,
+                background: statusFilter === sf ? 'rgba(0,212,255,0.1)' : 'rgba(255,255,255,0.04)',
+                color: statusFilter === sf ? '#00D4FF' : '#64748B',
+                fontFamily: 'inherit', fontWeight: statusFilter === sf ? 700 : 500,
+                cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap',
+              }}
+            >
+              {sf}
+            </button>
+          ))}
+        </div>
+
+        {/* Starred only toggle */}
+        <button
+          onClick={() => setStarredWorkspacesOnly(v => !v)}
+          aria-label="Show starred workspaces only"
+          aria-pressed={starredWorkspacesOnly}
+          style={{
+            height: '28px', fontSize: '0.72rem', padding: '0 0.75rem', borderRadius: '9px',
+            border: `1px solid ${starredWorkspacesOnly ? 'rgba(245,158,11,0.35)' : 'rgba(255,255,255,0.09)'}`,
+            background: starredWorkspacesOnly ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.04)',
+            color: starredWorkspacesOnly ? '#F59E0B' : '#64748B',
+            fontFamily: 'inherit', fontWeight: starredWorkspacesOnly ? 700 : 500,
+            cursor: 'pointer', whiteSpace: 'nowrap',
+          }}
+        >
+          ⭐ Starred
+        </button>
+
+        {/* Budget Overrun toggle */}
+        <button
+          onClick={() => setBudgetOverrunOnly(v => !v)}
+          aria-label="Show budget overrun workspaces only"
+          aria-pressed={budgetOverrunOnly}
+          style={{
+            height: '28px', fontSize: '0.72rem', padding: '0 0.75rem', borderRadius: '9px',
+            border: `1px solid ${budgetOverrunOnly ? 'rgba(239,68,68,0.35)' : 'rgba(255,255,255,0.09)'}`,
+            background: budgetOverrunOnly ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.04)',
+            color: budgetOverrunOnly ? '#FCA5A5' : '#64748B',
+            fontFamily: 'inherit', fontWeight: budgetOverrunOnly ? 700 : 500,
+            cursor: 'pointer', whiteSpace: 'nowrap',
+          }}
+        >
+          Over Budget
+        </button>
+
+        {/* Sector filter */}
+        {sectorOptions.length > 1 && (
+          <select
+            aria-label="Filter workspaces by sector"
+            value={sectorFilter}
+            onChange={e => setSectorFilter(e.target.value)}
+            style={{ height: '28px', fontSize: '0.72rem', padding: '0 0.5rem', borderRadius: '9px', border: '1px solid rgba(255,255,255,0.09)', background: sectorFilter !== 'All' ? 'rgba(0,212,255,0.07)' : 'rgba(255,255,255,0.04)', color: sectorFilter !== 'All' ? '#00D4FF' : '#64748B', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }}
+          >
+            {sectorOptions.map(s => <option key={s} value={s}>{s === 'All' ? 'All Sectors' : s}</option>)}
+          </select>
+        )}
+
+        {/* Language filter */}
+        {(['All', 'EN', 'AR'] as const).map(lang => (
+          <button
+            key={lang}
+            onClick={() => setLanguageFilter(lang)}
+            aria-label={lang === 'All' ? 'All languages' : `${lang} only workspaces`}
+            aria-pressed={languageFilter === lang}
+            style={{ height: '28px', fontSize: '0.72rem', padding: '0 0.625rem', borderRadius: '9px', border: `1px solid ${languageFilter === lang ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.09)'}`, background: languageFilter === lang ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.04)', color: languageFilter === lang ? '#34D399' : '#64748B', cursor: 'pointer', fontFamily: 'inherit', fontWeight: languageFilter === lang ? 700 : 500 }}
+          >
+            {lang === 'All' ? 'All Lang' : lang}
+          </button>
+        ))}
 
         <div style={{ display: 'flex', gap: '0.625rem', alignItems: 'center', flexWrap: 'wrap' }}>
           {/* Search */}
@@ -406,10 +648,10 @@ export default function Workspaces() {
             onBlurCapture={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; }}
           >
             <Search size={13} style={{ color: '#475569', flexShrink: 0 }} />
-            <input type="text" placeholder="Search workspaces…" value={search} onChange={e => setSearch(e.target.value)}
+            <input type="text" aria-label="Search workspaces" placeholder="Search workspacesâ€¦" value={search} onChange={e => setSearch(e.target.value)}
               style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: '0.8rem', color: '#F1F5F9', width: '100%', fontFamily: 'inherit' }} />
             {search && (
-              <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: 0, display: 'flex', lineHeight: 1, transition: 'color 0.15s' }}
+              <button onClick={() => setSearch('')} aria-label="Clear search" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: 0, display: 'flex', lineHeight: 1, transition: 'color 0.15s' }}
                 onMouseEnter={e => { e.currentTarget.style.color = '#94A3B8'; }}
                 onMouseLeave={e => { e.currentTarget.style.color = '#475569'; }}
               >
@@ -418,10 +660,47 @@ export default function Workspaces() {
             )}
           </div>
 
+          {/* Sort */}
+          <select
+            aria-label="Sort workspaces"
+            value={sortBy}
+            onChange={e => setSortBy(e.target.value as typeof sortBy)}
+            className="input-field"
+            style={{ height: 36, fontSize: '0.78rem', padding: '0 0.625rem', minWidth: 120 }}
+          >
+            <option value="default">Sort: Default</option>
+            <option value="name">Sort: Name</option>
+            <option value="progress">Sort: Progress</option>
+            <option value="status">Sort: Status</option>
+            <option value="contributors">Sort: Contributors</option>
+            <option value="language">Sort: Language</option>
+            <option value="client">Sort: Client</option>
+            <option value="sector">Sort: Sector</option>
+            <option value="budget">Sort: Budget</option>
+          </select>
+
+          {/* Archive toggle */}
+          <button
+            onClick={() => setShowArchived(p => !p)}
+            aria-label={showArchived ? 'Show active workspaces' : 'Show archived workspaces'}
+            aria-pressed={showArchived}
+            style={{
+              height: 36, padding: '0 0.75rem', display: 'flex', alignItems: 'center', gap: '5px',
+              borderRadius: '9px', background: showArchived ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.04)',
+              border: `1px solid ${showArchived ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.09)'}`,
+              color: showArchived ? '#F59E0B' : '#64748B', cursor: 'pointer',
+              transition: 'all 0.15s', fontFamily: 'inherit', fontSize: '0.72rem', fontWeight: 600,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <Archive size={12} />
+            {showArchived ? 'Active' : `Archived${archivedIds.size > 0 ? ` (${archivedIds.size})` : ''}`}
+          </button>
+
           {/* View mode toggle */}
           <div style={{ display: 'flex', gap: '2px', background: 'rgba(255,255,255,0.04)', padding: '3px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }}>
             {([['grid', <Grid3X3 size={13} />], ['list', <List size={13} />]] as const).map(([mode, icon]) => (
-              <button key={mode} onClick={() => setViewMode(mode as 'grid' | 'list')} style={{
+              <button key={mode} onClick={() => setViewMode(mode as 'grid' | 'list')} aria-label={`View: ${mode}`} aria-pressed={viewMode === mode} style={{
                 width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 borderRadius: '6px', border: 'none', cursor: 'pointer',
                 background: viewMode === mode ? 'rgba(0,212,255,0.12)' : 'transparent',
@@ -433,13 +712,46 @@ export default function Workspaces() {
             ))}
           </div>
 
-          {/* Refresh */}
+          {/* Copy Summary */}
+          <button
+            onClick={handleCopyWorkspaceSummary}
+            disabled={workspaces.length === 0}
+            aria-label="Copy workspace summary to clipboard"
+            className="btn-ghost"
+            style={{ fontSize: '0.78rem', height: 36, display: 'flex', alignItems: 'center', gap: '0.375rem', color: wsSummaryCopied ? '#10B981' : undefined }}
+          >
+            <ClipboardCopy size={13} /> {wsSummaryCopied ? 'Copied!' : 'Summary'}
+          </button>
+
+          {/* Export CSV */}
+          <button
+            onClick={() => exportWorkspacesCSV(workspaces)}
+            disabled={workspaces.length === 0}
+            aria-label="Export workspaces to CSV"
+            className="btn-ghost"
+            style={{ fontSize: '0.78rem', height: 36, display: 'flex', alignItems: 'center', gap: '0.375rem' }}
+          >
+            <Download size={13} /> Export
+          </button>
+
+          {/* Export TXT */}
+          <button
+            onClick={() => handleExportWorkspacesTxt(workspaces)}
+            disabled={workspaces.length === 0}
+            aria-label="Export workspaces to TXT"
+            className="btn-ghost"
+            style={{ fontSize: '0.78rem', height: 36, display: 'flex', alignItems: 'center', gap: '0.375rem', color: wsTxtExported ? '#10B981' : undefined }}
+          >
+            <FileText size={13} /> {wsTxtExported ? 'Exported!' : 'TXT'}
+          </button>
+
           <button style={{
             width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
             borderRadius: '9px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)',
             color: '#64748B', cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit',
           }}
             onClick={() => loadData(true)}
+            aria-label="Refresh workspaces"
             onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)'; e.currentTarget.style.color = '#94A3B8'; }}
             onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; e.currentTarget.style.color = '#64748B'; }}
             title="Refresh"
@@ -448,13 +760,13 @@ export default function Workspaces() {
           </button>
 
           {/* New workspace */}
-          <button className="btn-primary" onClick={() => setShowNewModal(true)}>
+          <button className="btn-primary" aria-label="New Workspace" onClick={() => setShowNewModal(true)}>
             <Plus size={14} /> New Workspace
           </button>
         </div>
       </div>
 
-      {/* ── Empty State ─────────────────────────────────────────────────── */}
+      {/* â”€â”€ Empty State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {filtered.length === 0 && !loading && (
         <div style={{
           padding: '5rem 2rem', textAlign: 'center',
@@ -473,14 +785,14 @@ export default function Workspaces() {
               : 'Create your first workspace to start managing client engagements, documents, and milestones.'}
           </div>
           {!search && (
-            <button className="btn-primary" onClick={() => setShowNewModal(true)}>
+            <button className="btn-primary" aria-label="Create Workspace" onClick={() => setShowNewModal(true)}>
               <Plus size={14} /> Create Workspace
             </button>
           )}
         </div>
       )}
 
-      {/* ── Grid / List view ────────────────────────────────────────────── */}
+      {/* â”€â”€ Grid / List view â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {filtered.length > 0 && (
         <div style={{
           display: viewMode === 'grid' ? 'grid' : 'flex',
@@ -500,7 +812,7 @@ export default function Workspaces() {
               ? 'linear-gradient(90deg, #0EA5E9, #00D4FF)'
               : 'linear-gradient(90deg, #F59E0B, #FCD34D)';
 
-            // ── List row ────────────────────────────────────────────────
+            // â”€â”€ List row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             if (viewMode === 'list') {
               return (
                 <div key={ws.id} style={{
@@ -541,7 +853,7 @@ export default function Workspaces() {
               );
             }
 
-            // ── Grid card ───────────────────────────────────────────────
+            // â”€â”€ Grid card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             const cardStatus = rag?.rag === 'Red' ? 'At Risk' : rag?.rag === 'Amber' ? 'On Hold' : ws.status;
             const statusColor = cardStatus === 'Active' ? '#10B981' : cardStatus === 'At Risk' ? '#EF4444' : '#F59E0B';
             const statusBg = cardStatus === 'Active' ? 'rgba(16,185,129,0.1)' : cardStatus === 'At Risk' ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)';
@@ -633,7 +945,7 @@ export default function Workspaces() {
                       { dot: '#8B5CF6', icon: <Video size={11} />, count: ws.meetings_count, label: 'meetings' },
                     ].map((s, i) => (
                       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                        {i > 0 && <span style={{ color: '#1E293B', fontSize: '0.7rem', marginRight: '1px' }}>•</span>}
+                        {i > 0 && <span style={{ color: '#1E293B', fontSize: '0.7rem', marginRight: '1px' }}>â€¢</span>}
                         <div style={{ width: 6, height: 6, borderRadius: '50%', background: s.dot, boxShadow: `0 0 5px ${s.dot}80`, flexShrink: 0 }} />
                         <span style={{ fontSize: '0.72rem', color: '#94A3B8' }}>{s.count} {s.label}</span>
                       </div>
@@ -674,10 +986,22 @@ export default function Workspaces() {
                       )}
                     </div>
 
-                    {/* Edit + Delete actions */}
+                    {/* Edit + Archive + Delete actions */}
+                    <button
+                      onClick={e => handleToggleStarWorkspace(ws.id, e)}
+                      title={starredWorkspaces.has(ws.id) ? 'Unstar workspace' : 'Star workspace'}
+                      aria-label={`${starredWorkspaces.has(ws.id) ? 'Unstar' : 'Star'} workspace: ${ws.name}`}
+                      aria-pressed={starredWorkspaces.has(ws.id)}
+                      style={{ width: 28, height: 28, borderRadius: '6px', border: 'none', background: starredWorkspaces.has(ws.id) ? 'rgba(245,158,11,0.12)' : 'transparent', cursor: 'pointer', color: starredWorkspaces.has(ws.id) ? '#F59E0B' : '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s', fontFamily: 'inherit', fontSize: '0.75rem' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.12)'; e.currentTarget.style.color = '#F59E0B'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = starredWorkspaces.has(ws.id) ? 'rgba(245,158,11,0.12)' : 'transparent'; e.currentTarget.style.color = starredWorkspaces.has(ws.id) ? '#F59E0B' : '#475569'; }}
+                    >
+                      {starredWorkspaces.has(ws.id) ? '⭐' : '☆'}
+                    </button>
                     <button
                       onClick={e => { e.stopPropagation(); openEditModal(ws); }}
                       title="Edit workspace"
+                      aria-label={`Edit ${ws.name}`}
                       style={{ width: 28, height: 28, borderRadius: '6px', border: 'none', background: 'transparent', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s', fontFamily: 'inherit' }}
                       onMouseEnter={e => { e.currentTarget.style.background = 'rgba(14,165,233,0.1)'; e.currentTarget.style.color = '#38BDF8'; }}
                       onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#475569'; }}
@@ -685,8 +1009,31 @@ export default function Workspaces() {
                       <Pencil size={13} />
                     </button>
                     <button
+                      onClick={e => { e.stopPropagation(); toggleArchiveWorkspace(ws.id); }}
+                      title={archivedIds.has(ws.id) ? 'Unarchive workspace' : 'Archive workspace'}
+                      aria-label={archivedIds.has(ws.id) ? `Unarchive ${ws.name}` : `Archive ${ws.name}`}
+                      aria-pressed={archivedIds.has(ws.id)}
+                      style={{ width: 28, height: 28, borderRadius: '6px', border: 'none', background: archivedIds.has(ws.id) ? 'rgba(245,158,11,0.12)' : 'transparent', cursor: 'pointer', color: archivedIds.has(ws.id) ? '#F59E0B' : '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s', fontFamily: 'inherit' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.12)'; e.currentTarget.style.color = '#F59E0B'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = archivedIds.has(ws.id) ? 'rgba(245,158,11,0.12)' : 'transparent'; e.currentTarget.style.color = archivedIds.has(ws.id) ? '#F59E0B' : '#475569'; }}
+                    >
+                      <Archive size={13} />
+                    </button>
+                    <button
+                      onClick={e => handleDuplicateWorkspace(ws, e)}
+                      title="Duplicate workspace"
+                      aria-label={`Duplicate ${ws.name}`}
+                      disabled={duplicatingId === ws.id}
+                      style={{ width: 28, height: 28, borderRadius: '6px', border: 'none', background: 'transparent', cursor: duplicatingId === ws.id ? 'default' : 'pointer', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s', fontFamily: 'inherit', opacity: duplicatingId === ws.id ? 0.5 : 1 }}
+                      onMouseEnter={e => { if (duplicatingId !== ws.id) { e.currentTarget.style.background = 'rgba(14,165,233,0.1)'; e.currentTarget.style.color = '#38BDF8'; } }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#475569'; }}
+                    >
+                      <Copy size={13} />
+                    </button>
+                    <button
                       onClick={e => { e.stopPropagation(); setDeletingWorkspace(ws); }}
                       title="Delete workspace"
+                      aria-label={`Delete ${ws.name}`}
                       style={{ width: 28, height: 28, borderRadius: '6px', border: 'none', background: 'transparent', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s', fontFamily: 'inherit' }}
                       onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; e.currentTarget.style.color = '#FCA5A5'; }}
                       onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#475569'; }}
@@ -701,7 +1048,7 @@ export default function Workspaces() {
         </div>
       )}
 
-      {/* ── New Workspace Modal ──────────────────────────────────────────── */}
+      {/* â”€â”€ New Workspace Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {showNewModal && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.78)',
@@ -730,7 +1077,7 @@ export default function Workspaces() {
                 </div>
                 <div style={{ fontSize: '0.78rem', color: '#64748B' }}>Create a new client engagement workspace</div>
               </div>
-              <button onClick={() => { setShowNewModal(false); setForm(defaultForm); setFormError(''); }} style={{
+              <button onClick={() => { setShowNewModal(false); setForm(defaultForm); setFormError(''); }} aria-label="Close new workspace modal" style={{
                 background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
                 borderRadius: '8px', cursor: 'pointer', color: '#64748B', padding: '6px',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s',
@@ -759,7 +1106,7 @@ export default function Workspaces() {
               {/* Name */}
               <div>
                 <FieldLabel>Workspace Name *</FieldLabel>
-                <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                <input type="text" aria-label="Workspace name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                   placeholder="e.g. ADNOC Digital Transformation"
                   style={inputStyle}
                   onFocus={e => { e.currentTarget.style.borderColor = 'rgba(0,212,255,0.35)'; }}
@@ -770,7 +1117,7 @@ export default function Workspaces() {
               {/* Client */}
               <div>
                 <FieldLabel>Client / Organization *</FieldLabel>
-                <input type="text" value={form.client} onChange={e => setForm(f => ({ ...f, client: e.target.value }))}
+                <input type="text" aria-label="Client or organization" value={form.client} onChange={e => setForm(f => ({ ...f, client: e.target.value }))}
                   placeholder="e.g. Abu Dhabi National Oil Company"
                   style={inputStyle}
                   onFocus={e => { e.currentTarget.style.borderColor = 'rgba(0,212,255,0.35)'; }}
@@ -782,7 +1129,7 @@ export default function Workspaces() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.875rem' }}>
                 <div>
                   <FieldLabel>Sector</FieldLabel>
-                  <select value={form.sector} onChange={e => setForm(f => ({ ...f, sector: e.target.value }))}
+                  <select aria-label="Business sector" value={form.sector} onChange={e => setForm(f => ({ ...f, sector: e.target.value }))}
                     style={{ ...inputStyle }}
                     onFocus={e => { e.currentTarget.style.borderColor = 'rgba(0,212,255,0.35)'; }}
                     onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; }}
@@ -792,7 +1139,7 @@ export default function Workspaces() {
                 </div>
                 <div>
                   <FieldLabel>Type</FieldLabel>
-                  <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as typeof TYPES[number] }))}
+                  <select aria-label="Workspace type" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as typeof TYPES[number] }))}
                     style={{ ...inputStyle }}
                     onFocus={e => { e.currentTarget.style.borderColor = 'rgba(0,212,255,0.35)'; }}
                     onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; }}
@@ -810,7 +1157,7 @@ export default function Workspaces() {
                     const lc = langColors[l];
                     const active = form.language === l;
                     return (
-                      <button key={l} onClick={() => setForm(f => ({ ...f, language: l }))} style={{
+                      <button key={l} onClick={() => setForm(f => ({ ...f, language: l }))} aria-label={`Language: ${l}`} aria-pressed={active} style={{
                         flex: 1, padding: '0.5rem', borderRadius: '8px', border: `1px solid ${active ? lc.border : 'rgba(255,255,255,0.09)'}`,
                         background: active ? lc.bg : 'rgba(255,255,255,0.03)',
                         color: active ? lc.text : '#64748B', cursor: 'pointer',
@@ -827,8 +1174,8 @@ export default function Workspaces() {
               {/* Description */}
               <div>
                 <FieldLabel>Description</FieldLabel>
-                <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                  placeholder="Brief description of the engagement scope and key objectives…" rows={3}
+                <textarea aria-label="Workspace description" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                  placeholder="Brief description of the engagement scope and key objectivesâ€¦" rows={3}
                   style={{ ...inputStyle, resize: 'vertical' }}
                   onFocus={e => { e.currentTarget.style.borderColor = 'rgba(0,212,255,0.35)'; }}
                   onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; }}
@@ -844,7 +1191,7 @@ export default function Workspaces() {
                   {saving ? (
                     <>
                       <span style={{ width: 13, height: 13, border: '2px solid rgba(5,8,15,0.4)', borderTopColor: '#05080F', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-                      Creating…
+                      Creatingâ€¦
                     </>
                   ) : (
                     <><Plus size={14} /> Create Workspace</>
@@ -856,40 +1203,40 @@ export default function Workspaces() {
         </div>
       )}
 
-      {/* ── Edit Workspace Modal ────────────────────────────────────────── */}
+      {/* â”€â”€ Edit Workspace Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {editingWorkspace && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
           <div style={{ background: '#0C1220', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '1.75rem', width: '100%', maxWidth: '520px', boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#F1F5F9', margin: 0 }}>Edit Workspace</h3>
-              <button onClick={() => { setEditingWorkspace(null); setEditError(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569' }}><X size={16} /></button>
+              <button onClick={() => { setEditingWorkspace(null); setEditError(''); }} aria-label="Close edit workspace modal" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569' }}><X size={16} /></button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.875rem' }}>
-                <div><FieldLabel>Workspace Name *</FieldLabel><input style={inputStyle} value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))} /></div>
-                <div><FieldLabel>Client *</FieldLabel><input style={inputStyle} value={editForm.client} onChange={e => setEditForm(p => ({ ...p, client: e.target.value }))} /></div>
+                <div><FieldLabel>Workspace Name *</FieldLabel><input aria-label="Edit workspace name" style={inputStyle} value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))} /></div>
+                <div><FieldLabel>Client *</FieldLabel><input aria-label="Edit client or organization" style={inputStyle} value={editForm.client} onChange={e => setEditForm(p => ({ ...p, client: e.target.value }))} /></div>
                 <div><FieldLabel>Sector</FieldLabel>
-                  <select style={inputStyle} value={editForm.sector} onChange={e => setEditForm(p => ({ ...p, sector: e.target.value }))}>
+                  <select aria-label="Edit business sector" style={inputStyle} value={editForm.sector} onChange={e => setEditForm(p => ({ ...p, sector: e.target.value }))}>
                     {SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
                 <div><FieldLabel>Type</FieldLabel>
-                  <select style={inputStyle} value={editForm.type} onChange={e => setEditForm(p => ({ ...p, type: e.target.value as typeof TYPES[number] }))}>
+                  <select aria-label="Edit workspace type" style={inputStyle} value={editForm.type} onChange={e => setEditForm(p => ({ ...p, type: e.target.value as typeof TYPES[number] }))}>
                     {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
                 <div><FieldLabel>Language</FieldLabel>
-                  <select style={inputStyle} value={editForm.language} onChange={e => setEditForm(p => ({ ...p, language: e.target.value as typeof LANGUAGES[number] }))}>
+                  <select aria-label="Edit workspace language" style={inputStyle} value={editForm.language} onChange={e => setEditForm(p => ({ ...p, language: e.target.value as typeof LANGUAGES[number] }))}>
                     {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
                   </select>
                 </div>
               </div>
-              <div><FieldLabel>Description</FieldLabel><textarea style={{ ...inputStyle, minHeight: '72px', resize: 'vertical' }} value={editForm.description} onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))} /></div>
+              <div><FieldLabel>Description</FieldLabel><textarea aria-label="Edit workspace description" style={{ ...inputStyle, minHeight: '72px', resize: 'vertical' }} value={editForm.description} onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))} /></div>
               {editError && <div style={{ fontSize: '0.78rem', color: '#FCA5A5', padding: '0.5rem 0.75rem', background: 'rgba(239,68,68,0.08)', borderRadius: '6px' }}>{editError}</div>}
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.625rem', marginTop: '0.5rem' }}>
                 <button className="btn-ghost" onClick={() => { setEditingWorkspace(null); setEditError(''); }}>Cancel</button>
                 <button className="btn-primary" onClick={handleEditWorkspace} disabled={editSaving} style={{ minWidth: '120px', justifyContent: 'center' }}>
-                  {editSaving ? <><span style={{ width: 13, height: 13, border: '2px solid rgba(5,8,15,0.4)', borderTopColor: '#05080F', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />Saving…</> : 'Save Changes'}
+                  {editSaving ? <><span style={{ width: 13, height: 13, border: '2px solid rgba(5,8,15,0.4)', borderTopColor: '#05080F', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />Savingâ€¦</> : 'Save Changes'}
                 </button>
               </div>
             </div>
@@ -897,7 +1244,7 @@ export default function Workspaces() {
         </div>
       )}
 
-      {/* ── Delete Workspace Confirmation ───────────────────────────────── */}
+      {/* â”€â”€ Delete Workspace Confirmation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {deletingWorkspace && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
           <div style={{ background: '#0C1220', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '16px', padding: '1.75rem', width: '100%', maxWidth: '420px', boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}>
@@ -914,10 +1261,27 @@ export default function Workspaces() {
               <button className="btn-ghost" onClick={() => setDeletingWorkspace(null)}>Cancel</button>
               <button onClick={handleDeleteWorkspace} disabled={deleteConfirming}
                 style={{ height: 36, padding: '0 1rem', borderRadius: '8px', border: 'none', background: '#EF4444', color: '#fff', cursor: deleteConfirming ? 'not-allowed' : 'pointer', fontSize: '0.82rem', fontWeight: 600, fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '0.375rem', opacity: deleteConfirming ? 0.6 : 1 }}>
-                {deleteConfirming ? 'Deleting…' : <><Trash2 size={13} /> Delete</>}
+                {deleteConfirming ? 'Deletingâ€¦' : <><Trash2 size={13} /> Delete</>}
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Duplicate toast */}
+      {duplicateToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'fixed', bottom: 24, right: 24, zIndex: 200,
+            background: 'rgba(14,165,233,0.15)', border: '1px solid rgba(14,165,233,0.3)',
+            borderRadius: 10, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8,
+            color: '#38BDF8', fontSize: '0.82rem', fontWeight: 600,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+          }}
+        >
+          <Copy size={14} /> {duplicateToast}
         </div>
       )}
 
@@ -927,3 +1291,4 @@ export default function Workspaces() {
     </div>
   );
 }
+

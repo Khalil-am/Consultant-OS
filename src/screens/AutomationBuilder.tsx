@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Save, Play, ChevronDown, ChevronRight, Check,
   Bell, List, Code, Settings, Database, FileOutput, MessageSquare,
-  Filter, Cpu, Upload, AlertCircle
+  Filter, Cpu, Upload, AlertCircle, Download, ClipboardCopy
 } from 'lucide-react';
 import { automations } from '../data/mockData';
 import { chatWithDocument } from '../lib/openrouter';
@@ -29,7 +29,7 @@ const flowNodes: FlowNode[] = [
   { id: 'n8', label: 'Notify', type: 'notify', icon: <Bell size={14} />, color: '#F59E0B', status: 'idle', description: 'Email/Slack notification' },
 ];
 
-const rightPanelTabs = ['Prompt', 'Schema', 'Destinations', 'Notifications', 'Logs'];
+const rightPanelTabs = ['Prompt', 'Schema', 'Destinations', 'Notifications', 'Logs', 'Notes'];
 
 const recentLogs = [
   { time: '2h ago', status: 'Success', input: 'NCA_Requirements_v2.docx', output: 'BRD_NCA_EA_v2.3.docx', duration: '42s' },
@@ -71,22 +71,113 @@ export default function AutomationBuilder() {
   const [running, setRunning] = useState(false);
   const [runOutput, setRunOutput] = useState('');
   const [runError, setRunError] = useState('');
+  const [testRunning, setTestRunning] = useState(false);
+  const [testRunStep, setTestRunStep] = useState<string | null>(null);
+  const [testRunDone, setTestRunDone] = useState(false);
   const fileInputRef = useRef<HTMLTextAreaElement>(null);
+  const [exportToast, setExportToast] = useState<string | null>(null);
+  const [configCopied, setConfigCopied] = useState(false);
+  const [nodeListCopied, setNodeListCopied] = useState(false);
+  const [nodeListTxtExported, setNodeListTxtExported] = useState(false);
 
   const auto = automations.find(a => a.id === id) ?? automations[0];
   const storageKey = `ab_cfg_${id ?? auto?.id ?? 'default'}`;
   const [savedAt, setSavedAt] = useState<string | null>(() => {
     try { return JSON.parse(localStorage.getItem(storageKey) ?? 'null')?.savedAt ?? null; } catch { return null; }
   });
+  const [automationNotes, setAutomationNotes] = useState<string>(() => {
+    try { return JSON.parse(localStorage.getItem(storageKey) ?? 'null')?.notes ?? ''; } catch { return ''; }
+  });
+  const [notesSaved, setNotesSaved] = useState(false);
+  const [logFilter, setLogFilter] = useState<'All' | 'Success' | 'Warning' | 'Error'>('All');
+  const [logSearch, setLogSearch] = useState('');
+  const [logSort, setLogSort] = useState<'default' | 'status' | 'duration' | 'input'>('default');
+  const [nodeTypeFilter, setNodeTypeFilter] = useState<string>('All');
+  const [nodeSearch, setNodeSearch] = useState('');
+
+  function handleSaveNotes() {
+    try {
+      const existing = JSON.parse(localStorage.getItem(storageKey) ?? '{}');
+      localStorage.setItem(storageKey, JSON.stringify({ ...existing, notes: automationNotes }));
+    } catch { /* ignore */ }
+    setNotesSaved(true);
+    setTimeout(() => setNotesSaved(false), 2000);
+  }
 
   if (!auto) {
     return <div style={{ padding: '2rem', color: 'var(--text-muted)', fontSize: '0.875rem' }}>Automation not found.</div>;
+  }
+
+  function handleCopyNodeList() {
+    const lines = [`Workflow Nodes – ${auto.name}`, ''];
+    flowNodes.forEach((node, i) => {
+      lines.push(`${i + 1}. ${node.label} (${node.type}) – ${node.status}`);
+    });
+    navigator.clipboard.writeText(lines.join('\n')).then(() => {
+      setNodeListCopied(true);
+      setTimeout(() => setNodeListCopied(false), 2000);
+    }).catch(() => {});
+  }
+
+  function handleExportNodeListTxt() {
+    const lines = [
+      `Workflow Node List – ${auto.name}`,
+      `Category: ${auto.category}`,
+      `Total Nodes: ${flowNodes.length}`,
+      '',
+      ...flowNodes.map((node, i) => `${i + 1}. ${node.label} (${node.type}) – Status: ${node.status}`),
+    ].join('\n');
+    const blob = new Blob([lines], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${auto.name.replace(/\s+/g, '_')}_nodes.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setNodeListTxtExported(true);
+    setTimeout(() => setNodeListTxtExported(false), 2000);
   }
 
   function handleSave() {
     const cfg = { savedAt: new Date().toLocaleTimeString(), automationId: id ?? auto.id };
     localStorage.setItem(storageKey, JSON.stringify(cfg));
     setSavedAt(cfg.savedAt);
+  }
+
+  function handleExportConfig() {
+    const config = {
+      id: auto.id,
+      name: auto.name,
+      category: auto.category,
+      nodes: flowNodes.map(n => ({ id: n.id, label: n.label, type: n.type, status: n.status })),
+      prompt: promptTemplate,
+      exportedAt: new Date().toISOString(),
+    };
+    const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${auto.name.replace(/\s+/g, '_')}_config.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setExportToast(`Config exported as ${a.download}`);
+    setTimeout(() => setExportToast(null), 3000);
+  }
+
+  function handleCopyConfig() {
+    const config = {
+      id: auto.id,
+      name: auto.name,
+      category: auto.category,
+      nodes: flowNodes.map(n => ({ id: n.id, label: n.label, type: n.type })),
+      prompt: promptTemplate,
+    };
+    navigator.clipboard.writeText(JSON.stringify(config, null, 2)).then(() => {
+      setConfigCopied(true);
+      setTimeout(() => setConfigCopied(false), 2000);
+    }).catch(() => {});
   }
 
   const handleRun = async () => {
@@ -109,7 +200,23 @@ export default function AutomationBuilder() {
     }
   };
 
+  const handleTestRun = async () => {
+    if (testRunning || running) return;
+    setTestRunning(true);
+    setTestRunDone(false);
+    setTestRunStep(null);
+    for (const node of flowNodes) {
+      setTestRunStep(node.id);
+      await new Promise(res => setTimeout(res, 400));
+    }
+    setTestRunStep(null);
+    setTestRunDone(true);
+    setTestRunning(false);
+    setTimeout(() => setTestRunDone(false), 3000);
+  };
+
   const getNodeBg = (node: FlowNode) => {
+    if (testRunStep === node.id) return `${node.color}25`;
     if (node.id === selectedNode) return `${node.color}20`;
     if (node.status === 'done') return 'rgba(16,185,129,0.08)';
     if (node.status === 'active') return `${node.color}12`;
@@ -117,6 +224,7 @@ export default function AutomationBuilder() {
   };
 
   const getNodeBorder = (node: FlowNode) => {
+    if (testRunStep === node.id) return `${node.color}90`;
     if (node.id === selectedNode) return `${node.color}60`;
     if (node.status === 'done') return 'rgba(16,185,129,0.3)';
     if (node.status === 'active') return `${node.color}50`;
@@ -135,6 +243,7 @@ export default function AutomationBuilder() {
           <button
             onClick={() => navigate('/automations')}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8rem', fontFamily: 'inherit' }}
+            aria-label="Back to Automations"
           >
             <ArrowLeft size={14} /> Automations
           </button>
@@ -146,18 +255,93 @@ export default function AutomationBuilder() {
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           <span className="status-active" style={{ fontSize: '0.72rem' }}>Active</span>
-          <button className="btn-ghost" style={{ height: '32px', fontSize: '0.78rem' }} onClick={handleSave} title={savedAt ? `Last saved ${savedAt}` : 'Save configuration'}>
+          <button
+            className="btn-ghost"
+            style={{ height: '32px', fontSize: '0.78rem' }}
+            onClick={handleExportConfig}
+            aria-label="Export automation config"
+          >
+            <Download size={13} /> Export
+          </button>
+          <button
+            className="btn-ghost"
+            style={{ height: '32px', fontSize: '0.78rem' }}
+            onClick={handleCopyConfig}
+            aria-label="Copy automation config to clipboard"
+          >
+            <ClipboardCopy size={13} /> {configCopied ? 'Copied!' : 'Copy Config'}
+          </button>
+          <button
+            className="btn-ghost"
+            style={{ height: '32px', fontSize: '0.78rem' }}
+            onClick={handleCopyNodeList}
+            aria-label="Copy node list to clipboard"
+          >
+            <ClipboardCopy size={13} /> {nodeListCopied ? 'Copied!' : 'Node List'}
+          </button>
+          <button
+            className="btn-ghost"
+            style={{ height: '32px', fontSize: '0.78rem' }}
+            onClick={handleExportNodeListTxt}
+            aria-label="Export node list to TXT"
+          >
+            <Filter size={13} /> {nodeListTxtExported ? 'Exported!' : 'Export Nodes'}
+          </button>
+          <button className="btn-ghost" style={{ height: '32px', fontSize: '0.78rem' }} onClick={handleSave} title={savedAt ? `Last saved ${savedAt}` : 'Save configuration'} aria-label={savedAt ? `Saved ${savedAt}` : 'Save configuration'}>
             <Save size={13} /> {savedAt ? `Saved ${savedAt}` : 'Save'}
+          </button>
+          <button
+            className="btn-ghost"
+            style={{ height: '32px', fontSize: '0.78rem', opacity: testRunning || running ? 0.6 : 1 }}
+            onClick={handleTestRun}
+            disabled={testRunning || running}
+            aria-label={testRunning ? 'Testing…' : testRunDone ? 'Test passed' : 'Test Run'}
+          >
+            {testRunning ? <Settings size={13} style={{ animation: 'spin 1s linear infinite' }} /> : testRunDone ? <Check size={13} /> : <Settings size={13} />}
+            {testRunning ? 'Testing…' : testRunDone ? 'Test passed' : 'Test Run'}
           </button>
           <button
             className="btn-primary"
             style={{ height: '32px', fontSize: '0.78rem' }}
             onClick={handleRun}
+            aria-label={running ? 'Running...' : 'Run Now'}
           >
             <Play size={13} /> {running ? 'Running...' : 'Run Now'}
           </button>
         </div>
       </div>
+      {/* Test run status toast */}
+      {testRunDone && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'fixed', bottom: 24, right: 24, zIndex: 100,
+            background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)',
+            borderRadius: 10, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8,
+            color: '#34D399', fontSize: '0.82rem', fontWeight: 600,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+          }}
+        >
+          <Check size={14} /> All nodes passed – test run complete
+        </div>
+      )}
+      {/* Export toast */}
+      {exportToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'fixed', bottom: 24, left: 24, zIndex: 100,
+            background: 'rgba(14,165,233,0.15)', border: '1px solid rgba(14,165,233,0.3)',
+            borderRadius: 10, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8,
+            color: '#38BDF8', fontSize: '0.82rem', fontWeight: 600,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+          }}
+        >
+          <Download size={14} /> {exportToast}
+        </div>
+      )}
 
       {/* Three Panel Layout */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
@@ -224,12 +408,46 @@ export default function AutomationBuilder() {
 
         {/* Center Canvas */}
         <div style={{ flex: 1, overflow: 'auto', background: '#080C18', padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          {/* Node type filter */}
+          <div style={{ display: 'flex', gap: '0.375rem', marginBottom: '1.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+            {(['All', 'trigger', 'input', 'process', 'ai', 'output', 'notify'] as const).map(t => (
+              <button
+                key={t}
+                onClick={() => setNodeTypeFilter(t)}
+                aria-label={`Filter nodes by type: ${t}`}
+                aria-pressed={nodeTypeFilter === t}
+                style={{
+                  fontSize: '0.65rem', fontWeight: 600, padding: '3px 9px', borderRadius: '6px', textTransform: 'capitalize',
+                  background: nodeTypeFilter === t ? 'rgba(0,212,255,0.12)' : 'rgba(255,255,255,0.04)',
+                  color: nodeTypeFilter === t ? '#00D4FF' : '#475569',
+                  border: nodeTypeFilter === t ? '1px solid rgba(0,212,255,0.3)' : '1px solid rgba(255,255,255,0.08)',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+          {/* Node search */}
+          <div style={{ marginBottom: '1rem', width: '100%', maxWidth: '280px', position: 'relative' }}>
+            <input
+              type="text"
+              aria-label="Search flow nodes"
+              placeholder="Search nodes…"
+              value={nodeSearch}
+              onChange={e => setNodeSearch(e.target.value)}
+              style={{ width: '100%', boxSizing: 'border-box', padding: '0.3rem 0.75rem', height: '28px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: '6px', color: '#CBD5E1', fontSize: '0.72rem', fontFamily: 'inherit', outline: 'none' }}
+            />
+          </div>
           {/* Flow nodes */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0, minWidth: '280px' }}>
-            {flowNodes.map((node, i) => (
+            {flowNodes.filter(node => (nodeTypeFilter === 'All' || node.type === nodeTypeFilter) && (!nodeSearch.trim() || node.label.toLowerCase().includes(nodeSearch.toLowerCase()))).map((node, i, arr) => (
               <div key={node.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 {/* Node */}
                 <div
+                  role="button"
+                  aria-label={`Flow node: ${node.label}`}
+                  aria-pressed={selectedNode === node.id}
                   onClick={() => setSelectedNode(node.id)}
                   style={{
                     padding: '0.875rem 1.25rem',
@@ -264,7 +482,7 @@ export default function AutomationBuilder() {
                 </div>
 
                 {/* Connector arrow */}
-                {i < flowNodes.length - 1 && (
+                {i < arr.length - 1 && (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '4px 0' }}>
                     <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.1)' }} />
                     <ChevronRight size={12} style={{ color: '#334155', transform: 'rotate(90deg)' }} />
@@ -302,6 +520,8 @@ export default function AutomationBuilder() {
                 key={tab}
                 className={`tab-underline ${activeTab === tab ? 'active' : ''}`}
                 onClick={() => setActiveTab(tab)}
+                aria-label={`Builder tab: ${tab}`}
+                aria-pressed={activeTab === tab}
                 style={{ fontSize: '0.78rem', padding: '0.625rem 0.5rem', marginRight: '0.75rem' }}
               >
                 {tab}
@@ -315,7 +535,7 @@ export default function AutomationBuilder() {
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.625rem' }}>
                   <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#94A3B8' }}>System Prompt</span>
-                  <button className="btn-ghost" style={{ padding: '0.125rem 0.5rem', fontSize: '0.68rem' }}>
+                  <button className="btn-ghost" style={{ padding: '0.125rem 0.5rem', fontSize: '0.68rem' }} aria-label="Format prompt">
                     <Code size={11} /> Format
                   </button>
                 </div>
@@ -333,6 +553,7 @@ export default function AutomationBuilder() {
                   <div style={{ fontSize: '0.7rem', color: '#475569', marginBottom: '0.375rem' }}>Input (paste document text or requirements to test)</div>
                   <textarea
                     ref={fileInputRef}
+                    aria-label="Test input document"
                     placeholder="Paste requirements text here to test the automation with real AI output…"
                     style={{
                       width: '100%', minHeight: '80px', padding: '0.625rem 0.75rem',
@@ -343,7 +564,7 @@ export default function AutomationBuilder() {
                   />
                 </div>
                 <div style={{ marginTop: '0.875rem', display: 'flex', gap: '0.5rem' }}>
-                  <select style={{
+                  <select aria-label="AI model" style={{
                     flex: 1, padding: '0.375rem 0.625rem', borderRadius: '6px', fontSize: '0.78rem',
                     background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
                     color: '#94A3B8', fontFamily: 'inherit',
@@ -352,7 +573,7 @@ export default function AutomationBuilder() {
                     <option>GPT-4 Turbo</option>
                     <option>Claude 3.5 Sonnet</option>
                   </select>
-                  <select style={{
+                  <select aria-label="Temperature setting" style={{
                     width: '80px', padding: '0.375rem 0.625rem', borderRadius: '6px', fontSize: '0.78rem',
                     background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
                     color: '#94A3B8', fontFamily: 'inherit',
@@ -490,8 +711,50 @@ export default function AutomationBuilder() {
                     )}
                   </div>
                 )}
-                <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#94A3B8', marginBottom: '0.875rem' }}>Recent Runs</div>
-                {recentLogs.map((log, i) => (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.875rem' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#94A3B8' }}>Recent Runs</div>
+                  <div style={{ display: 'flex', gap: '0.375rem' }}>
+                    {(['All', 'Success', 'Warning', 'Error'] as const).map(f => (
+                      <button key={f} className="btn-ghost" style={{ height: 22, padding: '0 0.5rem', fontSize: '0.63rem', opacity: logFilter === f ? 1 : 0.5 }}
+                        onClick={() => setLogFilter(f)}
+                        aria-label={`Filter logs by status: ${f}`}
+                        aria-pressed={logFilter === f}>
+                        {f}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search logs…"
+                  aria-label="Search logs"
+                  value={logSearch}
+                  onChange={e => setLogSearch(e.target.value)}
+                  style={{ width: '100%', marginBottom: '0.5rem', padding: '0.25rem 0.5rem', borderRadius: '0.375rem', border: '1px solid #334155', background: '#0F172A', color: '#E2E8F0', fontSize: '0.75rem', boxSizing: 'border-box' }}
+                />
+                <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '0.5rem' }}>
+                  {(['default', 'status', 'duration', 'input'] as const).map(s => (
+                    <button
+                      key={s}
+                      onClick={() => setLogSort(s)}
+                      aria-label={`Sort logs by ${s}`}
+                      aria-pressed={logSort === s}
+                      style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: '0.25rem', border: `1px solid ${logSort === s ? 'rgba(0,212,255,0.5)' : 'rgba(255,255,255,0.1)'}`, background: logSort === s ? 'rgba(0,212,255,0.1)' : 'transparent', color: logSort === s ? '#00D4FF' : '#475569', cursor: 'pointer', fontFamily: 'inherit' }}
+                    >
+                      {s === 'default' ? 'Default' : s === 'status' ? 'Status' : s === 'duration' ? 'Duration' : 'Input A–Z'}
+                    </button>
+                  ))}
+                </div>
+                {(() => {
+                  const filtered = recentLogs.filter(log =>
+                    (logFilter === 'All' || log.status === logFilter) &&
+                    (!logSearch.trim() || log.input?.toLowerCase().includes(logSearch.toLowerCase()) || log.output?.toLowerCase().includes(logSearch.toLowerCase()))
+                  );
+                  if (logSort === 'status') filtered.sort((a, b) => (a.status ?? '').localeCompare(b.status ?? ''));
+                  else if (logSort === 'duration') filtered.sort((a, b) => (a.duration ?? '').localeCompare(b.duration ?? ''));
+                  else if (logSort === 'input') filtered.sort((a, b) => (a.input ?? '').localeCompare(b.input ?? ''));
+                  return filtered;
+                })().map((log, i) => (
                   <div key={i} style={{
                     padding: '0.75rem',
                     borderRadius: '0.5rem',
@@ -518,6 +781,40 @@ export default function AutomationBuilder() {
                     <div style={{ fontSize: '0.68rem', color: '#334155', marginTop: '2px' }}>Duration: {log.duration}</div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* Notes */}
+            {activeTab === 'Notes' && (
+              <div>
+                <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#94A3B8', marginBottom: '0.875rem' }}>Automation Notes</div>
+                <textarea
+                  aria-label="Automation notes"
+                  value={automationNotes}
+                  onChange={e => setAutomationNotes(e.target.value)}
+                  placeholder="Add notes about this automation..."
+                  rows={10}
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: '0.5rem', color: '#CBD5E1', fontSize: '0.8rem',
+                    padding: '0.75rem', resize: 'vertical', fontFamily: 'inherit',
+                    lineHeight: 1.6,
+                  }}
+                />
+                <button
+                  onClick={handleSaveNotes}
+                  aria-label="Save automation notes"
+                  style={{
+                    marginTop: '0.75rem', padding: '0.5rem 1.25rem',
+                    background: notesSaved ? 'rgba(16,185,129,0.15)' : 'rgba(0,212,255,0.1)',
+                    border: `1px solid ${notesSaved ? 'rgba(16,185,129,0.4)' : 'rgba(0,212,255,0.3)'}`,
+                    borderRadius: '0.375rem', color: notesSaved ? '#6EE7B7' : '#00D4FF',
+                    fontSize: '0.8rem', cursor: 'pointer', fontWeight: 500,
+                  }}
+                >
+                  {notesSaved ? 'Saved!' : 'Save Notes'}
+                </button>
               </div>
             )}
           </div>
