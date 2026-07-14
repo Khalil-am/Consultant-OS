@@ -5,7 +5,7 @@ import {
   ArrowLeft, FileText, Video, CheckSquare, AlertTriangle,
   TrendingUp, Plus, ExternalLink, Zap, DollarSign, TrendingDown,
   RefreshCw, AlertCircle, X, Upload, Download, Trash2, Pencil,
-  Settings,
+  Settings, ClipboardCopy,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import {
@@ -92,6 +92,282 @@ export default function WorkspaceDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [summaryCopied, setSummaryCopied] = useState(false);
+  const [milestoneCsvExported, setMilestoneCsvExported] = useState(false);
+  const [riskCsvExported, setRiskCsvExported] = useState(false);
+  const [docsCsvExported, setDocsCsvExported] = useState(false);
+  const [meetingsCsvExported, setMeetingsCsvExported] = useState(false);
+  const [tasksCsvExported, setTasksCsvExported] = useState(false);
+  const [riskSummaryCopied, setRiskSummaryCopied] = useState(false);
+  const [milestoneSummaryCopied, setMilestoneSummaryCopied] = useState(false);
+  const [tasksSummaryCopied, setTasksSummaryCopied] = useState(false);
+  const [meetingsSummaryCopied, setMeetingsSummaryCopied] = useState(false);
+  const [wsSummaryTxtExported, setWsSummaryTxtExported] = useState(false);
+
+  function handleCopyRisksSummary(risksToSummarize: RiskRow[]) {
+    if (risksToSummarize.length === 0) return;
+    const open = risksToSummarize.filter(r => r.status === 'Open').length;
+    const critical = risksToSummarize.filter(r => r.severity === 'Critical').length;
+    const high = risksToSummarize.filter(r => r.severity === 'High').length;
+    const mitigated = risksToSummarize.filter(r => r.status === 'Mitigated').length;
+    const lines = [
+      `Risk Register Summary`,
+      `Total Risks: ${risksToSummarize.length}`,
+      `Open: ${open}`,
+      `Mitigated: ${mitigated}`,
+      `Critical: ${critical}`,
+      `High: ${high}`,
+    ].join('\n');
+    navigator.clipboard.writeText(lines).then(() => {
+      setRiskSummaryCopied(true);
+      setTimeout(() => setRiskSummaryCopied(false), 2000);
+    }).catch(() => {});
+  }
+
+  function handleCopyMeetingsSummary(meetingsToSummarize: MeetingRow[]) {
+    if (meetingsToSummarize.length === 0) return;
+    const upcoming = meetingsToSummarize.filter(m => m.status === 'Upcoming').length;
+    const completed = meetingsToSummarize.filter(m => m.status === 'Completed').length;
+    const lines = [
+      `Meetings Summary`,
+      `Total: ${meetingsToSummarize.length}`,
+      `Upcoming: ${upcoming}`,
+      `Completed: ${completed}`,
+    ].join('\n');
+    navigator.clipboard.writeText(lines).then(() => {
+      setMeetingsSummaryCopied(true);
+      setTimeout(() => setMeetingsSummaryCopied(false), 2000);
+    }).catch(() => {});
+  }
+
+  function handleCopyTasksSummary(tasksToSummarize: TaskRow[]) {
+    if (tasksToSummarize.length === 0) return;
+    const completed = tasksToSummarize.filter(t => t.status === 'Completed').length;
+    const inProgress = tasksToSummarize.filter(t => t.status === 'In Progress').length;
+    const overdue = tasksToSummarize.filter(t => t.status === 'Overdue').length;
+    const backlog = tasksToSummarize.filter(t => t.status === 'Backlog').length;
+    const lines = [
+      `Tasks Summary`,
+      `Total: ${tasksToSummarize.length}`,
+      `Completed: ${completed}`,
+      `In Progress: ${inProgress}`,
+      `Overdue: ${overdue}`,
+      `Backlog: ${backlog}`,
+    ].join('\n');
+    navigator.clipboard.writeText(lines).then(() => {
+      setTasksSummaryCopied(true);
+      setTimeout(() => setTasksSummaryCopied(false), 2000);
+    }).catch(() => {});
+  }
+
+  function handleCopyMilestonesSummary(milestonesToSummarize: MilestoneRow[]) {
+    if (milestonesToSummarize.length === 0) return;
+    const completed = milestonesToSummarize.filter(m => m.status === 'Completed').length;
+    const onTrack = milestonesToSummarize.filter(m => m.status === 'On Track').length;
+    const atRisk = milestonesToSummarize.filter(m => m.status === 'At Risk').length;
+    const delayed = milestonesToSummarize.filter(m => m.status === 'Delayed').length;
+    const lines = [
+      `Milestones Summary`,
+      `Total: ${milestonesToSummarize.length}`,
+      `Completed: ${completed}`,
+      `On Track: ${onTrack}`,
+      `At Risk: ${atRisk}`,
+      `Delayed: ${delayed}`,
+    ].join('\n');
+    navigator.clipboard.writeText(lines).then(() => {
+      setMilestoneSummaryCopied(true);
+      setTimeout(() => setMilestoneSummaryCopied(false), 2000);
+    }).catch(() => {});
+  }
+
+  function handleCopyWorkspaceSummary() {
+    if (!data) return;
+    const ws = data.ws;
+    const fin = data.fin;
+    const rag = data.rag;
+    const lines = [
+      `Workspace: ${ws.name}`,
+      `Client: ${ws.client}`,
+      `Sector: ${ws.sector}`,
+      `Status: ${ws.status}`,
+      `Type: ${ws.type}`,
+      `Progress: ${ws.progress}%`,
+      rag ? `RAG: ${rag.rag} (Budget: ${rag.budget}, Schedule: ${rag.schedule}, Risk: ${rag.risk})` : null,
+      fin ? `Contract Value: SAR ${fin.contract_value.toLocaleString()}` : null,
+      fin ? `Spent: SAR ${fin.spent.toLocaleString()}` : null,
+    ].filter(Boolean).join('\n');
+    navigator.clipboard.writeText(lines).then(() => {
+      setSummaryCopied(true);
+      setTimeout(() => setSummaryCopied(false), 2000);
+    }).catch(() => {});
+  }
+
+  function handleExportMilestonesCSV() {
+    if (!data || data.milestones.length === 0) return;
+    const headers = ['Title', 'Status', 'Due Date', 'Owner', 'Value (SAR)', 'Completion %'];
+    const rows = data.milestones.map(ms => [
+      `"${ms.title.replace(/"/g, '""')}"`,
+      ms.status,
+      ms.due_date,
+      `"${(ms.owner ?? '').replace(/"/g, '""')}"`,
+      ms.value ?? 0,
+      `${ms.completion_pct ?? 0}%`,
+    ].join(','));
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `milestones_${data.ws.name.replace(/\s+/g, '_')}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setMilestoneCsvExported(true);
+    setTimeout(() => setMilestoneCsvExported(false), 2000);
+  }
+
+  function handleExportRisksCSV() {
+    if (!data || data.risks.length === 0) return;
+    const headers = ['Title', 'Category', 'Severity', 'Status', 'Owner', 'Probability', 'Impact'];
+    const rows = data.risks.map(r => [
+      `"${r.title.replace(/"/g, '""')}"`,
+      r.category,
+      r.severity,
+      r.status,
+      `"${(r.owner ?? '').replace(/"/g, '""')}"`,
+      r.probability ?? 0,
+      r.impact ?? 0,
+    ].join(','));
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `risks_${data.ws.name.replace(/\s+/g, '_')}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setRiskCsvExported(true);
+    setTimeout(() => setRiskCsvExported(false), 2000);
+  }
+
+  function handleExportDocsCSV(docsToExport: DocumentRow[]) {
+    if (docsToExport.length === 0) return;
+    const headers = ['Name', 'Type', 'Date', 'Status', 'Language', 'Author', 'Pages'];
+    const rows = docsToExport.map(d => [
+      `"${d.name.replace(/"/g, '""')}"`,
+      d.type,
+      d.date,
+      d.status,
+      d.language,
+      `"${(d.author ?? '').replace(/"/g, '""')}"`,
+      d.pages ?? 0,
+    ].join(','));
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `documents_${data?.ws.name.replace(/\s+/g, '_') ?? 'workspace'}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setDocsCsvExported(true);
+    setTimeout(() => setDocsCsvExported(false), 2000);
+  }
+
+  function handleExportMeetingsCSV(meetingsToExport: MeetingRow[]) {
+    if (meetingsToExport.length === 0) return;
+    const headers = ['Title', 'Type', 'Status', 'Date', 'Time', 'Duration', 'Participants'];
+    const rows = meetingsToExport.map(m => [
+      `"${m.title.replace(/"/g, '""')}"`,
+      m.type,
+      m.status,
+      m.date,
+      m.time,
+      m.duration,
+      `"${m.participants.join('; ')}"`,
+    ].join(','));
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `meetings_${data?.ws.name.replace(/\s+/g, '_') ?? 'workspace'}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setMeetingsCsvExported(true);
+    setTimeout(() => setMeetingsCsvExported(false), 2000);
+  }
+
+  function handleExportTasksCSV(tasksToExport: TaskRow[]) {
+    if (tasksToExport.length === 0) return;
+    const headers = ['Title', 'Priority', 'Status', 'Due Date', 'Assignee'];
+    const rows = tasksToExport.map(t => [
+      `"${t.title.replace(/"/g, '""')}"`,
+      t.priority,
+      t.status,
+      t.due_date ?? '',
+      `"${(t.assignee ?? '').replace(/"/g, '""')}"`,
+    ].join(','));
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `tasks_${data?.ws.name.replace(/\s+/g, '_') ?? 'workspace'}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setTasksCsvExported(true);
+    setTimeout(() => setTasksCsvExported(false), 2000);
+  }
+
+  function handleExportWorkspaceSummaryTxt() {
+    if (!data) return;
+    const { ws, docs, meetings, tasks, risks, milestones } = data;
+    const lines = [
+      `Workspace Summary – Consultant OS`,
+      ``,
+      `Name: ${ws.name}`,
+      `Client: ${ws.client}`,
+      `Sector: ${ws.sector}`,
+      `Status: ${ws.status}`,
+      `Progress: ${ws.progress}%`,
+      ``,
+      `Milestones: ${milestones.length} total`,
+      ...milestones.map(m => `  [${m.status}] ${m.title} – due ${m.due_date}`),
+      ``,
+      `Risks: ${risks.length} total`,
+      ...risks.map(r => `  [${r.severity}/${r.status}] ${r.title}`),
+      ``,
+      `Tasks: ${tasks.length} total`,
+      ...tasks.map(t => `  [${t.status}] ${t.title} – ${t.assignee || 'Unassigned'}`),
+      ``,
+      `Documents: ${docs.length} total`,
+      ...docs.map(d => `  [${d.status}] ${d.name}`),
+      ``,
+      `Meetings: ${meetings.length} total`,
+      ...meetings.map(m => `  [${m.status}] ${m.title} – ${m.date}`),
+    ].join('\n');
+    const blob = new Blob([lines], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `workspace_summary_${ws.name.replace(/\s+/g, '_').toLowerCase()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setWsSummaryTxtExported(true);
+    setTimeout(() => setWsSummaryTxtExported(false), 2000);
+  }
 
   // Task modal
   const [showTaskModal, setShowTaskModal] = useState(false);
@@ -152,6 +428,38 @@ export default function WorkspaceDetail() {
   // Generic delete confirm (id of item being deleted, or null)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Risk severity filter
+  const [milestoneStatusFilter, setMilestoneStatusFilter] = useState<'All' | 'Upcoming' | 'On Track' | 'At Risk' | 'Delayed' | 'Completed'>('All');
+  const [riskSeverityFilter, setRiskSeverityFilter] = useState<'All' | 'Critical' | 'High' | 'Medium' | 'Low'>('All');
+  const [riskStatusFilter, setRiskStatusFilter] = useState<'All' | 'Open' | 'Monitoring' | 'Mitigated' | 'Closed'>('All');
+  const [taskStatusFilter, setTaskStatusFilter] = useState<'All' | 'Backlog' | 'In Progress' | 'In Review' | 'Completed' | 'Overdue'>('All');
+  const [taskPriorityFilter, setTaskPriorityFilter] = useState<'All' | 'High' | 'Medium' | 'Low'>('All');
+  const [meetingTypeFilter, setMeetingTypeFilter] = useState<string>('All');
+  const [meetingStatusFilter, setMeetingStatusFilter] = useState<'All' | 'Upcoming' | 'In Progress' | 'Completed'>('All');
+  const [docStatusFilter, setDocStatusFilter] = useState<'All' | 'Draft' | 'Under Review' | 'Approved' | 'Final'>('All');
+  const [docSort, setDocSort] = useState<'default' | 'name' | 'pages'>('default');
+  const [taskSearch, setTaskSearch] = useState('');
+  const [taskSort, setTaskSort] = useState<'default' | 'title' | 'priority'>('default');
+  const [docSearch, setDocSearch] = useState('');
+  const [meetingSearch, setMeetingSearch] = useState('');
+  const [milestoneSearch, setMilestoneSearch] = useState('');
+  const [milestoneSort, setMilestoneSort] = useState<'default' | 'due_date' | 'title'>('default');
+  const [riskSearch, setRiskSearch] = useState('');
+  const [riskSort, setRiskSort] = useState<'default' | 'title' | 'severity'>('default');
+
+  // Workspace sticky notes (persisted to localStorage)
+  const wsNotesKey = `workspace_notes_${id ?? 'unknown'}`;
+  const [wsNotes, setWsNotes] = useState<string>(() => {
+    try { return localStorage.getItem(`workspace_notes_${id ?? 'unknown'}`) ?? ''; } catch { return ''; }
+  });
+  const [wsNotesSaved, setWsNotesSaved] = useState(false);
+
+  function handleSaveWsNotes() {
+    try { localStorage.setItem(wsNotesKey, wsNotes); } catch { /* ignore */ }
+    setWsNotesSaved(true);
+    setTimeout(() => setWsNotesSaved(false), 2000);
+  }
 
   // ── Load data ────────────────────────────────────────────────
   const loadData = useCallback(async (isRefresh = false) => {
@@ -509,11 +817,27 @@ export default function WorkspaceDetail() {
           <ArrowLeft size={14} /> Back to Workspaces
         </button>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button className="btn-ghost" style={{ padding: '0.375rem', width: '30px', height: '30px' }} onClick={() => loadData(true)} title="Refresh">
+          <button className="btn-ghost" aria-label="Refresh workspace" style={{ padding: '0.375rem', width: '30px', height: '30px' }} onClick={() => loadData(true)} title="Refresh">
             <RefreshCw size={13} style={{ animation: refreshing ? 'spin 0.8s linear infinite' : 'none' }} />
           </button>
-          <button className="btn-ghost" style={{ fontSize: '0.78rem' }} onClick={openEditWs}><Settings size={13} /> Edit</button>
-          <button className="btn-ghost" style={{ fontSize: '0.78rem', color: '#FCA5A5', borderColor: 'rgba(239,68,68,0.2)' }} onClick={() => setShowDeleteWs(true)}>
+          <button
+            className="btn-ghost"
+            aria-label="Copy workspace summary to clipboard"
+            style={{ fontSize: '0.78rem', color: summaryCopied ? '#34D399' : undefined }}
+            onClick={handleCopyWorkspaceSummary}
+          >
+            <ClipboardCopy size={13} /> {summaryCopied ? 'Copied!' : 'Copy'}
+          </button>
+          <button
+            className="btn-ghost"
+            aria-label="Export workspace summary to TXT"
+            style={{ fontSize: '0.78rem', color: wsSummaryTxtExported ? '#34D399' : undefined }}
+            onClick={handleExportWorkspaceSummaryTxt}
+          >
+            <FileText size={13} /> {wsSummaryTxtExported ? 'Exported!' : 'Export TXT'}
+          </button>
+          <button className="btn-ghost" aria-label="Edit workspace settings" style={{ fontSize: '0.78rem' }} onClick={openEditWs}><Settings size={13} /> Edit</button>
+          <button className="btn-ghost" aria-label="Delete workspace" style={{ fontSize: '0.78rem', color: '#FCA5A5', borderColor: 'rgba(239,68,68,0.2)' }} onClick={() => setShowDeleteWs(true)}>
             <Trash2 size={13} /> Delete
           </button>
         </div>
@@ -553,8 +877,8 @@ export default function WorkspaceDetail() {
             <p style={{ fontSize: '0.8rem', color: '#475569', margin: 0, maxWidth: '600px', lineHeight: 1.5 }}>{ws.description}</p>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
-            <button className="btn-ghost" style={{ fontSize: '0.8rem' }} onClick={() => navigate('/automations')}><Zap size={14} /> Run Automation</button>
-            <button className="btn-primary" style={{ fontSize: '0.8rem' }} onClick={() => { setShowTaskModal(true); setActiveTab('Tasks'); }}><Plus size={14} /> Add Task</button>
+            <button className="btn-ghost" aria-label="Run Automation" style={{ fontSize: '0.8rem' }} onClick={() => navigate('/automations')}><Zap size={14} /> Run Automation</button>
+            <button className="btn-primary" aria-label="Add Task" style={{ fontSize: '0.8rem' }} onClick={() => { setShowTaskModal(true); setActiveTab('Tasks'); }}><Plus size={14} /> Add Task</button>
           </div>
         </div>
         <div style={{ display: 'flex', gap: isMobile ? '1rem' : '2rem', marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
@@ -591,7 +915,7 @@ export default function WorkspaceDetail() {
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid rgba(255,255,255,0.05)', overflowX: 'auto' }}>
         {tabs.map(tab => (
-          <button key={tab} className={`tab-underline ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)} style={{ marginRight: '1.5rem', whiteSpace: 'nowrap' }}>
+          <button key={tab} className={`tab-underline ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)} aria-label={`Workspace tab: ${tab}`} aria-pressed={activeTab === tab} style={{ marginRight: '1.5rem', whiteSpace: 'nowrap' }}>
             {tab}
             {tab === 'Tasks' && openTasks.length > 0 && <span style={{ marginLeft: '5px', background: '#EF4444', color: 'white', borderRadius: '9999px', fontSize: '0.6rem', padding: '1px 5px', fontWeight: 700 }}>{openTasks.length}</span>}
             {tab === 'Risks' && risks.filter(r => r.status === 'Open').length > 0 && <span style={{ marginLeft: '5px', background: '#F59E0B', color: 'white', borderRadius: '9999px', fontSize: '0.6rem', padding: '1px 5px', fontWeight: 700 }}>{risks.filter(r => r.status === 'Open').length}</span>}
@@ -610,7 +934,7 @@ export default function WorkspaceDetail() {
               <DollarSign size={15} style={{ color: '#F59E0B' }} />
               <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#F1F5F9' }}>Financial Summary</span>
               {fin && <span style={{ fontSize: '0.65rem', padding: '1px 7px', borderRadius: '9999px', background: 'rgba(245,158,11,0.12)', color: '#FCD34D', border: '1px solid rgba(245,158,11,0.2)' }}>{fin.billing_model} · {fin.currency}</span>}
-              <button className="btn-ghost" style={{ marginLeft: 'auto', fontSize: '0.75rem', padding: '0.2rem 0.6rem', height: 'auto' }} onClick={openEditFin}><Pencil size={11} /> Edit</button>
+              <button className="btn-ghost" aria-label="Edit financial summary" style={{ marginLeft: 'auto', fontSize: '0.75rem', padding: '0.2rem 0.6rem', height: 'auto' }} onClick={openEditFin}><Pencil size={11} /> Edit</button>
             </div>
             {fin ? (
               <>
@@ -654,15 +978,73 @@ export default function WorkspaceDetail() {
               <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Milestone Tracker</span>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.7rem', color: '#475569' }}>{milestones.filter(m => m.status !== 'Completed').length} active</span>
-                <button className="btn-primary" style={{ fontSize: '0.75rem', padding: '0.2rem 0.7rem', height: 'auto' }} onClick={openAddMs}><Plus size={11} /> Add</button>
+                <button className="btn-primary" aria-label="New Milestone" style={{ fontSize: '0.75rem', padding: '0.2rem 0.7rem', height: 'auto' }} onClick={openAddMs}><Plus size={11} /> Add</button>
+                <button
+                  className="btn-ghost"
+                  aria-label="Copy milestones summary to clipboard"
+                  disabled={milestones.length === 0}
+                  onClick={() => handleCopyMilestonesSummary(milestones)}
+                  style={{ fontSize: '0.75rem', padding: '0.2rem 0.7rem', height: 'auto', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                >
+                  <ClipboardCopy size={11} /> {milestoneSummaryCopied ? 'Copied!' : 'Copy'}
+                </button>
+                <button
+                  className="btn-ghost"
+                  aria-label="Export milestones to CSV"
+                  disabled={milestones.length === 0}
+                  onClick={handleExportMilestonesCSV}
+                  style={{ fontSize: '0.75rem', padding: '0.2rem 0.7rem', height: 'auto', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                >
+                  <Download size={11} /> {milestoneCsvExported ? 'Exported!' : 'Export'}
+                </button>
               </div>
             </div>
+            {milestones.length > 0 && (
+              <div style={{ padding: '0.5rem 1.25rem', display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                {(['All', 'Upcoming', 'On Track', 'At Risk', 'Delayed', 'Completed'] as const).map(s => (
+                  <button
+                    key={s}
+                    onClick={() => setMilestoneStatusFilter(s)}
+                    aria-label={`Filter milestones by status: ${s}`}
+                    aria-pressed={milestoneStatusFilter === s}
+                    style={{ padding: '0.2rem 0.6rem', fontSize: '0.7rem', borderRadius: '4px', border: `1px solid ${milestoneStatusFilter === s ? '#00D4FF' : 'rgba(255,255,255,0.1)'}`, background: milestoneStatusFilter === s ? 'rgba(0,212,255,0.1)' : 'transparent', color: milestoneStatusFilter === s ? '#00D4FF' : '#94A3B8', cursor: 'pointer', fontFamily: 'inherit' }}
+                  >{s}</button>
+                ))}
+              </div>
+            )}
+            {milestones.length > 0 && (
+              <>
+                <div style={{ padding: '0 1.25rem 0.5rem' }}>
+                  <input
+                    type="text"
+                    aria-label="Search milestones"
+                    placeholder="Search milestones…"
+                    value={milestoneSearch}
+                    onChange={e => setMilestoneSearch(e.target.value)}
+                    style={{ width: '100%', boxSizing: 'border-box', height: '30px', padding: '0 0.5rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: '6px', color: '#CBD5E1', fontSize: '0.72rem', fontFamily: 'inherit', outline: 'none' }}
+                  />
+                </div>
+                <div style={{ padding: '0 1.25rem 0.5rem', display: 'flex', gap: '0.3rem' }}>
+                  {(['default', 'due_date', 'title'] as const).map(s => (
+                    <button key={s} onClick={() => setMilestoneSort(s)} aria-label={`Sort milestones by ${s}`} aria-pressed={milestoneSort === s}
+                      style={{ fontSize: '0.62rem', padding: '1px 7px', borderRadius: '4px', background: milestoneSort === s ? 'rgba(0,212,255,0.1)' : 'transparent', color: milestoneSort === s ? '#00D4FF' : '#475569', border: milestoneSort === s ? '1px solid rgba(0,212,255,0.25)' : '1px solid transparent', cursor: 'pointer', fontFamily: 'inherit' }}>
+                      {s === 'default' ? 'Default' : s === 'due_date' ? 'Due Date' : 'Title A–Z'}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
             {milestones.length > 0 ? (
               <div style={{ overflowX: 'auto' }}>
                 <table className="data-table" style={{ minWidth: '560px' }}>
                   <thead><tr><th>Milestone</th><th>Due Date</th><th>Progress</th><th>Value</th><th>Owner</th><th>Status</th><th></th></tr></thead>
                   <tbody>
-                    {milestones.map(ms => {
+                    {(milestoneSort === 'due_date'
+                      ? [...milestones].sort((a, b) => (a.due_date ?? '').localeCompare(b.due_date ?? ''))
+                      : milestoneSort === 'title'
+                      ? [...milestones].sort((a, b) => a.title.localeCompare(b.title))
+                      : milestones
+                    ).filter(ms => (milestoneStatusFilter === 'All' || ms.status === milestoneStatusFilter) && (!milestoneSearch.trim() || ms.title.toLowerCase().includes(milestoneSearch.toLowerCase()))).map(ms => {
                       const sc = milestoneStatusColor[ms.status] ?? '#475569';
                       return (
                         <tr key={ms.id}>
@@ -698,7 +1080,7 @@ export default function WorkspaceDetail() {
             <div className="section-card">
               <div className="section-card-header">
                 <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Recent Documents</span>
-                <button className="btn-ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.625rem' }} onClick={() => setActiveTab('Documents')}>View All</button>
+                <button className="btn-ghost" aria-label="View all documents" style={{ fontSize: '0.75rem', padding: '0.25rem 0.625rem' }} onClick={() => setActiveTab('Documents')}>View All</button>
               </div>
               <div>
                 {docs.slice(0, 4).map((doc, i) => (
@@ -725,7 +1107,7 @@ export default function WorkspaceDetail() {
             <div className="section-card">
               <div className="section-card-header">
                 <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Open Actions</span>
-                <button className="btn-ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.625rem' }} onClick={() => setActiveTab('Tasks')}>View All</button>
+                <button className="btn-ghost" aria-label="View all tasks" style={{ fontSize: '0.75rem', padding: '0.25rem 0.625rem' }} onClick={() => setActiveTab('Tasks')}>View All</button>
               </div>
               <div>
                 {openTasks.slice(0, 4).map((task, i) => (
@@ -748,7 +1130,7 @@ export default function WorkspaceDetail() {
             <div className="section-card">
               <div className="section-card-header">
                 <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Upcoming Meetings</span>
-                <button className="btn-ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.625rem' }} onClick={() => setActiveTab('Meetings')}>View All</button>
+                <button className="btn-ghost" aria-label="View all meetings" style={{ fontSize: '0.75rem', padding: '0.25rem 0.625rem' }} onClick={() => setActiveTab('Meetings')}>View All</button>
               </div>
               <div>
                 {upcomingMeetings.slice(0, 3).map((mtg, i) => (
@@ -772,7 +1154,7 @@ export default function WorkspaceDetail() {
             <div className="section-card">
               <div className="section-card-header">
                 <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Open Risks</span>
-                <button className="btn-ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.625rem' }} onClick={() => setActiveTab('Risks')}>View All</button>
+                <button className="btn-ghost" aria-label="View all risks" style={{ fontSize: '0.75rem', padding: '0.25rem 0.625rem' }} onClick={() => setActiveTab('Risks')}>View All</button>
               </div>
               <div>
                 {risks.filter(r => r.status === 'Open' || r.status === 'Monitoring').slice(0, 3).map((risk, i, arr) => {
@@ -795,18 +1177,92 @@ export default function WorkspaceDetail() {
         </div>
       )}
 
+      {/* ── WORKSPACE NOTES (shown in Overview) ── */}
+      {activeTab === 'Overview' && (
+        <div className="section-card" style={{ overflow: 'hidden', marginTop: '0.5rem' }}>
+          <div className="section-card-header">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <FileText size={14} style={{ color: '#8B5CF6' }} />
+              <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>Workspace Notes</span>
+            </div>
+            <button
+              aria-label="Save workspace notes"
+              onClick={handleSaveWsNotes}
+              style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', cursor: 'pointer', color: wsNotesSaved ? '#34D399' : '#475569', fontSize: '0.68rem', padding: '2px 8px', fontFamily: 'inherit', transition: 'color 0.2s' }}
+            >
+              {wsNotesSaved ? 'Saved' : 'Save'}
+            </button>
+          </div>
+          <div style={{ padding: '1rem 1.25rem' }}>
+            <textarea
+              aria-label="Workspace notes input"
+              placeholder="Add internal notes, reminders, or context for this workspace…"
+              value={wsNotes}
+              onChange={e => setWsNotes(e.target.value)}
+              style={{
+                width: '100%', minHeight: '90px', padding: '0.625rem 0.75rem',
+                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: '0.5rem', color: '#94A3B8', fontSize: '0.8rem',
+                fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box',
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* ── DOCUMENTS ── */}
       {activeTab === 'Documents' && (
         <div className="section-card">
-          <div className="section-card-header">
+          <div className="section-card-header" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
             <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Documents ({docs.length})</span>
-            <button className="btn-primary" style={{ fontSize: '0.8rem' }} onClick={() => setShowDocModal(true)}><Plus size={13} /> Add Document</button>
+            <div style={{ display: 'flex', gap: '0.375rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              {(['All', 'Draft', 'Under Review', 'Approved', 'Final'] as const).map(s => (
+                <button
+                  key={s}
+                  onClick={() => setDocStatusFilter(s)}
+                  aria-label={`Filter documents by status: ${s}`}
+                  aria-pressed={docStatusFilter === s}
+                  style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '0.25rem', border: `1px solid ${docStatusFilter === s ? 'rgba(14,165,233,0.5)' : 'rgba(255,255,255,0.1)'}`, background: docStatusFilter === s ? 'rgba(14,165,233,0.1)' : 'transparent', color: docStatusFilter === s ? '#38BDF8' : 'var(--text-faint)', cursor: 'pointer', fontFamily: 'inherit' }}
+                >{s}</button>
+              ))}
+              <button
+                className="btn-ghost"
+                aria-label="Export workspace documents to CSV"
+                disabled={docs.length === 0}
+                onClick={() => handleExportDocsCSV(docs)}
+                style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}
+              >
+                <Download size={13} /> {docsCsvExported ? 'Exported!' : 'Export'}
+              </button>
+              <select
+                aria-label="Sort workspace documents"
+                value={docSort}
+                onChange={e => setDocSort(e.target.value as typeof docSort)}
+                style={{ fontSize: '0.7rem', height: '26px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: '#94A3B8', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }}
+              >
+                <option value="default">Default</option>
+                <option value="name">Name A–Z</option>
+                <option value="pages">Most Pages</option>
+              </select>
+              <button className="btn-primary" aria-label="Add Document" style={{ fontSize: '0.8rem' }} onClick={() => setShowDocModal(true)}><Plus size={13} /> Add Document</button>
+            </div>
           </div>
+          {docs.length > 0 && (
+            <div style={{ padding: '0.5rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <input
+                aria-label="Search workspace documents"
+                placeholder="Search documents by name…"
+                value={docSearch}
+                onChange={e => setDocSearch(e.target.value)}
+                style={{ width: '100%', boxSizing: 'border-box', padding: '0.25rem 0.5rem', borderRadius: '0.375rem', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: 'var(--text-primary)', fontSize: '0.75rem', fontFamily: 'inherit', outline: 'none' }}
+              />
+            </div>
+          )}
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
               <thead><tr><th>Document</th><th>Type</th><th>Date</th><th>Language</th><th>Status</th><th>Pages</th><th>File</th><th></th></tr></thead>
               <tbody>
-                {docs.map(doc => (
+                {(docSort === 'name' ? [...docs].sort((a, b) => a.name.localeCompare(b.name)) : docSort === 'pages' ? [...docs].sort((a, b) => (b.pages ?? 0) - (a.pages ?? 0)) : docs).filter(doc => (docStatusFilter === 'All' || doc.status === docStatusFilter) && (!docSearch.trim() || doc.name.toLowerCase().includes(docSearch.toLowerCase()))).map(doc => (
                   <tr key={doc.id}>
                     <td>
                       <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F1F5F9' }}>{doc.name}</div>
@@ -850,13 +1306,71 @@ export default function WorkspaceDetail() {
         <div className="section-card">
           <div className="section-card-header">
             <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Meetings ({meetings.length})</span>
-            <button className="btn-primary" style={{ fontSize: '0.8rem' }} onClick={() => setShowMtgModal(true)}><Plus size={13} /> Schedule Meeting</button>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <button
+                className="btn-ghost"
+                aria-label="Copy workspace meetings summary to clipboard"
+                disabled={meetings.length === 0}
+                onClick={() => handleCopyMeetingsSummary(meetings)}
+                style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}
+              >
+                <ClipboardCopy size={13} /> {meetingsSummaryCopied ? 'Copied!' : 'Copy Summary'}
+              </button>
+              <button
+                className="btn-ghost"
+                aria-label="Export workspace meetings to CSV"
+                disabled={meetings.length === 0}
+                onClick={() => handleExportMeetingsCSV(meetings)}
+                style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}
+              >
+                <Download size={13} /> {meetingsCsvExported ? 'Exported!' : 'Export'}
+              </button>
+              <button className="btn-primary" aria-label="Schedule Meeting" style={{ fontSize: '0.8rem' }} onClick={() => setShowMtgModal(true)}><Plus size={13} /> Schedule Meeting</button>
+            </div>
           </div>
+          {meetings.length > 0 && (
+            <div style={{ display: 'flex', gap: '0.25rem', padding: '0.5rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
+              {(['All', ...Array.from(new Set(meetings.map(m => m.type))).sort()] as string[]).map(t => (
+                <button key={t} className={`btn-ghost${meetingTypeFilter === t ? ' active' : ''}`}
+                  aria-label={`Filter meetings by type: ${t}`}
+                  aria-pressed={meetingTypeFilter === t}
+                  onClick={() => setMeetingTypeFilter(t)}
+                  style={{ fontSize: '0.72rem', height: '28px', padding: '0 0.5rem', background: meetingTypeFilter === t ? 'rgba(14,165,233,0.1)' : undefined, borderColor: meetingTypeFilter === t ? 'rgba(14,165,233,0.3)' : undefined }}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          )}
+          {meetings.length > 0 && (
+            <div style={{ display: 'flex', gap: '0.25rem', padding: '0.25rem 1.25rem 0.5rem', flexWrap: 'wrap' }}>
+              {(['All', 'Upcoming', 'In Progress', 'Completed'] as const).map(sf => (
+                <button
+                  key={sf}
+                  className={`btn-ghost${meetingStatusFilter === sf ? ' active' : ''}`}
+                  aria-label={`Filter workspace meetings by status: ${sf}`}
+                  aria-pressed={meetingStatusFilter === sf}
+                  onClick={() => setMeetingStatusFilter(sf)}
+                  style={{ fontSize: '0.72rem', height: '28px', padding: '0 0.5rem' }}
+                >{sf}</button>
+              ))}
+            </div>
+          )}
+          {meetings.length > 0 && (
+            <div style={{ padding: '0.5rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <input
+                aria-label="Search workspace meetings"
+                placeholder="Search meetings by title…"
+                value={meetingSearch}
+                onChange={e => setMeetingSearch(e.target.value)}
+                style={{ width: '100%', boxSizing: 'border-box', padding: '0.25rem 0.5rem', borderRadius: '0.375rem', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: 'var(--text-primary)', fontSize: '0.75rem', fontFamily: 'inherit', outline: 'none' }}
+              />
+            </div>
+          )}
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table" style={{ minWidth: '640px' }}>
               <thead><tr><th>Meeting</th><th>Type</th><th>Date & Time</th><th>Duration</th><th>Participants</th><th>Status</th><th></th></tr></thead>
               <tbody>
-                {meetings.map(mtg => {
+                {meetings.filter(mtg => (meetingTypeFilter === 'All' || mtg.type === meetingTypeFilter) && (meetingStatusFilter === 'All' || mtg.status === meetingStatusFilter) && (!meetingSearch.trim() || mtg.title.toLowerCase().includes(meetingSearch.toLowerCase()))).map(mtg => {
                   const tc = meetingTypeColors[mtg.type] ?? '#8B5CF6';
                   return (
                     <tr key={mtg.id}>
@@ -901,13 +1415,76 @@ export default function WorkspaceDetail() {
         <div className="section-card">
           <div className="section-card-header">
             <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Tasks ({tasks.length})</span>
-            <button className="btn-primary" style={{ fontSize: '0.8rem' }} onClick={() => setShowTaskModal(true)}><Plus size={13} /> New Task</button>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button className="btn-ghost" aria-label="Copy workspace tasks summary to clipboard" style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }} disabled={tasks.length === 0} onClick={() => handleCopyTasksSummary(tasks)}>
+                <ClipboardCopy size={13} /> {tasksSummaryCopied ? 'Copied!' : 'Copy Summary'}
+              </button>
+              <button className="btn-secondary" aria-label="Export workspace tasks to CSV" style={{ fontSize: '0.8rem' }} disabled={tasks.length === 0} onClick={() => handleExportTasksCSV(tasks)}>
+                {tasksCsvExported ? 'Exported!' : <><Download size={13} /> Export CSV</>}
+              </button>
+              <button className="btn-primary" aria-label="New Task" style={{ fontSize: '0.8rem' }} onClick={() => setShowTaskModal(true)}><Plus size={13} /> New Task</button>
+            </div>
+          </div>
+          {/* Task status quick filter */}
+          <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', padding: '0.5rem 0' }}>
+            {(['All', 'Backlog', 'In Progress', 'In Review', 'Completed', 'Overdue'] as const).map(sf => (
+              <button
+                key={sf}
+                className={`tab-item ${taskStatusFilter === sf ? 'active' : ''}`}
+                aria-label={`Filter workspace tasks by status: ${sf}`}
+                aria-pressed={taskStatusFilter === sf}
+                onClick={() => setTaskStatusFilter(sf)}
+                style={{ padding: '0.2rem 0.6rem', fontSize: '0.72rem', whiteSpace: 'nowrap' }}
+              >
+                {sf}
+              </button>
+            ))}
+          </div>
+          {/* Task search */}
+          <div style={{ paddingBottom: '0.5rem' }}>
+            <input
+              type="text"
+              aria-label="Search workspace tasks"
+              placeholder="Search tasks…"
+              value={taskSearch}
+              onChange={e => setTaskSearch(e.target.value)}
+              style={{ width: '100%', boxSizing: 'border-box', height: '30px', fontSize: '0.78rem', padding: '0 0.625rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', background: 'rgba(255,255,255,0.04)', color: '#F1F5F9', fontFamily: 'inherit', outline: 'none' }}
+            />
+          </div>
+          {/* Task priority quick filter */}
+          <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', paddingBottom: '0.5rem' }}>
+            {(['All', 'High', 'Medium', 'Low'] as const).map(pf => (
+              <button
+                key={pf}
+                className={`tab-item ${taskPriorityFilter === pf ? 'active' : ''}`}
+                aria-label={`Filter workspace tasks by priority: ${pf}`}
+                aria-pressed={taskPriorityFilter === pf}
+                onClick={() => setTaskPriorityFilter(pf)}
+                style={{ padding: '0.2rem 0.6rem', fontSize: '0.72rem', whiteSpace: 'nowrap' }}
+              >
+                {pf}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', paddingBottom: '0.5rem' }}>
+            {(['default', 'title', 'priority'] as const).map(s => (
+              <button key={s} onClick={() => setTaskSort(s)} aria-label={`Sort tasks by ${s}`} aria-pressed={taskSort === s}
+                style={{ fontSize: '0.62rem', padding: '1px 7px', borderRadius: '4px', background: taskSort === s ? 'rgba(0,212,255,0.1)' : 'transparent', color: taskSort === s ? '#00D4FF' : '#475569', border: taskSort === s ? '1px solid rgba(0,212,255,0.25)' : '1px solid transparent', cursor: 'pointer', fontFamily: 'inherit', textTransform: 'capitalize' }}>
+                {s === 'default' ? 'Default' : s === 'title' ? 'Title A–Z' : 'Priority'}
+              </button>
+            ))}
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
               <thead><tr><th>Task</th><th>Priority</th><th>Status</th><th>Due Date</th><th>Assignee</th><th>Actions</th><th></th></tr></thead>
               <tbody>
-                {tasks.map(task => (
+                {((() => {
+                  const PRIORITY_ORD: Record<string, number> = { High: 0, Medium: 1, Low: 2 };
+                  const filtered = tasks.filter(t => (taskStatusFilter === 'All' || t.status === taskStatusFilter) && (taskPriorityFilter === 'All' || t.priority === taskPriorityFilter) && (!taskSearch.trim() || t.title.toLowerCase().includes(taskSearch.toLowerCase())));
+                  if (taskSort === 'title') return [...filtered].sort((a, b) => a.title.localeCompare(b.title));
+                  if (taskSort === 'priority') return [...filtered].sort((a, b) => (PRIORITY_ORD[a.priority] ?? 1) - (PRIORITY_ORD[b.priority] ?? 1));
+                  return filtered;
+                })()).map(task => (
                   <tr key={task.id}>
                     <td>
                       <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F1F5F9' }}>{task.title}</div>
@@ -943,7 +1520,7 @@ export default function WorkspaceDetail() {
                     </td>
                   </tr>
                 ))}
-                {tasks.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: '#334155' }}>No tasks yet</td></tr>}
+                {tasks.filter(t => (taskStatusFilter === 'All' || t.status === taskStatusFilter) && (taskPriorityFilter === 'All' || t.priority === taskPriorityFilter) && (!taskSearch.trim() || t.title.toLowerCase().includes(taskSearch.toLowerCase()))).length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: '#334155' }}>{tasks.length === 0 ? 'No tasks yet' : 'No tasks match filter'}</td></tr>}
               </tbody>
             </table>
           </div>
@@ -955,13 +1532,87 @@ export default function WorkspaceDetail() {
         <div className="section-card">
           <div className="section-card-header">
             <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Risk Register ({risks.length})</span>
-            <button className="btn-primary" style={{ fontSize: '0.8rem' }} onClick={() => setShowRiskModal(true)}><Plus size={13} /> Log Risk</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <select
+                aria-label="Filter by risk severity"
+                value={riskSeverityFilter}
+                onChange={e => setRiskSeverityFilter(e.target.value as typeof riskSeverityFilter)}
+                style={{ height: '30px', fontSize: '0.75rem', padding: '0 0.625rem', borderRadius: '6px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#F1F5F9', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }}
+              >
+                <option value="All">All Severities</option>
+                <option value="Critical">Critical</option>
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+              </select>
+              <button
+                className="btn-ghost"
+                aria-label="Copy risks summary to clipboard"
+                disabled={risks.length === 0}
+                onClick={() => handleCopyRisksSummary(risks)}
+                style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}
+              >
+                <ClipboardCopy size={13} /> {riskSummaryCopied ? 'Copied!' : 'Copy Summary'}
+              </button>
+              <button
+                className="btn-ghost"
+                aria-label="Export risks to CSV"
+                disabled={risks.length === 0}
+                onClick={handleExportRisksCSV}
+                style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}
+              >
+                <Download size={13} /> {riskCsvExported ? 'Exported!' : 'Export'}
+              </button>
+              <button className="btn-primary" aria-label="Log Risk" style={{ fontSize: '0.8rem' }} onClick={() => setShowRiskModal(true)}><Plus size={13} /> Log Risk</button>
+            </div>
           </div>
+          {/* Risk status quick filter */}
+          <div style={{ display: 'flex', gap: '0.25rem', padding: '0.5rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
+            {(['All', 'Open', 'Monitoring', 'Mitigated', 'Closed'] as const).map(sf => (
+              <button
+                key={sf}
+                className={`btn-ghost${riskStatusFilter === sf ? ' active' : ''}`}
+                aria-label={`Filter risks by status: ${sf}`}
+                aria-pressed={riskStatusFilter === sf}
+                onClick={() => setRiskStatusFilter(sf)}
+                style={{ fontSize: '0.72rem', height: '28px', padding: '0 0.5rem', background: riskStatusFilter === sf ? 'rgba(245,158,11,0.1)' : undefined, borderColor: riskStatusFilter === sf ? 'rgba(245,158,11,0.3)' : undefined }}
+              >
+                {sf}
+              </button>
+            ))}
+          </div>
+          {risks.length > 0 && (
+            <>
+              <div style={{ padding: '0.5rem 1.25rem' }}>
+                <input
+                  type="text"
+                  aria-label="Search risks"
+                  placeholder="Search risks…"
+                  value={riskSearch}
+                  onChange={e => setRiskSearch(e.target.value)}
+                  style={{ width: '100%', height: '30px', fontSize: '0.75rem', padding: '0 0.625rem', borderRadius: '6px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#F1F5F9', fontFamily: 'inherit', outline: 'none' }}
+                />
+              </div>
+              <div style={{ padding: '0 1.25rem 0.5rem', display: 'flex', gap: '0.3rem' }}>
+                {(['default', 'title', 'severity'] as const).map(s => (
+                  <button key={s} onClick={() => setRiskSort(s)} aria-label={`Sort risks by ${s}`} aria-pressed={riskSort === s}
+                    style={{ fontSize: '0.62rem', padding: '1px 7px', borderRadius: '4px', background: riskSort === s ? 'rgba(245,158,11,0.1)' : 'transparent', color: riskSort === s ? '#F59E0B' : '#475569', border: riskSort === s ? '1px solid rgba(245,158,11,0.25)' : '1px solid transparent', cursor: 'pointer', fontFamily: 'inherit' }}>
+                    {s === 'default' ? 'Default' : s === 'title' ? 'Title A–Z' : 'Severity'}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
               <thead><tr><th>Risk</th><th>Category</th><th>P×I</th><th>Severity</th><th>Status</th><th>Owner</th>{!isMobile && <th>Exposure</th>}<th></th></tr></thead>
               <tbody>
-                {risks.map(risk => (
+                {(riskSort === 'title'
+                  ? [...risks].sort((a, b) => a.title.localeCompare(b.title))
+                  : riskSort === 'severity'
+                  ? [...risks].sort((a, b) => (a.severity ?? '').localeCompare(b.severity ?? ''))
+                  : risks
+                ).filter(r => (riskSeverityFilter === 'All' || r.severity === riskSeverityFilter) && (riskStatusFilter === 'All' || r.status === riskStatusFilter) && (!riskSearch.trim() || r.title.toLowerCase().includes(riskSearch.toLowerCase()) || (r.category ?? '').toLowerCase().includes(riskSearch.toLowerCase()))).map(risk => (
                   <tr key={risk.id}>
                     <td>
                       <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F1F5F9' }}>{risk.title}</div>
@@ -1020,35 +1671,35 @@ export default function WorkspaceDetail() {
         <Modal title="Edit Workspace" onClose={() => setShowEditWs(false)}>
           {editWsError && <ErrorBanner msg={editWsError} />}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
-            <Field label="Workspace Name *"><input style={inputStyle} value={editWsForm.name} onChange={e => setEditWsForm(f => ({ ...f, name: e.target.value }))} /></Field>
-            <Field label="Client / Organization *"><input style={inputStyle} value={editWsForm.client} onChange={e => setEditWsForm(f => ({ ...f, client: e.target.value }))} /></Field>
+            <Field label="Workspace Name *"><input aria-label="Workspace name" style={inputStyle} value={editWsForm.name} onChange={e => setEditWsForm(f => ({ ...f, name: e.target.value }))} /></Field>
+            <Field label="Client / Organization *"><input aria-label="Client or organization" style={inputStyle} value={editWsForm.client} onChange={e => setEditWsForm(f => ({ ...f, client: e.target.value }))} /></Field>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
               <Field label="Sector">
-                <select style={selectStyle} value={editWsForm.sector} onChange={e => setEditWsForm(f => ({ ...f, sector: e.target.value }))}>
+                <select aria-label="Workspace sector" style={selectStyle} value={editWsForm.sector} onChange={e => setEditWsForm(f => ({ ...f, sector: e.target.value }))}>
                   {SECTORS.map(s => <option key={s}>{s}</option>)}
                 </select>
               </Field>
               <Field label="Type">
-                <select style={selectStyle} value={editWsForm.type} onChange={e => setEditWsForm(f => ({ ...f, type: e.target.value as WorkspaceRow['type'] }))}>
+                <select aria-label="Workspace type" style={selectStyle} value={editWsForm.type} onChange={e => setEditWsForm(f => ({ ...f, type: e.target.value as WorkspaceRow['type'] }))}>
                   <option>Client</option><option>Project</option><option>Internal</option><option>Procurement</option><option>Committee</option>
                 </select>
               </Field>
               <Field label="Language">
-                <select style={selectStyle} value={editWsForm.language} onChange={e => setEditWsForm(f => ({ ...f, language: e.target.value as WorkspaceRow['language'] }))}>
+                <select aria-label="Workspace language" style={selectStyle} value={editWsForm.language} onChange={e => setEditWsForm(f => ({ ...f, language: e.target.value as WorkspaceRow['language'] }))}>
                   <option>EN</option><option>AR</option><option>Bilingual</option>
                 </select>
               </Field>
               <Field label="Status">
-                <select style={selectStyle} value={editWsForm.status} onChange={e => setEditWsForm(f => ({ ...f, status: e.target.value as WorkspaceRow['status'] }))}>
+                <select aria-label="Workspace status" style={selectStyle} value={editWsForm.status} onChange={e => setEditWsForm(f => ({ ...f, status: e.target.value as WorkspaceRow['status'] }))}>
                   <option>Active</option><option>On Hold</option><option>Completed</option>
                 </select>
               </Field>
               <Field label="Progress (0–100)">
-                <input style={inputStyle} type="number" min="0" max="100" value={editWsForm.progress} onChange={e => setEditWsForm(f => ({ ...f, progress: e.target.value }))} />
+                <input aria-label="Progress percentage" style={inputStyle} type="number" min="0" max="100" value={editWsForm.progress} onChange={e => setEditWsForm(f => ({ ...f, progress: e.target.value }))} />
               </Field>
             </div>
             <Field label="Description">
-              <textarea style={{ ...inputStyle, resize: 'vertical' }} rows={3} value={editWsForm.description} onChange={e => setEditWsForm(f => ({ ...f, description: e.target.value }))} />
+              <textarea aria-label="Workspace description" style={{ ...inputStyle, resize: 'vertical' }} rows={3} value={editWsForm.description} onChange={e => setEditWsForm(f => ({ ...f, description: e.target.value }))} />
             </Field>
             <ModalFooter onCancel={() => setShowEditWs(false)} onConfirm={handleEditWs} saving={editWsSaving} label="Save Changes" />
           </div>
@@ -1061,18 +1712,18 @@ export default function WorkspaceDetail() {
           {editFinError && <ErrorBanner msg={editFinError} />}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-              <Field label="Contract Value (SAR)"><input style={inputStyle} type="number" min="0" value={editFinForm.contract_value} onChange={e => setEditFinForm(f => ({ ...f, contract_value: e.target.value }))} /></Field>
-              <Field label="Spent to Date (SAR)"><input style={inputStyle} type="number" min="0" value={editFinForm.spent} onChange={e => setEditFinForm(f => ({ ...f, spent: e.target.value }))} /></Field>
-              <Field label="Forecast at Completion (SAR)"><input style={inputStyle} type="number" min="0" value={editFinForm.forecast} onChange={e => setEditFinForm(f => ({ ...f, forecast: e.target.value }))} /></Field>
-              <Field label="Variance (SAR)"><input style={inputStyle} type="number" value={editFinForm.variance} onChange={e => setEditFinForm(f => ({ ...f, variance: e.target.value }))} placeholder="Auto: forecast − contract" /></Field>
+              <Field label="Contract Value (SAR)"><input aria-label="Contract value" style={inputStyle} type="number" min="0" value={editFinForm.contract_value} onChange={e => setEditFinForm(f => ({ ...f, contract_value: e.target.value }))} /></Field>
+              <Field label="Spent to Date (SAR)"><input aria-label="Spent to date" style={inputStyle} type="number" min="0" value={editFinForm.spent} onChange={e => setEditFinForm(f => ({ ...f, spent: e.target.value }))} /></Field>
+              <Field label="Forecast at Completion (SAR)"><input aria-label="Forecast at completion" style={inputStyle} type="number" min="0" value={editFinForm.forecast} onChange={e => setEditFinForm(f => ({ ...f, forecast: e.target.value }))} /></Field>
+              <Field label="Variance (SAR)"><input aria-label="Variance" style={inputStyle} type="number" value={editFinForm.variance} onChange={e => setEditFinForm(f => ({ ...f, variance: e.target.value }))} placeholder="Auto: forecast − contract" /></Field>
               <Field label="Billing Model">
-                <select style={selectStyle} value={editFinForm.billing_model} onChange={e => setEditFinForm(f => ({ ...f, billing_model: e.target.value }))}>
+                <select aria-label="Billing model" style={selectStyle} value={editFinForm.billing_model} onChange={e => setEditFinForm(f => ({ ...f, billing_model: e.target.value }))}>
                   {BILLING_MODELS.map(b => <option key={b}>{b}</option>)}
                 </select>
               </Field>
-              <Field label="Next Milestone Value (SAR)"><input style={inputStyle} type="number" min="0" value={editFinForm.next_milestone_value} onChange={e => setEditFinForm(f => ({ ...f, next_milestone_value: e.target.value }))} /></Field>
+              <Field label="Next Milestone Value (SAR)"><input aria-label="Next milestone value" style={inputStyle} type="number" min="0" value={editFinForm.next_milestone_value} onChange={e => setEditFinForm(f => ({ ...f, next_milestone_value: e.target.value }))} /></Field>
             </div>
-            <Field label="Last Invoice Date"><input style={inputStyle} type="text" placeholder="e.g. 15 Feb 2026" value={editFinForm.last_invoice} onChange={e => setEditFinForm(f => ({ ...f, last_invoice: e.target.value }))} /></Field>
+            <Field label="Last Invoice Date"><input aria-label="Last invoice date" style={inputStyle} type="text" placeholder="e.g. 15 Feb 2026" value={editFinForm.last_invoice} onChange={e => setEditFinForm(f => ({ ...f, last_invoice: e.target.value }))} /></Field>
             <ModalFooter onCancel={() => setShowEditFin(false)} onConfirm={handleEditFin} saving={editFinSaving} label="Save Financials" />
           </div>
         </Modal>
@@ -1083,18 +1734,18 @@ export default function WorkspaceDetail() {
         <Modal title={editingMs ? 'Edit Milestone' : 'Add Milestone'} onClose={() => setShowMsModal(false)}>
           {msError && <ErrorBanner msg={msError} />}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
-            <Field label="Title *"><input style={inputStyle} value={msForm.title} onChange={e => setMsForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Phase 1 Delivery" /></Field>
+            <Field label="Title *"><input aria-label="Milestone title" style={inputStyle} value={msForm.title} onChange={e => setMsForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Phase 1 Delivery" /></Field>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-              <Field label="Due Date *"><input style={selectStyle} type="date" value={msForm.due_date} onChange={e => setMsForm(f => ({ ...f, due_date: e.target.value }))} /></Field>
+              <Field label="Due Date *"><input aria-label="Milestone due date" style={selectStyle} type="date" value={msForm.due_date} onChange={e => setMsForm(f => ({ ...f, due_date: e.target.value }))} /></Field>
               <Field label="Status">
-                <select style={selectStyle} value={msForm.status} onChange={e => setMsForm(f => ({ ...f, status: e.target.value as MilestoneRow['status'] }))}>
+                <select aria-label="Milestone status" style={selectStyle} value={msForm.status} onChange={e => setMsForm(f => ({ ...f, status: e.target.value as MilestoneRow['status'] }))}>
                   <option>Upcoming</option><option>On Track</option><option>At Risk</option><option>Delayed</option><option>Completed</option>
                 </select>
               </Field>
-              <Field label="Value (SAR)"><input style={inputStyle} type="number" min="0" value={msForm.value} onChange={e => setMsForm(f => ({ ...f, value: e.target.value }))} /></Field>
-              <Field label="Completion %"><input style={inputStyle} type="number" min="0" max="100" value={msForm.completion_pct} onChange={e => setMsForm(f => ({ ...f, completion_pct: e.target.value }))} /></Field>
+              <Field label="Value (SAR)"><input aria-label="Milestone value" style={inputStyle} type="number" min="0" value={msForm.value} onChange={e => setMsForm(f => ({ ...f, value: e.target.value }))} /></Field>
+              <Field label="Completion %"><input aria-label="Milestone completion percentage" style={inputStyle} type="number" min="0" max="100" value={msForm.completion_pct} onChange={e => setMsForm(f => ({ ...f, completion_pct: e.target.value }))} /></Field>
             </div>
-            <Field label="Owner"><input style={inputStyle} value={msForm.owner} onChange={e => setMsForm(f => ({ ...f, owner: e.target.value }))} placeholder="e.g. AM" /></Field>
+            <Field label="Owner"><input aria-label="Milestone owner" style={inputStyle} value={msForm.owner} onChange={e => setMsForm(f => ({ ...f, owner: e.target.value }))} placeholder="e.g. AM" /></Field>
             <ModalFooter onCancel={() => setShowMsModal(false)} onConfirm={handleSaveMs} saving={msSaving} label={editingMs ? 'Save Changes' : 'Add Milestone'} />
           </div>
         </Modal>
@@ -1105,17 +1756,17 @@ export default function WorkspaceDetail() {
         <Modal title="New Task" onClose={() => { setShowTaskModal(false); setTaskError(''); }}>
           {taskError && <ErrorBanner msg={taskError} />}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
-            <Field label="Task Title *"><input style={inputStyle} value={taskForm.title} onChange={e => setTaskForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Complete stakeholder analysis" /></Field>
+            <Field label="Task Title *"><input aria-label="Task title" style={inputStyle} value={taskForm.title} onChange={e => setTaskForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Complete stakeholder analysis" /></Field>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
               <Field label="Priority">
-                <select style={selectStyle} value={taskForm.priority} onChange={e => setTaskForm(f => ({ ...f, priority: e.target.value as NewTaskForm['priority'] }))}>
+                <select aria-label="Task priority" style={selectStyle} value={taskForm.priority} onChange={e => setTaskForm(f => ({ ...f, priority: e.target.value as NewTaskForm['priority'] }))}>
                   <option>High</option><option>Medium</option><option>Low</option>
                 </select>
               </Field>
-              <Field label="Due Date *"><input style={selectStyle} type="date" value={taskForm.due_date} onChange={e => setTaskForm(f => ({ ...f, due_date: e.target.value }))} /></Field>
+              <Field label="Due Date *"><input aria-label="Task due date" style={selectStyle} type="date" value={taskForm.due_date} onChange={e => setTaskForm(f => ({ ...f, due_date: e.target.value }))} /></Field>
             </div>
-            <Field label="Assignee *"><input style={inputStyle} value={taskForm.assignee} onChange={e => setTaskForm(f => ({ ...f, assignee: e.target.value }))} placeholder="e.g. AM" /></Field>
-            <Field label="Description"><textarea style={{ ...inputStyle, resize: 'vertical' }} rows={2} value={taskForm.description} onChange={e => setTaskForm(f => ({ ...f, description: e.target.value }))} /></Field>
+            <Field label="Assignee *"><input aria-label="Task assignee" style={inputStyle} value={taskForm.assignee} onChange={e => setTaskForm(f => ({ ...f, assignee: e.target.value }))} placeholder="e.g. AM" /></Field>
+            <Field label="Description"><textarea aria-label="Task description" style={{ ...inputStyle, resize: 'vertical' }} rows={2} value={taskForm.description} onChange={e => setTaskForm(f => ({ ...f, description: e.target.value }))} /></Field>
             <ModalFooter onCancel={() => { setShowTaskModal(false); setTaskError(''); }} onConfirm={handleCreateTask} saving={taskSaving} label="Create Task" />
           </div>
         </Modal>
@@ -1155,15 +1806,15 @@ export default function WorkspaceDetail() {
                 </div>
               </div>
             )}
-            <Field label="Document Name *"><input style={inputStyle} value={docForm.name} onChange={e => setDocForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Phase 1 BRD v1.0" /></Field>
+            <Field label="Document Name *"><input aria-label="Document name" style={inputStyle} value={docForm.name} onChange={e => setDocForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Phase 1 BRD v1.0" /></Field>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-              <Field label="Type"><select style={selectStyle} value={docForm.type} onChange={e => setDocForm(f => ({ ...f, type: e.target.value }))}>{DOC_TYPES.map(t => <option key={t}>{t}</option>)}</select></Field>
-              <Field label="Status"><select style={selectStyle} value={docForm.status} onChange={e => setDocForm(f => ({ ...f, status: e.target.value as NewDocForm['status'] }))}><option>Draft</option><option>Under Review</option><option>Approved</option><option>Final</option></select></Field>
-              <Field label="Language"><select style={selectStyle} value={docForm.language} onChange={e => setDocForm(f => ({ ...f, language: e.target.value as NewDocForm['language'] }))}><option>EN</option><option>AR</option><option>Bilingual</option></select></Field>
-              <Field label="Pages"><input style={selectStyle} type="number" min="1" value={docForm.pages} onChange={e => setDocForm(f => ({ ...f, pages: e.target.value }))} /></Field>
+              <Field label="Type"><select aria-label="Document type" style={selectStyle} value={docForm.type} onChange={e => setDocForm(f => ({ ...f, type: e.target.value }))}>{DOC_TYPES.map(t => <option key={t}>{t}</option>)}</select></Field>
+              <Field label="Status"><select aria-label="Document status" style={selectStyle} value={docForm.status} onChange={e => setDocForm(f => ({ ...f, status: e.target.value as NewDocForm['status'] }))}><option>Draft</option><option>Under Review</option><option>Approved</option><option>Final</option></select></Field>
+              <Field label="Language"><select aria-label="Document language" style={selectStyle} value={docForm.language} onChange={e => setDocForm(f => ({ ...f, language: e.target.value as NewDocForm['language'] }))}><option>EN</option><option>AR</option><option>Bilingual</option></select></Field>
+              <Field label="Pages"><input aria-label="Document pages" style={selectStyle} type="number" min="1" value={docForm.pages} onChange={e => setDocForm(f => ({ ...f, pages: e.target.value }))} /></Field>
             </div>
-            <Field label="Author *"><input style={inputStyle} value={docForm.author} onChange={e => setDocForm(f => ({ ...f, author: e.target.value }))} placeholder="e.g. Ahmed Al-Mahmoud" /></Field>
-            <Field label="Summary"><textarea style={{ ...inputStyle, resize: 'vertical' }} rows={2} value={docForm.summary} onChange={e => setDocForm(f => ({ ...f, summary: e.target.value }))} /></Field>
+            <Field label="Author *"><input aria-label="Document author" style={inputStyle} value={docForm.author} onChange={e => setDocForm(f => ({ ...f, author: e.target.value }))} placeholder="e.g. Ahmed Al-Mahmoud" /></Field>
+            <Field label="Summary"><textarea aria-label="Document summary" style={{ ...inputStyle, resize: 'vertical' }} rows={2} value={docForm.summary} onChange={e => setDocForm(f => ({ ...f, summary: e.target.value }))} /></Field>
             <ModalFooter onCancel={() => { setShowDocModal(false); setDocError(''); setDocForm({ name: '', type: 'BRD', language: 'EN', status: 'Draft', author: '', pages: '1', summary: '', file: null }); }} onConfirm={handleCreateDoc} saving={docSaving} label={docForm.file ? 'Upload & Save' : 'Save Document'} />
           </div>
         </Modal>
@@ -1174,15 +1825,15 @@ export default function WorkspaceDetail() {
         <Modal title="Schedule Meeting" onClose={() => { setShowMtgModal(false); setMtgError(''); }}>
           {mtgError && <ErrorBanner msg={mtgError} />}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
-            <Field label="Meeting Title *"><input style={inputStyle} value={mtgForm.title} onChange={e => setMtgForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Steering Committee Review" /></Field>
+            <Field label="Meeting Title *"><input aria-label="Meeting title" style={inputStyle} value={mtgForm.title} onChange={e => setMtgForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Steering Committee Review" /></Field>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-              <Field label="Type"><select style={selectStyle} value={mtgForm.type} onChange={e => setMtgForm(f => ({ ...f, type: e.target.value as NewMeetingForm['type'] }))}>{MEETING_TYPES.map(t => <option key={t}>{t}</option>)}</select></Field>
-              <Field label="Date *"><input style={selectStyle} type="date" value={mtgForm.date} onChange={e => setMtgForm(f => ({ ...f, date: e.target.value }))} /></Field>
-              <Field label="Time *"><input style={selectStyle} type="time" value={mtgForm.time} onChange={e => setMtgForm(f => ({ ...f, time: e.target.value }))} /></Field>
-              <Field label="Duration"><input style={inputStyle} value={mtgForm.duration} onChange={e => setMtgForm(f => ({ ...f, duration: e.target.value }))} placeholder="e.g. 1h, 90m" /></Field>
+              <Field label="Type"><select aria-label="Meeting type" style={selectStyle} value={mtgForm.type} onChange={e => setMtgForm(f => ({ ...f, type: e.target.value as NewMeetingForm['type'] }))}>{MEETING_TYPES.map(t => <option key={t}>{t}</option>)}</select></Field>
+              <Field label="Date *"><input aria-label="Meeting date" style={selectStyle} type="date" value={mtgForm.date} onChange={e => setMtgForm(f => ({ ...f, date: e.target.value }))} /></Field>
+              <Field label="Time *"><input aria-label="Meeting time" style={selectStyle} type="time" value={mtgForm.time} onChange={e => setMtgForm(f => ({ ...f, time: e.target.value }))} /></Field>
+              <Field label="Duration"><input aria-label="Meeting duration" style={inputStyle} value={mtgForm.duration} onChange={e => setMtgForm(f => ({ ...f, duration: e.target.value }))} placeholder="e.g. 1h, 90m" /></Field>
             </div>
-            <Field label="Location"><input style={inputStyle} value={mtgForm.location} onChange={e => setMtgForm(f => ({ ...f, location: e.target.value }))} placeholder="e.g. Boardroom A, Virtual – Teams" /></Field>
-            <Field label="Participants (comma-separated)"><input style={inputStyle} value={mtgForm.participants} onChange={e => setMtgForm(f => ({ ...f, participants: e.target.value }))} placeholder="e.g. AM, SK, Client-CEO" /></Field>
+            <Field label="Location"><input aria-label="Meeting location" style={inputStyle} value={mtgForm.location} onChange={e => setMtgForm(f => ({ ...f, location: e.target.value }))} placeholder="e.g. Boardroom A, Virtual – Teams" /></Field>
+            <Field label="Participants (comma-separated)"><input aria-label="Meeting participants" style={inputStyle} value={mtgForm.participants} onChange={e => setMtgForm(f => ({ ...f, participants: e.target.value }))} placeholder="e.g. AM, SK, Client-CEO" /></Field>
             <ModalFooter onCancel={() => { setShowMtgModal(false); setMtgError(''); }} onConfirm={handleCreateMeeting} saving={mtgSaving} label="Schedule Meeting" />
           </div>
         </Modal>
@@ -1193,16 +1844,16 @@ export default function WorkspaceDetail() {
         <Modal title="Log Risk" onClose={() => { setShowRiskModal(false); setRiskError(''); }}>
           {riskError && <ErrorBanner msg={riskError} />}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
-            <Field label="Risk Title *"><input style={inputStyle} value={riskForm.title} onChange={e => setRiskForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Key stakeholder unavailability" /></Field>
+            <Field label="Risk Title *"><input aria-label="Risk title" style={inputStyle} value={riskForm.title} onChange={e => setRiskForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Key stakeholder unavailability" /></Field>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-              <Field label="Category"><select style={selectStyle} value={riskForm.category} onChange={e => setRiskForm(f => ({ ...f, category: e.target.value }))}>{RISK_CATEGORIES.map(c => <option key={c}>{c}</option>)}</select></Field>
-              <Field label="Severity"><select style={selectStyle} value={riskForm.severity} onChange={e => setRiskForm(f => ({ ...f, severity: e.target.value as NewRiskForm['severity'] }))}><option>Critical</option><option>High</option><option>Medium</option><option>Low</option></select></Field>
-              <Field label="Probability (1–5)"><select style={selectStyle} value={riskForm.probability} onChange={e => setRiskForm(f => ({ ...f, probability: e.target.value }))}>{['1','2','3','4','5'].map(n => <option key={n}>{n}</option>)}</select></Field>
-              <Field label="Impact (1–5)"><select style={selectStyle} value={riskForm.impact} onChange={e => setRiskForm(f => ({ ...f, impact: e.target.value }))}>{['1','2','3','4','5'].map(n => <option key={n}>{n}</option>)}</select></Field>
+              <Field label="Category"><select aria-label="Risk category" style={selectStyle} value={riskForm.category} onChange={e => setRiskForm(f => ({ ...f, category: e.target.value }))}>{RISK_CATEGORIES.map(c => <option key={c}>{c}</option>)}</select></Field>
+              <Field label="Severity"><select aria-label="Risk severity" style={selectStyle} value={riskForm.severity} onChange={e => setRiskForm(f => ({ ...f, severity: e.target.value as NewRiskForm['severity'] }))}><option>Critical</option><option>High</option><option>Medium</option><option>Low</option></select></Field>
+              <Field label="Probability (1–5)"><select aria-label="Risk probability" style={selectStyle} value={riskForm.probability} onChange={e => setRiskForm(f => ({ ...f, probability: e.target.value }))}>{['1','2','3','4','5'].map(n => <option key={n}>{n}</option>)}</select></Field>
+              <Field label="Impact (1–5)"><select aria-label="Risk impact" style={selectStyle} value={riskForm.impact} onChange={e => setRiskForm(f => ({ ...f, impact: e.target.value }))}>{['1','2','3','4','5'].map(n => <option key={n}>{n}</option>)}</select></Field>
             </div>
-            <Field label="Owner *"><input style={inputStyle} value={riskForm.owner} onChange={e => setRiskForm(f => ({ ...f, owner: e.target.value }))} placeholder="e.g. AM" /></Field>
-            <Field label="Mitigation Plan"><textarea style={{ ...inputStyle, resize: 'vertical' }} rows={2} value={riskForm.mitigation} onChange={e => setRiskForm(f => ({ ...f, mitigation: e.target.value }))} /></Field>
-            <Field label="Financial Exposure (SAR)"><input style={inputStyle} type="number" min="0" value={riskForm.financial_exposure} onChange={e => setRiskForm(f => ({ ...f, financial_exposure: e.target.value }))} placeholder="e.g. 500000" /></Field>
+            <Field label="Owner *"><input aria-label="Risk owner" style={inputStyle} value={riskForm.owner} onChange={e => setRiskForm(f => ({ ...f, owner: e.target.value }))} placeholder="e.g. AM" /></Field>
+            <Field label="Mitigation Plan"><textarea aria-label="Risk mitigation plan" style={{ ...inputStyle, resize: 'vertical' }} rows={2} value={riskForm.mitigation} onChange={e => setRiskForm(f => ({ ...f, mitigation: e.target.value }))} /></Field>
+            <Field label="Financial Exposure (SAR)"><input aria-label="Risk financial exposure" style={inputStyle} type="number" min="0" value={riskForm.financial_exposure} onChange={e => setRiskForm(f => ({ ...f, financial_exposure: e.target.value }))} placeholder="e.g. 500000" /></Field>
             <ModalFooter onCancel={() => { setShowRiskModal(false); setRiskError(''); }} onConfirm={handleCreateRisk} saving={riskSaving} label="Log Risk" />
           </div>
         </Modal>
@@ -1264,11 +1915,11 @@ function DeleteOrConfirm({ id, confirmDelete, setConfirmDelete, deleting, onDele
   return (
     <div style={{ display: 'flex', gap: '0.25rem' }}>
       {onEdit && (
-        <button className="btn-ghost" style={{ padding: '3px 5px', height: 'auto' }} onClick={onEdit} title="Edit">
+        <button className="btn-ghost" aria-label="Edit item" style={{ padding: '3px 5px', height: 'auto' }} onClick={onEdit} title="Edit">
           <Pencil size={11} style={{ color: '#475569' }} />
         </button>
       )}
-      <button className="btn-ghost" style={{ padding: '3px 5px', height: 'auto' }} onClick={() => setConfirmDelete(id)} title="Delete">
+      <button className="btn-ghost" aria-label="Delete item" style={{ padding: '3px 5px', height: 'auto' }} onClick={() => setConfirmDelete(id)} title="Delete">
         <Trash2 size={11} style={{ color: '#475569' }} />
       </button>
     </div>
@@ -1282,7 +1933,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
       <div style={{ background: '#0C1220', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', padding: '1.75rem', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <div style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9' }}>{title}</div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><X size={18} /></button>
+          <button onClick={onClose} aria-label="Close modal" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><X size={18} /></button>
         </div>
         {children}
       </div>

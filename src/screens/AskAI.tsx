@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Send, Mic, Plus, Sparkles, ChevronDown, Share2, History,
-  User, Image, FileText, Code2, MessageSquare, Bot, Menu, X,
+  User, Image, FileText, Code2, MessageSquare, Bot, Menu, X, Download, Eraser, ClipboardCopy, Search,
 } from 'lucide-react';
 import { useLayout } from '../hooks/useLayout';
 import {
@@ -298,6 +298,18 @@ export default function AskAI() {
   const [showSidebar, setShowSidebar] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [shareLabel, setShareLabel] = useState('Share');
+  const [threadSearch, setThreadSearch] = useState('');
+  const [threadPersonaFilter, setThreadPersonaFilter] = useState<string>('All');
+  const [threadSort, setThreadSort] = useState<'newest' | 'oldest' | 'messages' | 'title' | 'persona' | 'model'>('newest');
+  const [starredThreads, setStarredThreads] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('askai_starred_threads') ?? '[]')); } catch { return new Set(); }
+  });
+  const [starredOnly, setStarredOnly] = useState(false);
+  const [activeThreadsOnly, setActiveThreadsOnly] = useState(false);
+  const [copiedLastResponse, setCopiedLastResponse] = useState(false);
+  const [copiedFullConversation, setCopiedFullConversation] = useState(false);
+  const [txtExported, setTxtExported] = useState(false);
+  const [messageSearch, setMessageSearch] = useState('');
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -419,6 +431,83 @@ export default function AskAI() {
     }
   }, [messages, selectedPersona]);
 
+  const handleExportTxt = useCallback(() => {
+    if (messages.length === 0) return;
+    const date = new Date().toISOString().slice(0, 10);
+    const lines: string[] = [
+      `AI Conversation – ${selectedPersona.name}`,
+      `Exported: ${date} | Model: ${selectedModel.label}`,
+      '',
+    ];
+    for (const msg of messages) {
+      const role = msg.role === 'user' ? 'You' : (msg.persona ?? selectedPersona.name);
+      lines.push(`${role}:`, msg.content, '');
+    }
+    const txt = lines.join('\n');
+    const blob = new Blob([txt], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `conversation_${date}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setTxtExported(true);
+    setTimeout(() => setTxtExported(false), 2000);
+  }, [messages, selectedPersona, selectedModel]);
+
+  const handleExportMarkdown = useCallback(() => {
+    if (messages.length === 0) return;
+    const date = new Date().toISOString().slice(0, 10);
+    const lines = [
+      `# AI Conversation – ${selectedPersona.name}`,
+      `> Exported ${date} | Model: ${selectedModel.label}`,
+      '',
+    ];
+    for (const msg of messages) {
+      const header = msg.role === 'user' ? '## User' : `## ${msg.persona ?? selectedPersona.name}`;
+      lines.push(header, '', msg.content, '');
+    }
+    const md = lines.join('\n');
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `conversation_${date}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [messages, selectedPersona, selectedModel]);
+
+  const handleClearChat = useCallback(() => {
+    if (window.confirm('Clear this conversation?')) {
+      setMessages([]);
+    }
+  }, []);
+
+  const handleCopyFullConversation = useCallback(() => {
+    if (messages.length === 0) return;
+    const text = messages.map(m => {
+      const role = m.role === 'user' ? 'You' : (m.persona ?? selectedPersona.name);
+      return `${role}:\n${m.content}`;
+    }).join('\n\n---\n\n');
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedFullConversation(true);
+      setTimeout(() => setCopiedFullConversation(false), 2000);
+    }).catch(() => {});
+  }, [messages, selectedPersona]);
+
+  const handleCopyLastResponse = useCallback(() => {
+    const lastAI = [...messages].reverse().find(m => m.role === 'assistant');
+    if (!lastAI) return;
+    navigator.clipboard.writeText(lastAI.content).then(() => {
+      setCopiedLastResponse(true);
+      setTimeout(() => setCopiedLastResponse(false), 2000);
+    }).catch(() => {});
+  }, [messages]);
+
   const saveCurrentThread = useCallback((msgs: ChatMessage[]) => {
     if (msgs.length === 0) return;
     const firstUser = msgs.find(m => m.role === 'user');
@@ -462,6 +551,34 @@ export default function AskAI() {
     buildRAGContext().then(setRagContext);
   };
 
+  const handleDeleteThread = (threadId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = threads.filter(t => t.id !== threadId);
+    setThreads(updated);
+    saveThreads(updated);
+    if (selectedThread === threadId) {
+      setMessages([]);
+      setSelectedThread(null);
+    }
+  };
+
+  const handleClearAllThreads = () => {
+    setThreads([]);
+    saveThreads([]);
+    setMessages([]);
+    setSelectedThread(null);
+  };
+
+  function handleToggleStarThread(threadId: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    setStarredThreads(prev => {
+      const next = new Set(prev);
+      if (next.has(threadId)) next.delete(threadId); else next.add(threadId);
+      try { localStorage.setItem('askai_starred_threads', JSON.stringify([...next])); } catch { /* ignore */ }
+      return next;
+    });
+  }
+
   // ── Render ──────────────────────────────────────────────────
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#080C18', color: '#F1F5F9', overflow: 'hidden' }}>
@@ -481,6 +598,7 @@ export default function AskAI() {
                 background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
                 color: '#94A3B8', cursor: 'pointer', flexShrink: 0,
               }}
+              aria-label="Toggle sidebar"
             >
               <Menu size={16} />
             </button>
@@ -508,6 +626,8 @@ export default function AskAI() {
                   border: showHistory ? '1px solid rgba(16,185,129,0.25)' : '1px solid rgba(255,255,255,0.08)',
                   color: showHistory ? '#10B981' : '#94A3B8', fontSize: '0.8rem', cursor: 'pointer',
                 }}
+                aria-label="Toggle history"
+                aria-expanded={showHistory}
               >
                 <History size={14} /> History
               </button>
@@ -542,6 +662,82 @@ export default function AskAI() {
                 </div>
               )}
             </div>
+            {/* Export buttons */}
+            <button
+              onClick={handleExportMarkdown}
+              disabled={messages.length === 0}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8,
+                background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+                color: messages.length === 0 ? '#334155' : '#94A3B8', fontSize: '0.8rem',
+                cursor: messages.length === 0 ? 'not-allowed' : 'pointer', opacity: messages.length === 0 ? 0.5 : 1,
+              }}
+              aria-label="Export conversation as Markdown"
+            >
+              <Download size={14} /> Export MD
+            </button>
+            <button
+              onClick={handleExportTxt}
+              disabled={messages.length === 0}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8,
+                background: txtExported ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.05)',
+                border: txtExported ? '1px solid rgba(16,185,129,0.25)' : '1px solid rgba(255,255,255,0.08)',
+                color: messages.length === 0 ? '#334155' : txtExported ? '#10B981' : '#94A3B8', fontSize: '0.8rem',
+                cursor: messages.length === 0 ? 'not-allowed' : 'pointer', opacity: messages.length === 0 ? 0.5 : 1,
+              }}
+              aria-label="Export conversation as TXT"
+            >
+              <Download size={14} /> {txtExported ? 'Exported!' : 'Export TXT'}
+            </button>
+            {/* Copy Last AI Response button */}
+            <button
+              onClick={handleCopyLastResponse}
+              disabled={!messages.some(m => m.role === 'assistant')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8,
+                background: copiedLastResponse ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.05)',
+                border: copiedLastResponse ? '1px solid rgba(16,185,129,0.25)' : '1px solid rgba(255,255,255,0.08)',
+                color: !messages.some(m => m.role === 'assistant') ? '#334155' : copiedLastResponse ? '#10B981' : '#94A3B8',
+                fontSize: '0.8rem',
+                cursor: !messages.some(m => m.role === 'assistant') ? 'not-allowed' : 'pointer',
+                opacity: !messages.some(m => m.role === 'assistant') ? 0.5 : 1,
+              }}
+              aria-label="Copy last AI response to clipboard"
+            >
+              <ClipboardCopy size={14} /> {copiedLastResponse ? 'Copied!' : 'Copy'}
+            </button>
+            {/* Copy Full Conversation button */}
+            <button
+              onClick={handleCopyFullConversation}
+              disabled={messages.length === 0}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8,
+                background: copiedFullConversation ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.05)',
+                border: copiedFullConversation ? '1px solid rgba(16,185,129,0.25)' : '1px solid rgba(255,255,255,0.08)',
+                color: messages.length === 0 ? '#334155' : copiedFullConversation ? '#10B981' : '#94A3B8',
+                fontSize: '0.8rem',
+                cursor: messages.length === 0 ? 'not-allowed' : 'pointer',
+                opacity: messages.length === 0 ? 0.5 : 1,
+              }}
+              aria-label="Copy full conversation to clipboard"
+            >
+              <ClipboardCopy size={14} /> {copiedFullConversation ? 'Copied!' : 'Copy All'}
+            </button>
+            {/* Clear Chat button */}
+            <button
+              onClick={handleClearChat}
+              disabled={messages.length === 0}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8,
+                background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+                color: messages.length === 0 ? '#334155' : '#94A3B8', fontSize: '0.8rem',
+                cursor: messages.length === 0 ? 'not-allowed' : 'pointer', opacity: messages.length === 0 ? 0.5 : 1,
+              }}
+              aria-label="Clear Chat"
+            >
+              <Eraser size={14} /> Clear
+            </button>
             {/* Share button */}
             <button
               onClick={handleShare}
@@ -551,6 +747,7 @@ export default function AskAI() {
                 border: shareLabel === 'Copied!' ? '1px solid rgba(16,185,129,0.25)' : '1px solid rgba(255,255,255,0.08)',
                 color: shareLabel === 'Copied!' ? '#10B981' : '#94A3B8', fontSize: '0.8rem', cursor: 'pointer',
               }}
+              aria-label="Share conversation"
             >
               <Share2 size={14} /> {shareLabel}
             </button>
@@ -593,6 +790,7 @@ export default function AskAI() {
                   background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
                   color: '#94A3B8', cursor: 'pointer',
                 }}
+                aria-label="Close sidebar"
               >
                 <X size={14} />
               </button>
@@ -602,34 +800,141 @@ export default function AskAI() {
           <div style={{ padding: '16px 14px 8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
               <span style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.08em', color: '#64748B', textTransform: 'uppercase' }}>Recent Threads</span>
-              <button
-                onClick={handleNewThread}
-                style={{
-                  width: 24, height: 24, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)',
-                  color: '#10B981', cursor: 'pointer',
-                }}
-              >
-                <Plus size={13} />
-              </button>
+              <div style={{ display: 'flex', gap: '0.3rem' }}>
+                {threads.length > 0 && (
+                  <button
+                    onClick={handleClearAllThreads}
+                    style={{
+                      width: 24, height: 24, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
+                      color: '#FCA5A5', cursor: 'pointer',
+                    }}
+                    aria-label="Clear all threads"
+                    title="Clear all threads"
+                  >
+                    <Eraser size={12} />
+                  </button>
+                )}
+                <button
+                  onClick={handleNewThread}
+                  style={{
+                    width: 24, height: 24, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)',
+                    color: '#10B981', cursor: 'pointer',
+                  }}
+                  aria-label="New thread"
+                >
+                  <Plus size={13} />
+                </button>
+              </div>
             </div>
+            {threads.length > 0 && (
+              <input
+                type="text"
+                aria-label="Search threads"
+                placeholder="Search threads…"
+                value={threadSearch}
+                onChange={e => setThreadSearch(e.target.value)}
+                style={{
+                  width: '100%', boxSizing: 'border-box',
+                  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 6, color: '#CBD5E1', fontSize: '0.75rem',
+                  padding: '5px 8px', marginBottom: 6, outline: 'none',
+                }}
+              />
+            )}
+            {/* Persona filter */}
+            <select
+              aria-label="Filter threads by persona"
+              value={threadPersonaFilter}
+              onChange={e => setThreadPersonaFilter(e.target.value)}
+              style={{ width: '100%', boxSizing: 'border-box', fontSize: '0.72rem', padding: '4px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#94A3B8', fontFamily: 'inherit', marginBottom: 6, outline: 'none', cursor: 'pointer' }}
+            >
+              <option value="All">All Personas</option>
+              {PERSONAS.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            <select
+              aria-label="Sort threads"
+              value={threadSort}
+              onChange={e => setThreadSort(e.target.value as typeof threadSort)}
+              style={{ width: '100%', boxSizing: 'border-box', fontSize: '0.72rem', padding: '4px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#94A3B8', fontFamily: 'inherit', marginBottom: 6, outline: 'none', cursor: 'pointer' }}
+            >
+              <option value="newest">Newest First</option>
+              <option value="oldest">Oldest First</option>
+              <option value="messages">Most Messages</option>
+              <option value="title">Title A–Z</option>
+              <option value="persona">Persona</option>
+              <option value="model">Model A–Z</option>
+            </select>
+            {threads.length > 0 && (
+              <>
+                <button
+                  onClick={() => setStarredOnly(v => !v)}
+                  aria-label="Show starred threads only"
+                  aria-pressed={starredOnly}
+                  style={{ width: '100%', marginBottom: 4, fontSize: '0.72rem', padding: '4px 8px', borderRadius: 6, background: starredOnly ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.04)', border: starredOnly ? '1px solid rgba(245,158,11,0.3)' : '1px solid rgba(255,255,255,0.08)', color: starredOnly ? '#FCD34D' : '#94A3B8', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }}
+                >
+                  ⭐ Starred only
+                </button>
+                <button
+                  onClick={() => setActiveThreadsOnly(v => !v)}
+                  aria-label="Show active threads only"
+                  aria-pressed={activeThreadsOnly}
+                  style={{ width: '100%', marginBottom: 6, fontSize: '0.72rem', padding: '4px 8px', borderRadius: 6, background: activeThreadsOnly ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.04)', border: activeThreadsOnly ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,255,255,0.08)', color: activeThreadsOnly ? '#34D399' : '#94A3B8', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }}
+                >
+                  ✓ Active only
+                </button>
+              </>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {threads.length === 0 ? (
                 <div style={{ fontSize: '0.75rem', color: '#475569', padding: '8px 10px' }}>No saved threads yet. Start chatting!</div>
-              ) : threads.map(t => (
-                <button
-                  key={t.id}
-                  onClick={() => handleLoadThread(t)}
-                  style={{
-                    textAlign: 'left', padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
-                    background: selectedThread === t.id ? 'rgba(16,185,129,0.10)' : 'transparent',
-                    border: selectedThread === t.id ? '1px solid rgba(16,185,129,0.2)' : '1px solid transparent',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  <div style={{ fontSize: '0.8rem', fontWeight: 500, color: selectedThread === t.id ? '#F1F5F9' : '#CBD5E1', lineHeight: 1.3 }}>{t.title}</div>
-                  <div style={{ fontSize: '0.65rem', color: '#475569', marginTop: 2 }}>{t.time}</div>
-                </button>
+              ) : (threadSort === 'oldest'
+                  ? [...threads].reverse()
+                  : threadSort === 'messages'
+                  ? [...threads].sort((a, b) => b.messages.length - a.messages.length)
+                  : threadSort === 'title'
+                  ? [...threads].sort((a, b) => a.title.localeCompare(b.title))
+                  : threadSort === 'persona'
+                  ? [...threads].sort((a, b) => (a.personaId ?? '').localeCompare(b.personaId ?? ''))
+                  : threadSort === 'model'
+                  ? [...threads].sort((a, b) => (a.modelId ?? '').localeCompare(b.modelId ?? ''))
+                  : threads
+                ).filter(t =>
+                  (!threadSearch.trim() || t.title.toLowerCase().includes(threadSearch.toLowerCase())) &&
+                  (threadPersonaFilter === 'All' || t.personaId === threadPersonaFilter) &&
+                  (!starredOnly || starredThreads.has(t.id)) &&
+                  (!activeThreadsOnly || t.messages.length > 0)
+                ).map(t => (
+                <div key={t.id} style={{ display: 'flex', alignItems: 'stretch', gap: 4 }}>
+                  <button
+                    onClick={() => handleLoadThread(t)}
+                    style={{
+                      flex: 1, textAlign: 'left', padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
+                      background: selectedThread === t.id ? 'rgba(16,185,129,0.10)' : 'transparent',
+                      border: selectedThread === t.id ? '1px solid rgba(16,185,129,0.2)' : '1px solid transparent',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <div style={{ fontSize: '0.8rem', fontWeight: 500, color: selectedThread === t.id ? '#F1F5F9' : '#CBD5E1', lineHeight: 1.3 }}>{starredThreads.has(t.id) ? '⭐ ' : ''}{t.title}</div>
+                    <div style={{ fontSize: '0.65rem', color: '#475569', marginTop: 2 }}>{t.time}</div>
+                  </button>
+                  <button
+                    aria-label={`${starredThreads.has(t.id) ? 'Unstar' : 'Star'} thread: ${t.title}`}
+                    aria-pressed={starredThreads.has(t.id)}
+                    onClick={(e) => handleToggleStarThread(t.id, e)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: starredThreads.has(t.id) ? '#F59E0B' : '#475569', padding: '4px 4px', borderRadius: 6, flexShrink: 0, display: 'flex', alignItems: 'center', fontSize: '0.75rem' }}
+                  >
+                    ⭐
+                  </button>
+                  <button
+                    aria-label={`Delete thread: ${t.title}`}
+                    onClick={(e) => handleDeleteThread(t.id, e)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px 6px', borderRadius: 6, flexShrink: 0, display: 'flex', alignItems: 'center' }}
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
               ))}
             </div>
           </div>
@@ -647,6 +952,8 @@ export default function AskAI() {
                   <button
                     key={p.id}
                     onClick={() => setSelectedPersona(p)}
+                    aria-label={`Persona: ${p.name}`}
+                    aria-pressed={active}
                     style={{
                       display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px', borderRadius: 10,
                       textAlign: 'left', cursor: 'pointer', transition: 'all 0.15s',
@@ -725,7 +1032,29 @@ export default function AskAI() {
               </div>
             )}
 
-            {messages.map(msg => (
+            {messages.length > 0 && (
+              <div style={{ marginBottom: 16, position: 'relative' }}>
+                <Search size={13} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: '#475569', pointerEvents: 'none' }} />
+                <input
+                  aria-label="Search messages in this conversation"
+                  placeholder="Search messages…"
+                  value={messageSearch}
+                  onChange={e => setMessageSearch(e.target.value)}
+                  style={{ width: '100%', paddingLeft: '2.25rem', paddingRight: messageSearch ? '2rem' : '0.75rem', height: '34px', fontSize: '0.78rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: '#CBD5E1', outline: 'none', boxSizing: 'border-box' }}
+                />
+                {messageSearch && (
+                  <button
+                    onClick={() => setMessageSearch('')}
+                    aria-label="Clear message search"
+                    style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', padding: 0 }}
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {(messageSearch ? messages.filter(m => m.content.toLowerCase().includes(messageSearch.toLowerCase())) : messages).map(msg => (
               <div
                 key={msg.id}
                 style={{
@@ -833,6 +1162,7 @@ export default function AskAI() {
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Ask anything about your projects, risks, data..."
+                aria-label="Chat input"
                 rows={1}
                 style={{
                   flex: 1, resize: 'none', background: 'transparent', border: 'none', outline: 'none',
@@ -847,17 +1177,21 @@ export default function AskAI() {
               />
 
               {/* Mic */}
-              <button style={{
-                width: 34, height: 34, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)',
-                color: '#64748B', cursor: 'pointer', flexShrink: 0,
-              }}>
+              <button
+                aria-label="Voice input"
+                style={{
+                  width: 34, height: 34, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)',
+                  color: '#64748B', cursor: 'pointer', flexShrink: 0,
+                }}>
                 <Mic size={15} />
               </button>
 
               {/* Model selector */}
               <div ref={modelDropdownRef} style={{ position: 'relative', flexShrink: 0 }}>
                 <button
+                  aria-label="Select model"
+                  aria-expanded={showModelDropdown}
                   onClick={() => setShowModelDropdown(v => !v)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 5, padding: '7px 10px', borderRadius: 8,
@@ -879,6 +1213,8 @@ export default function AskAI() {
                     {MODELS.map(m => (
                       <button
                         key={m.id}
+                        aria-label={`Model: ${m.label}`}
+                        aria-pressed={selectedModel.id === m.id}
                         onClick={() => { setSelectedModel(m); setShowModelDropdown(false); }}
                         style={{
                           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -914,6 +1250,7 @@ export default function AskAI() {
                   color: input.trim() && !isLoading ? '#fff' : '#475569',
                   transition: 'all 0.2s', flexShrink: 0,
                 }}
+                aria-label="Send message"
               >
                 <Send size={16} />
               </button>
