@@ -5,7 +5,7 @@ import {
   Plus, Video, Users, Clock, CheckCircle, FileText,
   ChevronRight, Calendar, MapPin, Search, Upload,
   Loader2, X, Pencil, Trash2, Monitor, FolderOpen,
-  TrendingUp, Sparkles, MessageSquareQuote, Copy, Download, ClipboardCopy,
+  TrendingUp, Sparkles, MessageSquareQuote, Copy, Download, ClipboardCopy, Bell,
 } from 'lucide-react';
 import { getMeetings, updateMeeting, upsertMeeting, deleteMeeting, getWorkspaces, upsertDocument } from '../lib/db';
 import type { MeetingRow, WorkspaceRow } from '../lib/db';
@@ -138,6 +138,9 @@ export default function Meetings() {
   const [starredMeetings, setStarredMeetings] = useState<Set<string>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem('meetings_starred') ?? '[]')); } catch { return new Set(); }
   });
+  const [reminderIds, setReminderIds] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('meetings_reminders') ?? '[]')); } catch { return new Set(); }
+  });
   const [starredMeetingsOnly, setStarredMeetingsOnly] = useState(false);
   const [meetingsSummaryCopied, setMeetingsSummaryCopied] = useState(false);
   const [meetingsTxtExported, setMeetingsTxtExported] = useState(false);
@@ -169,6 +172,17 @@ export default function Meetings() {
       if (next.has(meetingId)) next.delete(meetingId);
       else next.add(meetingId);
       try { localStorage.setItem('meetings_starred', JSON.stringify([...next])); } catch { /* ignore */ }
+      return next;
+    });
+  }
+
+  function handleToggleReminder(meetingId: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    setReminderIds(prev => {
+      const next = new Set(prev);
+      if (next.has(meetingId)) next.delete(meetingId);
+      else next.add(meetingId);
+      try { localStorage.setItem('meetings_reminders', JSON.stringify([...next])); } catch { /* ignore */ }
       return next;
     });
   }
@@ -945,6 +959,21 @@ export default function Meetings() {
                           }}
                         >
                           {starredMeetings.has(meeting.id) ? '⭐' : '☆'}
+                        </button>
+                        <button
+                          onClick={e => handleToggleReminder(meeting.id, e)}
+                          aria-label={reminderIds.has(meeting.id) ? `Remove reminder: ${meeting.title}` : `Set reminder: ${meeting.title}`}
+                          aria-pressed={reminderIds.has(meeting.id)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '3px',
+                            fontSize: '0.62rem', fontWeight: 500, padding: '3px 8px', borderRadius: '5px',
+                            background: reminderIds.has(meeting.id) ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.04)',
+                            color: reminderIds.has(meeting.id) ? '#818CF8' : '#64748B',
+                            border: reminderIds.has(meeting.id) ? '1px solid rgba(99,102,241,0.3)' : '1px solid rgba(255,255,255,0.08)',
+                            cursor: 'pointer', fontFamily: 'inherit',
+                          }}
+                        >
+                          <Bell size={10} /> {reminderIds.has(meeting.id) ? 'Reminded' : 'Remind'}
                         </button>
                         <button
                           onClick={e => openEditModal(meeting, e)}

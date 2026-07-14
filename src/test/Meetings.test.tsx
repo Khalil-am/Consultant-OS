@@ -5102,3 +5102,100 @@ describe('Meetings – Quorum Filter', () => {
     });
   });
 });
+
+// ────────────────────────────────────────────────────────────
+describe('Meetings – Reminder Toggle', () => {
+  afterEach(() => localStorage.clear());
+
+  it('renders a Set reminder button for each meeting card', async () => {
+    mockGetMeetings.mockResolvedValueOnce([mockMeeting]);
+    renderMeetings();
+    expect(await screen.findByRole('button', { name: /set reminder: sprint planning/i })).toBeInTheDocument();
+  });
+
+  it('reminder button has aria-pressed false initially', async () => {
+    mockGetMeetings.mockResolvedValueOnce([mockMeeting]);
+    renderMeetings();
+    const btn = await screen.findByRole('button', { name: /set reminder: sprint planning/i });
+    expect(btn).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('clicking reminder button sets aria-pressed true', async () => {
+    mockGetMeetings.mockResolvedValueOnce([mockMeeting]);
+    renderMeetings();
+    const btn = await screen.findByRole('button', { name: /set reminder: sprint planning/i });
+    await userEvent.click(btn);
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /remove reminder: sprint planning/i })).toHaveAttribute('aria-pressed', 'true');
+    });
+  });
+
+  it('button label changes to Remove reminder after clicking', async () => {
+    mockGetMeetings.mockResolvedValueOnce([mockMeeting]);
+    renderMeetings();
+    const btn = await screen.findByRole('button', { name: /set reminder: sprint planning/i });
+    await userEvent.click(btn);
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /remove reminder: sprint planning/i })).toBeInTheDocument();
+    });
+  });
+
+  it('clicking again toggles reminder off', async () => {
+    mockGetMeetings.mockResolvedValueOnce([mockMeeting]);
+    renderMeetings();
+    const btn = await screen.findByRole('button', { name: /set reminder: sprint planning/i });
+    await userEvent.click(btn);
+    await waitFor(() => screen.getByRole('button', { name: /remove reminder: sprint planning/i }));
+    await userEvent.click(screen.getByRole('button', { name: /remove reminder: sprint planning/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /set reminder: sprint planning/i })).toHaveAttribute('aria-pressed', 'false');
+    });
+  });
+
+  it('persists reminder to localStorage', async () => {
+    mockGetMeetings.mockResolvedValueOnce([mockMeeting]);
+    renderMeetings();
+    const btn = await screen.findByRole('button', { name: /set reminder: sprint planning/i });
+    await userEvent.click(btn);
+    await waitFor(() => {
+      const stored = JSON.parse(localStorage.getItem('meetings_reminders') ?? '[]');
+      expect(stored).toContain('m1');
+    });
+  });
+
+  it('persists removal to localStorage', async () => {
+    localStorage.setItem('meetings_reminders', JSON.stringify(['m1']));
+    mockGetMeetings.mockResolvedValueOnce([mockMeeting]);
+    renderMeetings();
+    await waitFor(() => screen.getByRole('button', { name: /remove reminder: sprint planning/i }));
+    await userEvent.click(screen.getByRole('button', { name: /remove reminder: sprint planning/i }));
+    await waitFor(() => {
+      const stored = JSON.parse(localStorage.getItem('meetings_reminders') ?? '[]');
+      expect(stored).not.toContain('m1');
+    });
+  });
+
+  it('loads reminder state from localStorage on mount', async () => {
+    localStorage.setItem('meetings_reminders', JSON.stringify(['m1']));
+    mockGetMeetings.mockResolvedValueOnce([mockMeeting]);
+    renderMeetings();
+    expect(await screen.findByRole('button', { name: /remove reminder: sprint planning/i })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('shows Reminded text when reminder is active', async () => {
+    mockGetMeetings.mockResolvedValueOnce([mockMeeting]);
+    renderMeetings();
+    const btn = await screen.findByRole('button', { name: /set reminder: sprint planning/i });
+    await userEvent.click(btn);
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /remove reminder: sprint planning/i })).toHaveTextContent('Reminded');
+    });
+  });
+
+  it('shows Remind text when reminder is inactive', async () => {
+    mockGetMeetings.mockResolvedValueOnce([mockMeeting]);
+    renderMeetings();
+    const btn = await screen.findByRole('button', { name: /set reminder: sprint planning/i });
+    expect(btn).toHaveTextContent('Remind');
+  });
+});
