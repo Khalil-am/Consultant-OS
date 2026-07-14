@@ -207,6 +207,29 @@ export default function Tasks() {
   const [paymentOnly, setPaymentOnly] = useState(false);
   const [clientFilter, setClientFilter] = useState<string>('All');
   const [labelFilter, setLabelFilter] = useState<string>('All');
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
+
+  function handleToggleBulkSelect(taskId: string) {
+    setBulkSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId); else next.add(taskId);
+      return next;
+    });
+  }
+  function handleBulkStarSelected() {
+    setBulkSelected(prev => {
+      const ids = [...prev];
+      setStarredTasks(starred => {
+        const next = new Set(starred);
+        const allStarred = ids.every(id => next.has(id));
+        ids.forEach(id => { if (allStarred) next.delete(id); else next.add(id); });
+        try { localStorage.setItem(STARRED_TASKS_KEY, JSON.stringify([...next])); } catch { /* ignore */ }
+        return next;
+      });
+      return new Set();
+    });
+  }
+  function handleClearBulkSelection() { setBulkSelected(new Set()); }
 
   // ── Data loading from Trello ────────────────────────────────
   async function loadFromTrello() {
@@ -747,17 +770,38 @@ export default function Tasks() {
           {/* Table header */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr auto' : 'minmax(0, 2fr) 90px 110px minmax(100px, 140px) minmax(80px, 120px) 90px auto',
+            gridTemplateColumns: isMobile ? '24px 1fr auto' : '24px minmax(0, 2fr) 90px 110px minmax(100px, 140px) minmax(80px, 120px) 90px auto',
             gap: '0', padding: '0.6rem 1rem',
             background: 'var(--bg-elevated)',
             borderBottom: '1px solid var(--border-subtle)',
           }}>
-            {['Card', ...(isMobile ? [] : ['Priority', 'Status', 'List', 'Client', 'Due Date', ''])].map((h, i) => (
+            {['', 'Card', ...(isMobile ? [] : ['Priority', 'Status', 'List', 'Client', 'Due Date', ''])].map((h, i) => (
               <div key={i} style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '0 0.5rem', textAlign: i > 0 && i < 6 ? 'center' : 'left' }}>
                 {h}
               </div>
             ))}
           </div>
+
+          {/* Bulk action bar */}
+          {bulkSelected.size > 0 && (
+            <div style={{ padding: '0.5rem 1rem', background: 'rgba(14,165,233,0.06)', borderBottom: '1px solid rgba(14,165,233,0.15)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <span style={{ fontSize: '0.75rem', color: '#0EA5E9', fontWeight: 600 }}>
+                {bulkSelected.size} task{bulkSelected.size !== 1 ? 's' : ''} selected
+              </span>
+              <div style={{ display: 'flex', gap: '0.375rem', marginLeft: 'auto' }}>
+                <button
+                  aria-label="Star selected tasks"
+                  onClick={handleBulkStarSelected}
+                  style={{ padding: '3px 10px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 500, background: 'rgba(251,191,36,0.1)', color: '#FBBF24', border: '1px solid rgba(251,191,36,0.25)', cursor: 'pointer', fontFamily: 'inherit' }}
+                >Star</button>
+                <button
+                  aria-label="Clear task selection"
+                  onClick={handleClearBulkSelection}
+                  style={{ padding: '3px 10px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 500, background: 'rgba(255,255,255,0.06)', color: '#94A3B8', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', fontFamily: 'inherit' }}
+                >Clear</button>
+              </div>
+            </div>
+          )}
 
           {/* Card rows */}
           <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -768,7 +812,7 @@ export default function Tasks() {
 
               const rowStyle: React.CSSProperties = {
                 display: 'grid',
-                gridTemplateColumns: isMobile ? '1fr auto' : 'minmax(0, 2fr) 90px 110px minmax(100px, 140px) minmax(80px, 120px) 90px auto',
+                gridTemplateColumns: isMobile ? '24px 1fr auto' : '24px minmax(0, 2fr) 90px 110px minmax(100px, 140px) minmax(80px, 120px) 90px auto',
                 gap: '0',
                 padding: '0.75rem 1rem',
                 borderBottom: idx < filtered.length - 1 ? '1px solid var(--border-subtle)' : 'none',
@@ -783,6 +827,16 @@ export default function Tasks() {
 
               const cardContent = (
                 <>
+                  {/* Checkbox */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', paddingLeft: '0.25rem' }} onClick={e => e.preventDefault()}>
+                    <input
+                      type="checkbox"
+                      aria-label={`Select task: ${card.name}`}
+                      checked={bulkSelected.has(card.id)}
+                      onChange={() => handleToggleBulkSelect(card.id)}
+                      style={{ cursor: 'pointer', accentColor: '#0EA5E9', width: 14, height: 14 }}
+                    />
+                  </div>
                   {/* Title + members + meta */}
                   <div style={{ padding: '0 0.5rem', minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>

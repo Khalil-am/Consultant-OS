@@ -5978,3 +5978,116 @@ describe('Tasks – Overdue Only Filter', () => {
     });
   });
 });
+
+// ─────────────────────────────────────────────────────────────
+describe('Tasks – Bulk Selection', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    const board = {
+      cards: [mockCard, mockCard2, mockCompletedCard],
+      lists: [mockList, { id: 'list-2', name: 'Backlog' }, { id: 'list-3', name: 'Done' }],
+      boardName: 'BA Traffic Board',
+    };
+    mockFetchBATrafficBoard.mockResolvedValue(board);
+  });
+
+  it('renders a checkbox for each task row', async () => {
+    renderTasks();
+    await screen.findByText('Review BRD for NCA');
+    const checkboxes = screen.getAllByRole('checkbox');
+    expect(checkboxes.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('checkbox aria-label includes task name', async () => {
+    renderTasks();
+    await screen.findByText('Review BRD for NCA');
+    expect(screen.getByRole('checkbox', { name: /Select task: Review BRD for NCA/i })).toBeInTheDocument();
+  });
+
+  it('checkboxes start unchecked', async () => {
+    renderTasks();
+    await screen.findByText('Review BRD for NCA');
+    const checkbox = screen.getByRole('checkbox', { name: /Select task: Review BRD for NCA/i }) as HTMLInputElement;
+    expect(checkbox.checked).toBe(false);
+  });
+
+  it('clicking a checkbox selects the task and shows bulk action bar', async () => {
+    renderTasks();
+    await screen.findByText('Review BRD for NCA');
+    const checkbox = screen.getByRole('checkbox', { name: /Select task: Review BRD for NCA/i });
+    await userEvent.click(checkbox);
+    await waitFor(() => {
+      expect(screen.getByText(/1 task selected/i)).toBeInTheDocument();
+    });
+  });
+
+  it('selecting two tasks shows "2 tasks selected"', async () => {
+    renderTasks();
+    await screen.findByText('Review BRD for NCA');
+    await userEvent.click(screen.getByRole('checkbox', { name: /Select task: Review BRD for NCA/i }));
+    await userEvent.click(screen.getByRole('checkbox', { name: /Select task: MOCI Procurement Analysis/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/2 tasks selected/i)).toBeInTheDocument();
+    });
+  });
+
+  it('bulk action bar shows "Star" button', async () => {
+    renderTasks();
+    await screen.findByText('Review BRD for NCA');
+    await userEvent.click(screen.getByRole('checkbox', { name: /Select task: Review BRD for NCA/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /star selected tasks/i })).toBeInTheDocument();
+    });
+  });
+
+  it('bulk action bar shows "Clear" button', async () => {
+    renderTasks();
+    await screen.findByText('Review BRD for NCA');
+    await userEvent.click(screen.getByRole('checkbox', { name: /Select task: Review BRD for NCA/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /clear task selection/i })).toBeInTheDocument();
+    });
+  });
+
+  it('clicking Clear removes bulk selection', async () => {
+    renderTasks();
+    await screen.findByText('Review BRD for NCA');
+    await userEvent.click(screen.getByRole('checkbox', { name: /Select task: Review BRD for NCA/i }));
+    await waitFor(() => expect(screen.getByText(/1 task selected/i)).toBeInTheDocument());
+    await userEvent.click(screen.getByRole('button', { name: /clear task selection/i }));
+    await waitFor(() => {
+      expect(screen.queryByText(/task selected/i)).not.toBeInTheDocument();
+    });
+  });
+
+  it('bulk action bar shows selected count correctly for three selected tasks', async () => {
+    renderTasks();
+    await screen.findByText('Review BRD for NCA');
+    await userEvent.click(screen.getByRole('checkbox', { name: /Select task: Review BRD for NCA/i }));
+    await userEvent.click(screen.getByRole('checkbox', { name: /Select task: MOCI Procurement Analysis/i }));
+    await userEvent.click(screen.getByRole('checkbox', { name: /Select task: Completed Requirements Gathering/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/3 tasks selected/i)).toBeInTheDocument();
+    });
+  });
+
+  it('bulk action bar not shown when no tasks selected', async () => {
+    renderTasks();
+    await screen.findByText('Review BRD for NCA');
+    expect(screen.queryByText(/task selected/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /clear task selection/i })).not.toBeInTheDocument();
+  });
+
+  it('clicking Star bulk-stars all selected tasks', async () => {
+    renderTasks();
+    await screen.findByText('Review BRD for NCA');
+    await userEvent.click(screen.getByRole('checkbox', { name: /Select task: Review BRD for NCA/i }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /star selected tasks/i })).toBeInTheDocument());
+    await userEvent.click(screen.getByRole('button', { name: /star selected tasks/i }));
+    await waitFor(() => {
+      const starred = JSON.parse(localStorage.getItem('tasks_starred') ?? '[]') as string[];
+      expect(starred).toContain('card-1');
+    });
+  });
+});
