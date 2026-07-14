@@ -5,13 +5,38 @@ import {
   Plus, Video, Users, Clock, CheckCircle, FileText,
   ChevronRight, Calendar, MapPin, Search, Upload,
   Loader2, X, Pencil, Trash2, Monitor, FolderOpen,
-  TrendingUp, Sparkles, MessageSquareQuote,
+  TrendingUp, Sparkles, MessageSquareQuote, Copy, Download, ClipboardCopy,
 } from 'lucide-react';
 import { getMeetings, updateMeeting, upsertMeeting, deleteMeeting, getWorkspaces, upsertDocument } from '../lib/db';
 import type { MeetingRow, WorkspaceRow } from '../lib/db';
 import { chatWithDocument } from '../lib/openrouter';
 
 const filterTabs = ['All', 'Upcoming', 'Completed', 'Needs Action'];
+
+function exportMeetingsCSV(meetings: MeetingRow[]) {
+  const headers = ['Title', 'Type', 'Status', 'Date', 'Time', 'Duration', 'Workspace', 'Location', 'Participants'];
+  const rows = meetings.map(m => [
+    `"${m.title.replace(/"/g, '""')}"`,
+    m.type,
+    m.status,
+    m.date,
+    m.time,
+    m.duration,
+    `"${m.workspace.replace(/"/g, '""')}"`,
+    m.location ? `"${m.location.replace(/"/g, '""')}"` : '',
+    `"${m.participants.join('; ')}"`,
+  ].join(','));
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `meetings_export_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 const typeColors: Record<string, { bg: string; text: string; border: string; accent: string }> = {
   Workshop:  { bg: 'rgba(14,165,233,0.1)',   text: '#38BDF8',  border: 'rgba(14,165,233,0.22)',  accent: '#0EA5E9' },
@@ -100,10 +125,87 @@ export default function Meetings() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [markingComplete, setMarkingComplete] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState<string | null>(null); // tracks which AI action is running
+  const [cloningMeetingId, setCloningMeetingId] = useState<string | null>(null);
+  const [cloneToast, setCloneToast] = useState<string | null>(null);
+  const [typeFilter, setTypeFilter] = useState('All Types');
+  const [dateFilter, setDateFilter] = useState<'All' | 'Today' | 'This Week'>('All');
+  const [locFilter, setLocFilter] = useState<'All' | 'Virtual' | 'In-Person'>('All');
+  const [hasActionsOnly, setHasActionsOnly] = useState(false);
+  const [durationFilter, setDurationFilter] = useState<'All' | 'Short' | 'Long'>('All');
+  const [minParticipants, setMinParticipants] = useState<0 | 3 | 5 | 10>(0);
+  const [quorumFilter, setQuorumFilter] = useState<'All' | 'Met' | 'Not Met'>('All');
+  const [meetingSort, setMeetingSort] = useState<'newest' | 'oldest' | 'title' | 'participants' | 'workspace' | 'type' | 'location'>('newest');
+  const [starredMeetings, setStarredMeetings] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('meetings_starred') ?? '[]')); } catch { return new Set(); }
+  });
+  const [starredMeetingsOnly, setStarredMeetingsOnly] = useState(false);
+  const [meetingsSummaryCopied, setMeetingsSummaryCopied] = useState(false);
+  const [meetingsTxtExported, setMeetingsTxtExported] = useState(false);
   const [form, setForm] = useState({
     title: '', date: '', time: '09:00', duration: '1h', type: 'Review' as MeetingRow['type'],
     workspace: '', workspace_id: '', location: '', participants: '',
   });
+
+  // ── Action Items ──────────────────────────────────────────────
+  interface ActionItem { id: string; text: string; owner: string; dueDate: string; done: boolean; meetingId: string; }
+  const ACTION_ITEMS_KEY = 'meetings_action_items';
+  const [actionItems, setActionItems] = useState<ActionItem[]>(() => {
+    try { return JSON.parse(localStorage.getItem(ACTION_ITEMS_KEY) ?? 'null') ?? []; } catch { return []; }
+  });
+  const [showActionPanel, setShowActionPanel] = useState(false);
+  const [newActionText, setNewActionText] = useState('');
+  const [newActionOwner, setNewActionOwner] = useState('');
+  const [newActionDue, setNewActionDue] = useState('');
+  const [newActionMeetingId, setNewActionMeetingId] = useState('');
+
+  function saveActionItems(items: ActionItem[]) {
+    try { localStorage.setItem(ACTION_ITEMS_KEY, JSON.stringify(items)); } catch { /* ignore */ }
+  }
+
+  function handleToggleStarMeeting(meetingId: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    setStarredMeetings(prev => {
+      const next = new Set(prev);
+      if (next.has(meetingId)) next.delete(meetingId);
+      else next.add(meetingId);
+      try { localStorage.setItem('meetings_starred', JSON.stringify([...next])); } catch { /* ignore */ }
+      return next;
+    });
+  }
+
+  function handleAddActionItem() {
+    if (!newActionText.trim()) return;
+    const item: ActionItem = {
+      id: `ai-${Date.now()}`,
+      text: newActionText.trim(),
+      owner: newActionOwner.trim() || 'Unassigned',
+      dueDate: newActionDue,
+      done: false,
+      meetingId: newActionMeetingId,
+    };
+    const updated = [item, ...actionItems];
+    setActionItems(updated);
+    saveActionItems(updated);
+    setNewActionText('');
+    setNewActionOwner('');
+    setNewActionDue('');
+    setNewActionMeetingId('');
+  }
+
+  function handleToggleActionItem(id: string) {
+    const updated = actionItems.map(a => a.id === id ? { ...a, done: !a.done } : a);
+    setActionItems(updated);
+    saveActionItems(updated);
+  }
+
+  function handleDeleteActionItem(id: string) {
+    const updated = actionItems.filter(a => a.id !== id);
+    setActionItems(updated);
+    saveActionItems(updated);
+  }
+
+  const pendingActionItems = actionItems.filter(a => !a.done);
+  const doneActionItems = actionItems.filter(a => a.done);
 
   function openEditModal(meeting: MeetingRow, e: React.MouseEvent) {
     e.stopPropagation();
@@ -185,6 +287,38 @@ export default function Meetings() {
       setMeetings(prev => prev.filter(m => m.id !== id));
     } catch { /* ignore */ }
     finally { setDeletingId(null); }
+  }
+
+  // ── Clone meeting ──────────────────────────────────────────
+  async function handleCloneMeeting(meeting: MeetingRow, e: React.MouseEvent) {
+    e.stopPropagation();
+    setCloningMeetingId(meeting.id);
+    try {
+      const base = new Date(meeting.date);
+      base.setDate(base.getDate() + 7);
+      const cloned = await upsertMeeting({
+        id: crypto.randomUUID(),
+        title: `Copy of ${meeting.title}`,
+        date: base.toISOString().slice(0, 10),
+        time: meeting.time,
+        duration: meeting.duration,
+        type: meeting.type,
+        status: 'Upcoming',
+        participants: meeting.participants,
+        workspace: meeting.workspace,
+        workspace_id: meeting.workspace_id,
+        minutes_generated: false,
+        actions_extracted: 0,
+        decisions_logged: 0,
+        location: meeting.location,
+        agenda: meeting.agenda,
+        quorum_status: null,
+      });
+      setMeetings(prev => [cloned, ...prev]);
+      setCloneToast(`"Copy of ${meeting.title}" created`);
+      setTimeout(() => setCloneToast(null), 3000);
+    } catch { /* ignore */ }
+    finally { setCloningMeetingId(null); }
   }
 
   // ── Mark complete ──────────────────────────────────────────
@@ -286,17 +420,94 @@ export default function Meetings() {
       .map(m => String(parseInt(m.date.slice(8))))
   );
 
-  const filtered = meetings.filter(m => {
-    const matchesFilter = activeFilter === 'All'
-      ? true
-      : activeFilter === 'Needs Action'
-      ? (m.status === 'Completed' && !m.minutes_generated)
-      : m.status === activeFilter;
-    const matchesSearch = !search
-      || m.title.toLowerCase().includes(search.toLowerCase())
-      || m.workspace.toLowerCase().includes(search.toLowerCase());
-    return matchesFilter && matchesSearch;
-  });
+  const filtered = (() => {
+    const base = meetings.filter(m => {
+      const matchesFilter = activeFilter === 'All'
+        ? true
+        : activeFilter === 'Needs Action'
+        ? (m.status === 'Completed' && !m.minutes_generated)
+        : m.status === activeFilter;
+      const matchesType = typeFilter === 'All Types' || m.type === typeFilter;
+      const matchesSearch = !search
+        || m.title.toLowerCase().includes(search.toLowerCase())
+        || m.workspace.toLowerCase().includes(search.toLowerCase());
+      const today = new Date().toISOString().slice(0, 10);
+      const matchesDate = dateFilter === 'All' ? true
+        : dateFilter === 'Today' ? m.date === today
+        : (() => {
+            const d = new Date(); const day = d.getDay();
+            const monday = new Date(d); monday.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+            const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+            return m.date >= monday.toISOString().slice(0, 10) && m.date <= sunday.toISOString().slice(0, 10);
+          })();
+      const matchesLoc = locFilter === 'All' ? true
+        : locFilter === 'Virtual' ? isVirtualLocation(m.location)
+        : !isVirtualLocation(m.location);
+      const meetingHasRowActions = (() => { try { const p = JSON.parse((m as { action_items?: string }).action_items ?? '[]'); return Array.isArray(p) && p.length > 0; } catch { return false; } })();
+      const matchesHasActions = !hasActionsOnly || actionItems.some(a => a.meetingId === m.id) || meetingHasRowActions;
+      const matchesDuration = durationFilter === 'All' ? true
+        : durationFilter === 'Short' ? (m.duration === '30min' || m.duration === '1h')
+        : (m.duration !== '30min' && m.duration !== '1h');
+      const matchesStarred = !starredMeetingsOnly || starredMeetings.has(m.id);
+      const matchesMinParticipants = (m.participants?.length ?? 0) >= minParticipants;
+      const matchesQuorum = quorumFilter === 'All' ? true : m.quorum_status === quorumFilter;
+      return matchesFilter && matchesType && matchesSearch && matchesDate && matchesLoc && matchesHasActions && matchesDuration && matchesStarred && matchesMinParticipants && matchesQuorum;
+    });
+    if (meetingSort === 'title') return [...base].sort((a, b) => a.title.localeCompare(b.title));
+    if (meetingSort === 'oldest') return [...base].sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''));
+    if (meetingSort === 'participants') return [...base].sort((a, b) => (b.participants?.length ?? 0) - (a.participants?.length ?? 0));
+    if (meetingSort === 'workspace') return [...base].sort((a, b) => (a.workspace ?? '').localeCompare(b.workspace ?? ''));
+    if (meetingSort === 'type') return [...base].sort((a, b) => (a.type ?? '').localeCompare(b.type ?? ''));
+    if (meetingSort === 'location') return [...base].sort((a, b) => (a.location ?? '').localeCompare(b.location ?? ''));
+    return [...base].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
+  })();
+
+  function handleCopyMeetingsSummary(meetingsToSummarize: MeetingRow[]) {
+    if (meetingsToSummarize.length === 0) return;
+    const upcoming = meetingsToSummarize.filter(m => m.status === 'Upcoming').length;
+    const completed = meetingsToSummarize.filter(m => m.status === 'Completed').length;
+    const needsAction = meetingsToSummarize.filter(m => m.status === 'Completed' && !m.minutes_generated).length;
+    const lines = [
+      `Meetings Summary`,
+      `Total: ${meetingsToSummarize.length}`,
+      `Upcoming: ${upcoming}`,
+      `Completed: ${completed}`,
+      `Needs Action: ${needsAction}`,
+    ].join('\n');
+    navigator.clipboard.writeText(lines).then(() => {
+      setMeetingsSummaryCopied(true);
+      setTimeout(() => setMeetingsSummaryCopied(false), 2000);
+    }).catch(() => {});
+  }
+
+  function handleExportMeetingsTxt(meetingsToExport: MeetingRow[]) {
+    if (meetingsToExport.length === 0) return;
+    const lines = [
+      `Meetings Export – Consultant OS`,
+      `Total: ${meetingsToExport.length}`,
+      '',
+      ...meetingsToExport.map(m => [
+        `Title: ${m.title}`,
+        `Date: ${m.date} at ${m.time} (${m.duration})`,
+        `Type: ${m.type} | Status: ${m.status}`,
+        `Workspace: ${m.workspace}`,
+        m.location ? `Location: ${m.location}` : null,
+        `Participants: ${m.participants.join(', ')}`,
+        '',
+      ].filter(Boolean).join('\n')),
+    ].join('\n');
+    const blob = new Blob([lines], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `meetings_export.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setMeetingsTxtExported(true);
+    setTimeout(() => setMeetingsTxtExported(false), 2000);
+  }
 
   return (
     <div className="screen-container animate-fade-in">
@@ -390,6 +601,7 @@ export default function Meetings() {
               <Search size={13} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
               <input
                 className="input-field"
+                aria-label="Search meetings"
                 placeholder="Search meetings…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
@@ -398,12 +610,169 @@ export default function Meetings() {
             </div>
             <div style={{ display: 'flex', gap: '0.25rem', background: 'rgba(255,255,255,0.03)', padding: '0.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
               {filterTabs.map(tab => (
-                <button key={tab} className={`tab-item ${activeFilter === tab ? 'active' : ''}`} onClick={() => setActiveFilter(tab)} style={{ padding: '0.3rem 0.75rem', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                <button key={tab} className={`tab-item ${activeFilter === tab ? 'active' : ''}`} onClick={() => setActiveFilter(tab)}
+                  aria-label={`Meeting filter: ${tab === 'All' ? 'All Meetings' : tab}`}
+                  aria-pressed={activeFilter === tab}
+                  style={{ padding: '0.3rem 0.75rem', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
                   {tab === 'All' ? 'All Meetings' : tab}
                 </button>
               ))}
             </div>
-            <button className="btn-primary" style={{ height: '36px', flexShrink: 0 }} onClick={() => setShowNewModal(true)}>
+            {/* Type filter */}
+            <select
+              className="input-field"
+              aria-label="Filter by meeting type"
+              value={typeFilter}
+              onChange={e => setTypeFilter(e.target.value)}
+              style={{ height: '36px', fontSize: '0.78rem', minWidth: '140px', flexShrink: 0 }}
+            >
+              <option value="All Types">All Types</option>
+              {(['Workshop', 'Committee', 'Steering', 'Review', 'Kickoff', 'Standup'] as const).map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+
+            {/* Date quick filter */}
+            <div style={{ display: 'flex', gap: '0.25rem', flexShrink: 0 }}>
+              {(['All', 'Today', 'This Week'] as const).map(df => (
+                <button
+                  key={df}
+                  className={`btn-ghost${dateFilter === df ? ' active' : ''}`}
+                  aria-label={`Filter meetings by date: ${df}`}
+                  aria-pressed={dateFilter === df}
+                  onClick={() => setDateFilter(df)}
+                  style={{ fontSize: '0.72rem', height: '36px', padding: '0 0.5rem', background: dateFilter === df ? 'rgba(0,212,255,0.1)' : undefined, borderColor: dateFilter === df ? 'rgba(0,212,255,0.3)' : undefined }}
+                >
+                  {df}
+                </button>
+              ))}
+            </div>
+
+            {/* Location quick filter */}
+            <div style={{ display: 'flex', gap: '0.25rem', flexShrink: 0 }}>
+              {(['All', 'Virtual', 'In-Person'] as const).map(lf => (
+                <button
+                  key={lf}
+                  className={`btn-ghost${locFilter === lf ? ' active' : ''}`}
+                  aria-label={`Filter meetings by location: ${lf}`}
+                  aria-pressed={locFilter === lf}
+                  onClick={() => setLocFilter(lf)}
+                  style={{ fontSize: '0.72rem', height: '36px', padding: '0 0.5rem', background: locFilter === lf ? 'rgba(139,92,246,0.1)' : undefined, borderColor: locFilter === lf ? 'rgba(139,92,246,0.3)' : undefined }}
+                >
+                  {lf}
+                </button>
+              ))}
+            </div>
+
+            {/* Has Actions toggle */}
+            <button
+              className={`btn-ghost${hasActionsOnly ? ' active' : ''}`}
+              aria-label="Show meetings with action items only"
+              aria-pressed={hasActionsOnly}
+              onClick={() => setHasActionsOnly(v => !v)}
+              style={{ fontSize: '0.72rem', height: '36px', padding: '0 0.5rem', background: hasActionsOnly ? 'rgba(245,158,11,0.1)' : undefined, borderColor: hasActionsOnly ? 'rgba(245,158,11,0.3)' : undefined, flexShrink: 0, whiteSpace: 'nowrap' }}
+            >
+              Has Actions
+            </button>
+
+            {/* Starred only toggle */}
+            <button
+              className={`btn-ghost${starredMeetingsOnly ? ' active' : ''}`}
+              aria-label="Show starred meetings only"
+              aria-pressed={starredMeetingsOnly}
+              onClick={() => setStarredMeetingsOnly(v => !v)}
+              style={{ fontSize: '0.72rem', height: '36px', padding: '0 0.5rem', background: starredMeetingsOnly ? 'rgba(245,158,11,0.1)' : undefined, borderColor: starredMeetingsOnly ? 'rgba(245,158,11,0.3)' : undefined, color: starredMeetingsOnly ? '#F59E0B' : undefined, flexShrink: 0, whiteSpace: 'nowrap' }}
+            >
+              ⭐ Starred
+            </button>
+
+            {/* Duration filter */}
+            {(['All', 'Short', 'Long'] as const).map(d => (
+              <button
+                key={d}
+                onClick={() => setDurationFilter(d)}
+                aria-label={`Filter meetings by duration: ${d}`}
+                aria-pressed={durationFilter === d}
+                className="btn-ghost"
+                style={{ fontSize: '0.72rem', height: '36px', padding: '0 0.5rem', background: durationFilter === d ? 'rgba(14,165,233,0.1)' : undefined, borderColor: durationFilter === d ? 'rgba(14,165,233,0.3)' : undefined, color: durationFilter === d ? '#38BDF8' : undefined, flexShrink: 0, whiteSpace: 'nowrap' }}
+              >{d === 'All' ? 'Any Duration' : d}</button>
+            ))}
+
+            {/* Min participants */}
+            <select
+              className="input-field"
+              aria-label="Filter meetings by minimum participants"
+              value={minParticipants}
+              onChange={e => setMinParticipants(Number(e.target.value) as typeof minParticipants)}
+              style={{ height: '36px', fontSize: '0.78rem', minWidth: '120px', flexShrink: 0 }}
+            >
+              <option value={0}>Any Size</option>
+              <option value={3}>3+ Participants</option>
+              <option value={5}>5+ Participants</option>
+              <option value={10}>10+ Participants</option>
+            </select>
+
+            {/* Quorum filter */}
+            <select
+              className="input-field"
+              aria-label="Filter meetings by quorum status"
+              value={quorumFilter}
+              onChange={e => setQuorumFilter(e.target.value as typeof quorumFilter)}
+              style={{ height: '36px', fontSize: '0.78rem', minWidth: '130px', flexShrink: 0 }}
+            >
+              <option value="All">Any Quorum</option>
+              <option value="Met">Quorum Met</option>
+              <option value="Not Met">Quorum Not Met</option>
+            </select>
+
+            {/* Sort */}
+            <select
+              className="input-field"
+              aria-label="Sort meetings"
+              value={meetingSort}
+              onChange={e => setMeetingSort(e.target.value as typeof meetingSort)}
+              style={{ height: '36px', fontSize: '0.78rem', minWidth: '120px', flexShrink: 0 }}
+            >
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+              <option value="title">Title</option>
+              <option value="participants">Most Participants</option>
+              <option value="workspace">By Workspace</option>
+              <option value="type">By Type</option>
+              <option value="location">By Location</option>
+            </select>
+
+            {filtered.length > 0 && (
+              <button
+                className="btn-ghost"
+                aria-label="Copy meetings summary to clipboard"
+                onClick={() => handleCopyMeetingsSummary(filtered)}
+                style={{ height: '36px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.375rem', flexShrink: 0, whiteSpace: 'nowrap' }}
+              >
+                <ClipboardCopy size={12} /> {meetingsSummaryCopied ? 'Copied!' : 'Copy Summary'}
+              </button>
+            )}
+            {filtered.length > 0 && (
+              <button
+                className="btn-ghost"
+                aria-label="Export meetings to CSV"
+                onClick={() => exportMeetingsCSV(filtered)}
+                style={{ height: '36px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.375rem', flexShrink: 0, whiteSpace: 'nowrap' }}
+              >
+                <Download size={12} /> Export CSV
+              </button>
+            )}
+            {filtered.length > 0 && (
+              <button
+                className="btn-ghost"
+                aria-label="Export meetings to TXT"
+                onClick={() => handleExportMeetingsTxt(filtered)}
+                style={{ height: '36px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.375rem', flexShrink: 0, whiteSpace: 'nowrap' }}
+              >
+                <FileText size={12} /> {meetingsTxtExported ? 'Exported!' : 'Export TXT'}
+              </button>
+            )}
+            <button className="btn-primary" aria-label="New Meeting" style={{ height: '36px', flexShrink: 0 }} onClick={() => setShowNewModal(true)}>
               <Plus size={14} /> New Meeting
             </button>
           </div>
@@ -501,6 +870,7 @@ export default function Meetings() {
                         <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
                           <button
                             onClick={e => { e.stopPropagation(); navigate(`/meetings/${meeting.id}`); }}
+                            aria-label={`Summarize minutes for ${meeting.title}`}
                             style={{
                               display: 'flex', alignItems: 'center', gap: '4px',
                               fontSize: '0.65rem', fontWeight: 700, padding: '4px 10px', borderRadius: '6px',
@@ -515,6 +885,7 @@ export default function Meetings() {
                           </button>
                           <button
                             onClick={e => { e.stopPropagation(); handleDraftFollowUp(meeting); }}
+                            aria-label={`Draft follow-up for ${meeting.title}`}
                             disabled={aiLoading === 'followup'}
                             style={{
                               display: 'flex', alignItems: 'center', gap: '4px',
@@ -538,6 +909,7 @@ export default function Meetings() {
                           <button
                             onClick={e => handleMarkComplete(meeting.id, e)}
                             disabled={markingComplete === meeting.id}
+                            aria-label={`Mark ${meeting.title} as complete`}
                             style={{
                               display: 'flex', alignItems: 'center', gap: '4px',
                               fontSize: '0.65rem', fontWeight: 700, padding: '4px 10px', borderRadius: '6px',
@@ -560,8 +932,24 @@ export default function Meetings() {
                       {/* Edit / Delete buttons */}
                       <div style={{ display: 'flex', gap: '4px', marginTop: '0.375rem' }}>
                         <button
+                          onClick={e => handleToggleStarMeeting(meeting.id, e)}
+                          aria-label={`${starredMeetings.has(meeting.id) ? 'Unstar' : 'Star'} meeting: ${meeting.title}`}
+                          aria-pressed={starredMeetings.has(meeting.id)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '3px',
+                            fontSize: '0.62rem', fontWeight: 500, padding: '3px 8px', borderRadius: '5px',
+                            background: starredMeetings.has(meeting.id) ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.04)',
+                            color: starredMeetings.has(meeting.id) ? '#F59E0B' : '#64748B',
+                            border: starredMeetings.has(meeting.id) ? '1px solid rgba(245,158,11,0.3)' : '1px solid rgba(255,255,255,0.08)',
+                            cursor: 'pointer', fontFamily: 'inherit',
+                          }}
+                        >
+                          {starredMeetings.has(meeting.id) ? '⭐' : '☆'}
+                        </button>
+                        <button
                           onClick={e => openEditModal(meeting, e)}
                           title="Edit meeting"
+                          aria-label={`Edit ${meeting.title}`}
                           style={{
                             display: 'flex', alignItems: 'center', gap: '3px',
                             fontSize: '0.62rem', fontWeight: 500, padding: '3px 8px', borderRadius: '5px',
@@ -574,8 +962,25 @@ export default function Meetings() {
                           <Pencil size={10} /> Edit
                         </button>
                         <button
+                          onClick={e => handleCloneMeeting(meeting, e)}
+                          title="Clone meeting"
+                          aria-label={`Clone ${meeting.title}`}
+                          disabled={cloningMeetingId === meeting.id}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '3px',
+                            fontSize: '0.62rem', fontWeight: 500, padding: '3px 8px', borderRadius: '5px',
+                            background: 'rgba(14,165,233,0.06)', color: '#38BDF8',
+                            border: '1px solid rgba(14,165,233,0.15)', cursor: 'pointer', fontFamily: 'inherit', opacity: cloningMeetingId === meeting.id ? 0.5 : 1,
+                          }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.12)'; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.06)'; }}
+                        >
+                          <Copy size={10} /> Clone
+                        </button>
+                        <button
                           onClick={e => handleDeleteMeeting(meeting.id, e)}
                           title="Delete meeting"
+                          aria-label={`Delete ${meeting.title}`}
                           disabled={deletingId === meeting.id}
                           style={{
                             display: 'flex', alignItems: 'center', gap: '3px',
@@ -683,6 +1088,7 @@ export default function Meetings() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <button
                 onClick={handleSummarizeMinutes}
+                aria-label="Summarize Minutes"
                 disabled={aiLoading === 'summarize'}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '6px', width: '100%',
@@ -699,6 +1105,7 @@ export default function Meetings() {
               </button>
               <button
                 onClick={() => handleDraftFollowUp()}
+                aria-label="Draft Follow-up"
                 disabled={aiLoading === 'followup'}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '6px', width: '100%',
@@ -715,6 +1122,7 @@ export default function Meetings() {
               </button>
               <button
                 onClick={handleGenerateReport}
+                aria-label="Generate AI Report"
                 disabled={aiLoading === 'report'}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '6px', width: '100%',
@@ -730,6 +1138,144 @@ export default function Meetings() {
                 {aiLoading === 'report' ? <><Loader2 size={13} className="animate-spin" /> Generating...</> : <><Sparkles size={13} /> Generate AI Report</>}
               </button>
             </div>
+          </div>
+
+          {/* Action Items Panel */}
+          <div className="section-card" style={{ padding: '1rem 1.125rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.875rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <CheckCircle size={13} style={{ color: '#10B981' }} />
+                <span style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)' }}>Action Items</span>
+                {pendingActionItems.length > 0 && (
+                  <span style={{
+                    fontSize: '0.6rem', fontWeight: 700, padding: '1px 6px', borderRadius: '9999px',
+                    background: 'rgba(239,68,68,0.12)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.25)',
+                  }}>
+                    {pendingActionItems.length} open
+                  </span>
+                )}
+              </div>
+              <button
+                className="btn-ghost"
+                aria-label={showActionPanel ? 'Hide action items form' : 'Add action item'}
+                onClick={() => setShowActionPanel(p => !p)}
+                style={{ height: '28px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+              >
+                <Plus size={11} /> Add
+              </button>
+            </div>
+
+            {/* Add action item form */}
+            {showActionPanel && (
+              <div style={{
+                background: 'rgba(0,212,255,0.04)', border: '1px solid rgba(0,212,255,0.12)',
+                borderRadius: '8px', padding: '0.75rem', marginBottom: '0.75rem',
+                display: 'flex', flexDirection: 'column', gap: '0.5rem',
+              }}>
+                <input
+                  className="input-field"
+                  aria-label="Action item description"
+                  placeholder="Action item description…"
+                  value={newActionText}
+                  onChange={e => setNewActionText(e.target.value)}
+                  style={{ fontSize: '0.78rem', height: '34px' }}
+                />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                  <input
+                    className="input-field"
+                    aria-label="Owner name"
+                    placeholder="Owner"
+                    value={newActionOwner}
+                    onChange={e => setNewActionOwner(e.target.value)}
+                    style={{ fontSize: '0.75rem', height: '32px' }}
+                  />
+                  <input
+                    className="input-field"
+                    aria-label="Action item due date"
+                    type="date"
+                    value={newActionDue}
+                    onChange={e => setNewActionDue(e.target.value)}
+                    style={{ fontSize: '0.75rem', height: '32px' }}
+                  />
+                </div>
+                <select
+                  className="input-field"
+                  aria-label="Link to meeting"
+                  value={newActionMeetingId}
+                  onChange={e => setNewActionMeetingId(e.target.value)}
+                  style={{ fontSize: '0.75rem', height: '32px' }}
+                >
+                  <option value="">No meeting linked</option>
+                  {meetings.map(m => <option key={m.id} value={m.id}>{m.title}</option>)}
+                </select>
+                <button
+                  className="btn-primary"
+                  aria-label="Save action item"
+                  onClick={handleAddActionItem}
+                  disabled={!newActionText.trim()}
+                  style={{ fontSize: '0.75rem', height: '32px', alignSelf: 'flex-end' }}
+                >
+                  Save
+                </button>
+              </div>
+            )}
+
+            {/* Action items list */}
+            {actionItems.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '1rem 0', color: 'var(--text-faint)', fontSize: '0.75rem' }}>
+                No action items yet. Add one above.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+                {[...pendingActionItems, ...doneActionItems].map(item => (
+                  <div
+                    key={item.id}
+                    data-testid={`action-item-${item.id}`}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '0.5rem',
+                      padding: '0.5rem 0.625rem', borderRadius: '7px',
+                      background: item.done ? 'rgba(16,185,129,0.05)' : 'rgba(255,255,255,0.03)',
+                      border: `1px solid ${item.done ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.06)'}`,
+                      opacity: item.done ? 0.7 : 1,
+                    }}
+                  >
+                    <button
+                      onClick={() => handleToggleActionItem(item.id)}
+                      aria-label={item.done ? `Mark action item incomplete: ${item.text}` : `Mark action item complete: ${item.text}`}
+                      style={{
+                        background: item.done ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.05)',
+                        border: `1px solid ${item.done ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.1)'}`,
+                        borderRadius: '50%', width: '18px', height: '18px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer', color: item.done ? '#34D399' : 'transparent',
+                        flexShrink: 0, padding: 0,
+                      }}
+                    >
+                      {item.done && <CheckCircle size={10} />}
+                    </button>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontSize: '0.75rem', color: item.done ? 'var(--text-muted)' : 'var(--text-primary)',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        textDecoration: item.done ? 'line-through' : 'none',
+                      }}>
+                        {item.text}
+                      </div>
+                      <div style={{ fontSize: '0.62rem', color: 'var(--text-faint)' }}>
+                        {item.owner}{item.dueDate ? ` · Due ${new Date(item.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}` : ''}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteActionItem(item.id)}
+                      aria-label={`Delete action item: ${item.text}`}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', padding: '2px', display: 'flex', flexShrink: 0 }}
+                    >
+                      <X size={11} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* AI Assistant Insights */}
@@ -775,7 +1321,7 @@ export default function Meetings() {
                 <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>{editMeeting ? 'Edit Meeting' : 'New Meeting'}</h2>
                 <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Schedule and track a meeting</p>
               </div>
-              <button onClick={() => { setShowNewModal(false); setEditMeeting(null); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px', borderRadius: '6px' }}>
+              <button onClick={() => { setShowNewModal(false); setEditMeeting(null); }} aria-label="Close meeting modal" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px', borderRadius: '6px' }}>
                 <X size={18} />
               </button>
             </div>
@@ -783,30 +1329,30 @@ export default function Meetings() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
                 <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>Meeting Title *</label>
-                <input className="input-field" placeholder="e.g. NCA Steering Committee #15" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} style={{ width: '100%' }} />
+                <input className="input-field" aria-label="Meeting title" placeholder="e.g. NCA Steering Committee #15" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} style={{ width: '100%' }} />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div>
                   <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>Date *</label>
-                  <input className="input-field" type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} style={{ width: '100%' }} />
+                  <input className="input-field" aria-label="Meeting date" type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} style={{ width: '100%' }} />
                 </div>
                 <div>
                   <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>Time</label>
-                  <input className="input-field" type="time" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} style={{ width: '100%' }} />
+                  <input className="input-field" aria-label="Meeting time" type="time" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} style={{ width: '100%' }} />
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div>
                   <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>Duration</label>
-                  <select className="input-field" value={form.duration} onChange={e => setForm(f => ({ ...f, duration: e.target.value }))} style={{ width: '100%' }}>
+                  <select className="input-field" aria-label="Meeting duration" value={form.duration} onChange={e => setForm(f => ({ ...f, duration: e.target.value }))} style={{ width: '100%' }}>
                     {['30min', '1h', '1.5h', '2h', '3h'].map(d => <option key={d} value={d}>{d}</option>)}
                   </select>
                 </div>
                 <div>
                   <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>Type</label>
-                  <select className="input-field" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as MeetingRow['type'] }))} style={{ width: '100%' }}>
+                  <select className="input-field" aria-label="Meeting type" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as MeetingRow['type'] }))} style={{ width: '100%' }}>
                     {['Review', 'Steering', 'Committee', 'Workshop', 'Kickoff', 'Standup'].map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
@@ -814,7 +1360,7 @@ export default function Meetings() {
 
               <div>
                 <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>Workspace *</label>
-                <select className="input-field" value={form.workspace_id} onChange={e => {
+                <select className="input-field" aria-label="Meeting workspace" value={form.workspace_id} onChange={e => {
                   const ws = workspaces.find(w => w.id === e.target.value);
                   setForm(f => ({ ...f, workspace_id: e.target.value, workspace: ws?.name || '' }));
                 }} style={{ width: '100%' }}>
@@ -825,12 +1371,12 @@ export default function Meetings() {
 
               <div>
                 <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>Location</label>
-                <input className="input-field" placeholder="e.g. Boardroom A / Microsoft Teams" value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} style={{ width: '100%' }} />
+                <input className="input-field" aria-label="Meeting location" placeholder="e.g. Boardroom A / Microsoft Teams" value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} style={{ width: '100%' }} />
               </div>
 
               <div>
                 <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.4rem' }}>Participants (initials, comma-separated)</label>
-                <input className="input-field" placeholder="e.g. AM, JL, RT, DN" value={form.participants} onChange={e => setForm(f => ({ ...f, participants: e.target.value }))} style={{ width: '100%' }} />
+                <input className="input-field" aria-label="Meeting participants" placeholder="e.g. AM, JL, RT, DN" value={form.participants} onChange={e => setForm(f => ({ ...f, participants: e.target.value }))} style={{ width: '100%' }} />
               </div>
             </div>
 
@@ -841,6 +1387,24 @@ export default function Meetings() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Clone toast */}
+      {cloneToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'fixed', bottom: '1.5rem', right: '1.5rem', zIndex: 2000,
+            background: 'rgba(14,165,233,0.15)', border: '1px solid rgba(14,165,233,0.35)',
+            borderRadius: '10px', padding: '0.75rem 1.25rem',
+            color: '#38BDF8', fontSize: '0.82rem', fontWeight: 600,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.35)', backdropFilter: 'blur(8px)',
+            display: 'flex', alignItems: 'center', gap: '0.5rem',
+          }}
+        >
+          <Copy size={13} /> {cloneToast}
         </div>
       )}
     </div>
