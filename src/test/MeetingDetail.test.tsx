@@ -4388,3 +4388,131 @@ describe('MeetingDetail – Export Action Items CSV', () => {
     });
   });
 });
+
+// ────────────────────────────────────────────────────────────────────────────
+describe('MeetingDetail – Starred Action Items', () => {
+  async function addActionItem(text: string) {
+    renderDetail();
+    await screen.findByText('NCA Steering Committee Q1 2026');
+    fireEvent.change(screen.getByRole('textbox', { name: /new action item text/i }), { target: { value: text } });
+    await userEvent.click(screen.getByRole('button', { name: /add action item/i }));
+  }
+
+  it('shows "Starred" filter button', async () => {
+    renderDetail();
+    await screen.findByText('NCA Steering Committee Q1 2026');
+    expect(screen.getByRole('button', { name: /show starred action items only/i })).toBeInTheDocument();
+  });
+
+  it('Starred filter button has aria-pressed false by default', async () => {
+    renderDetail();
+    await screen.findByText('NCA Steering Committee Q1 2026');
+    const btn = screen.getByRole('button', { name: /show starred action items only/i });
+    expect(btn).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('each action item has a star button', async () => {
+    await addActionItem('Prepare quarterly report');
+    const starBtn = await screen.findByRole('button', { name: /^Star action item: Prepare quarterly report$/i });
+    expect(starBtn).toBeInTheDocument();
+  });
+
+  it('star button has aria-pressed false for new action items', async () => {
+    await addActionItem('Draft stakeholder plan');
+    const starBtn = await screen.findByRole('button', { name: /^Star action item: Draft stakeholder plan$/i });
+    expect(starBtn).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('clicking star button stars an action item', async () => {
+    await addActionItem('Review risk register');
+    const starBtn = await screen.findByRole('button', { name: /^Star action item: Review risk register$/i });
+    await userEvent.click(starBtn);
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^Unstar action item: Review risk register$/i })).toBeInTheDocument();
+    });
+  });
+
+  it('starring an action item persists to localStorage', async () => {
+    await addActionItem('Submit milestone report');
+    const starBtn = await screen.findByRole('button', { name: /^Star action item: Submit milestone report$/i });
+    await userEvent.click(starBtn);
+    await waitFor(() => {
+      const stored = JSON.parse(localStorage.getItem('meeting_actions_mtg-1') ?? '[]');
+      expect(stored.some((a: { text: string; starred: boolean }) => a.text === 'Submit milestone report' && a.starred === true)).toBe(true);
+    });
+  });
+
+  it('clicking Unstar removes the star', async () => {
+    await addActionItem('Coordinate workshops');
+    const starBtn = await screen.findByRole('button', { name: /^Star action item: Coordinate workshops$/i });
+    await userEvent.click(starBtn);
+    const unstarBtn = await screen.findByRole('button', { name: /^Unstar action item: Coordinate workshops$/i });
+    await userEvent.click(unstarBtn);
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^Star action item: Coordinate workshops$/i })).toBeInTheDocument();
+    });
+  });
+
+  it('Starred filter shows only starred items', async () => {
+    renderDetail();
+    await screen.findByText('NCA Steering Committee Q1 2026');
+    // Add two items
+    fireEvent.change(screen.getByRole('textbox', { name: /new action item text/i }), { target: { value: 'Critical task' } });
+    await userEvent.click(screen.getByRole('button', { name: /add action item/i }));
+    fireEvent.change(screen.getByRole('textbox', { name: /new action item text/i }), { target: { value: 'Normal task' } });
+    await userEvent.click(screen.getByRole('button', { name: /add action item/i }));
+    // Star only Critical task
+    const starBtn = await screen.findByRole('button', { name: /^Star action item: Critical task$/i });
+    await userEvent.click(starBtn);
+    // Enable starred filter
+    await userEvent.click(screen.getByRole('button', { name: /show starred action items only/i }));
+    await waitFor(() => {
+      expect(screen.getByText('Critical task')).toBeInTheDocument();
+      expect(screen.queryByText('Normal task')).not.toBeInTheDocument();
+    });
+  });
+
+  it('Starred filter button has aria-pressed true when active', async () => {
+    renderDetail();
+    await screen.findByText('NCA Steering Committee Q1 2026');
+    const btn = screen.getByRole('button', { name: /show starred action items only/i });
+    await userEvent.click(btn);
+    await waitFor(() => expect(btn).toHaveAttribute('aria-pressed', 'true'));
+  });
+
+  it('toggling Starred filter off shows all items again', async () => {
+    renderDetail();
+    await screen.findByText('NCA Steering Committee Q1 2026');
+    fireEvent.change(screen.getByRole('textbox', { name: /new action item text/i }), { target: { value: 'Test item' } });
+    await userEvent.click(screen.getByRole('button', { name: /add action item/i }));
+    const filterBtn = screen.getByRole('button', { name: /show starred action items only/i });
+    await userEvent.click(filterBtn);
+    await userEvent.click(filterBtn);
+    await waitFor(() => expect(screen.getByText('Test item')).toBeInTheDocument());
+  });
+
+  it('"Starred First" sort option is present', async () => {
+    renderDetail();
+    await screen.findByText('NCA Steering Committee Q1 2026');
+    expect(screen.getByRole('button', { name: /sort actions by starred/i })).toBeInTheDocument();
+  });
+
+  it('"Starred First" sort button sets aria-pressed true when clicked', async () => {
+    renderDetail();
+    await screen.findByText('NCA Steering Committee Q1 2026');
+    const sortBtn = screen.getByRole('button', { name: /sort actions by starred/i });
+    await userEvent.click(sortBtn);
+    expect(sortBtn).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('starred items load from localStorage on initial render', async () => {
+    localStorage.setItem('meeting_actions_mtg-1', JSON.stringify([
+      { id: 'act-1', text: 'Persisted starred item', owner: '', done: false, starred: true },
+    ]));
+    renderDetail();
+    await screen.findByText('NCA Steering Committee Q1 2026');
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^Unstar action item: Persisted starred item$/i })).toBeInTheDocument();
+    });
+  });
+});

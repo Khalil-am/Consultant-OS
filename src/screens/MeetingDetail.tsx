@@ -247,19 +247,20 @@ export default function MeetingDetail() {
   const [decisionSort, setDecisionSort] = useState<'default' | 'text'>('default');
 
   const actionsKey = `meeting_actions_${id ?? 'unknown'}`;
-  interface ActionItem { id: string; text: string; owner: string; done: boolean; }
+  interface ActionItem { id: string; text: string; owner: string; done: boolean; starred?: boolean; }
   const [actionItems, setActionItems] = useState<ActionItem[]>(() => {
     try { return JSON.parse(localStorage.getItem(actionsKey) ?? 'null') ?? []; } catch { return []; }
   });
   const [newActionText, setNewActionText] = useState('');
   const [newActionOwner, setNewActionOwner] = useState('');
   const [pendingActionsOnly, setPendingActionsOnly] = useState(false);
+  const [starredActionsOnly, setStarredActionsOnly] = useState(false);
   const [actionSearch, setActionSearch] = useState('');
-  const [actionSort, setActionSort] = useState<'default' | 'owner' | 'pending' | 'text'>('default');
+  const [actionSort, setActionSort] = useState<'default' | 'owner' | 'pending' | 'text' | 'starred'>('default');
 
   function handleAddActionItem() {
     if (!newActionText.trim()) return;
-    const entry: ActionItem = { id: `act-${Date.now()}`, text: newActionText.trim(), owner: newActionOwner.trim(), done: false };
+    const entry: ActionItem = { id: `act-${Date.now()}`, text: newActionText.trim(), owner: newActionOwner.trim(), done: false, starred: false };
     const updated = [entry, ...actionItems];
     setActionItems(updated);
     try { localStorage.setItem(actionsKey, JSON.stringify(updated)); } catch { /* ignore */ }
@@ -269,6 +270,12 @@ export default function MeetingDetail() {
 
   function handleToggleActionDone(actId: string) {
     const updated = actionItems.map(a => a.id === actId ? { ...a, done: !a.done } : a);
+    setActionItems(updated);
+    try { localStorage.setItem(actionsKey, JSON.stringify(updated)); } catch { /* ignore */ }
+  }
+
+  function handleToggleActionStar(actId: string) {
+    const updated = actionItems.map(a => a.id === actId ? { ...a, starred: !a.starred } : a);
     setActionItems(updated);
     try { localStorage.setItem(actionsKey, JSON.stringify(updated)); } catch { /* ignore */ }
   }
@@ -779,6 +786,14 @@ export default function MeetingDetail() {
             >
               Pending Only
             </button>
+            <button
+              onClick={() => setStarredActionsOnly(s => !s)}
+              aria-label="Show starred action items only"
+              aria-pressed={starredActionsOnly}
+              style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '0.25rem', border: `1px solid ${starredActionsOnly ? 'rgba(245,158,11,0.5)' : 'rgba(255,255,255,0.1)'}`, background: starredActionsOnly ? 'rgba(245,158,11,0.1)' : 'transparent', color: starredActionsOnly ? '#F59E0B' : 'var(--text-faint)', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}
+            >
+              Starred
+            </button>
             {actionItems.length > 0 && (
               <>
                 <button
@@ -841,10 +856,10 @@ export default function MeetingDetail() {
                 style={{ width: '100%', boxSizing: 'border-box', marginBottom: '0.375rem', padding: '0.25rem 0.5rem', borderRadius: '0.375rem', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: 'var(--text-primary)', fontSize: '0.75rem', fontFamily: 'inherit', outline: 'none' }}
               />
               <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '0.5rem' }}>
-                {(['default', 'owner', 'pending', 'text'] as const).map(s => (
+                {(['default', 'owner', 'pending', 'text', 'starred'] as const).map(s => (
                   <button key={s} onClick={() => setActionSort(s)} aria-label={`Sort actions by ${s}`} aria-pressed={actionSort === s}
                     style={{ fontSize: '0.62rem', padding: '1px 7px', borderRadius: '4px', background: actionSort === s ? 'rgba(16,185,129,0.1)' : 'transparent', color: actionSort === s ? '#34D399' : '#475569', border: actionSort === s ? '1px solid rgba(16,185,129,0.25)' : '1px solid transparent', cursor: 'pointer', fontFamily: 'inherit', textTransform: 'capitalize' }}>
-                    {s === 'default' ? 'Default' : s === 'owner' ? 'Owner' : s === 'pending' ? 'Pending First' : 'A–Z'}
+                    {s === 'default' ? 'Default' : s === 'owner' ? 'Owner' : s === 'pending' ? 'Pending First' : s === 'starred' ? 'Starred First' : 'A–Z'}
                   </button>
                 ))}
               </div>
@@ -857,14 +872,16 @@ export default function MeetingDetail() {
               {(() => {
                 const filtered = actionItems.filter(act =>
                   (!pendingActionsOnly || !act.done) &&
+                  (!starredActionsOnly || act.starred) &&
                   (!actionSearch.trim() || act.text.toLowerCase().includes(actionSearch.toLowerCase()) || act.owner.toLowerCase().includes(actionSearch.toLowerCase()))
                 );
                 if (actionSort === 'owner') filtered.sort((a, b) => (a.owner ?? '').localeCompare(b.owner ?? ''));
                 else if (actionSort === 'pending') filtered.sort((a, b) => (a.done ? 1 : 0) - (b.done ? 1 : 0));
                 else if (actionSort === 'text') filtered.sort((a, b) => a.text.localeCompare(b.text));
+                else if (actionSort === 'starred') filtered.sort((a, b) => (b.starred ? 1 : 0) - (a.starred ? 1 : 0));
                 return filtered;
               })().map(act => (
-                <li key={act.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.75rem', borderRadius: '0.375rem', background: act.done ? 'rgba(16,185,129,0.05)' : 'rgba(255,255,255,0.03)', border: `1px solid ${act.done ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.07)'}` }}>
+                <li key={act.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.75rem', borderRadius: '0.375rem', background: act.starred ? 'rgba(245,158,11,0.04)' : act.done ? 'rgba(16,185,129,0.05)' : 'rgba(255,255,255,0.03)', border: `1px solid ${act.starred ? 'rgba(245,158,11,0.18)' : act.done ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.07)'}` }}>
                   <button
                     onClick={() => handleToggleActionDone(act.id)}
                     aria-label={`${act.done ? 'Reopen' : 'Complete'} action item: ${act.text}`}
@@ -872,6 +889,14 @@ export default function MeetingDetail() {
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: act.done ? '#34D399' : '#475569', padding: 0, display: 'flex', alignItems: 'center', flexShrink: 0 }}
                   >
                     <CheckCircle size={14} />
+                  </button>
+                  <button
+                    onClick={() => handleToggleActionStar(act.id)}
+                    aria-label={act.starred ? `Unstar action item: ${act.text}` : `Star action item: ${act.text}`}
+                    aria-pressed={act.starred ?? false}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: act.starred ? '#F59E0B' : '#334155', padding: 0, display: 'flex', alignItems: 'center', flexShrink: 0, fontSize: '0.75rem' }}
+                  >
+                    ★
                   </button>
                   <span style={{ flex: 1, fontSize: '0.8rem', color: act.done ? '#475569' : 'var(--text-secondary)', textDecoration: act.done ? 'line-through' : 'none' }}>{act.text}</span>
                   {act.owner && (
