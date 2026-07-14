@@ -4,6 +4,7 @@ import { useLayout } from '../hooks/useLayout';
 import {
   Search, Upload, FileText, Download,
   ExternalLink, Sparkles, Eye, Trash2, Plus, X, Loader2, Star, FolderInput, ClipboardCopy,
+  Grid3X3, List,
 } from 'lucide-react';
 import {
   getDocuments, upsertDocument, deleteDocument, updateDocument,
@@ -113,6 +114,16 @@ export default function Documents() {
   const [docSummaryCopied, setDocSummaryCopied] = useState(false);
   const [docsCsvExported, setDocsCsvExported] = useState(false);
   const [docsTxtExported, setDocsTxtExported] = useState(false);
+
+  // View mode (list | grid)
+  const DOC_VIEW_KEY = 'documents_view_mode';
+  const [docViewMode, setDocViewMode] = useState<'list' | 'grid'>(() => {
+    try { return (localStorage.getItem(DOC_VIEW_KEY) as 'list' | 'grid') ?? 'list'; } catch { return 'list'; }
+  });
+  function handleSetDocViewMode(mode: 'list' | 'grid') {
+    setDocViewMode(mode);
+    try { localStorage.setItem(DOC_VIEW_KEY, mode); } catch { /* ignore */ }
+  }
 
   function handleExportDocsCSV(docsToExport: DocumentRow[]) {
     if (docsToExport.length === 0) return;
@@ -691,6 +702,38 @@ export default function Documents() {
           >
             <ClipboardCopy size={13} /> {docSummaryCopied ? 'Copied!' : 'Copy Stats'}
           </button>
+
+          {/* View mode toggle */}
+          <div style={{ display: 'flex', gap: '2px', padding: '2px', borderRadius: '6px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <button
+              onClick={() => handleSetDocViewMode('list')}
+              aria-label="Switch to list view"
+              aria-pressed={docViewMode === 'list'}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: '30px', height: '30px', borderRadius: '4px', border: 'none',
+                background: docViewMode === 'list' ? 'rgba(14,165,233,0.18)' : 'transparent',
+                color: docViewMode === 'list' ? '#0EA5E9' : '#475569',
+                cursor: 'pointer',
+              }}
+            >
+              <List size={14} />
+            </button>
+            <button
+              onClick={() => handleSetDocViewMode('grid')}
+              aria-label="Switch to grid view"
+              aria-pressed={docViewMode === 'grid'}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: '30px', height: '30px', borderRadius: '4px', border: 'none',
+                background: docViewMode === 'grid' ? 'rgba(14,165,233,0.18)' : 'transparent',
+                color: docViewMode === 'grid' ? '#0EA5E9' : '#475569',
+                cursor: 'pointer',
+              }}
+            >
+              <Grid3X3 size={14} />
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -704,6 +747,50 @@ export default function Documents() {
           {loading ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px', color: '#475569', gap: '0.5rem' }}>
               <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Loading…
+            </div>
+          ) : docViewMode === 'grid' ? (
+            <div aria-label="Documents grid view" style={{ padding: '1rem 1.25rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem' }}>
+              {filtered.length === 0 && (
+                <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3rem', color: '#334155' }}>
+                  {docs.length === 0 ? 'No documents yet — upload your first document.' : 'No documents match your filters.'}
+                </div>
+              )}
+              {filtered.map(doc => (
+                <div
+                  key={doc.id}
+                  aria-label={`Document card: ${doc.name}`}
+                  onClick={() => setSelectedDoc(selectedDoc === doc.id ? null : doc.id)}
+                  style={{
+                    padding: '0.875rem', borderRadius: '8px', cursor: 'pointer',
+                    background: bulkSelected.has(doc.id) ? 'rgba(14,165,233,0.1)' : selectedDoc === doc.id ? 'rgba(0,212,255,0.07)' : 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${selectedDoc === doc.id ? 'rgba(0,212,255,0.2)' : 'rgba(255,255,255,0.06)'}`,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <div style={{ padding: '0.375rem', borderRadius: '6px', background: `${doc.type_color}15`, color: doc.type_color, flexShrink: 0 }}>
+                      <FileText size={14} />
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#F1F5F9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.name}</div>
+                      <div style={{ fontSize: '0.68rem', color: '#475569', marginTop: '1px' }}>{doc.author}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.5rem' }}>
+                    <span style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: '9999px', background: `${doc.type_color}18`, color: doc.type_color, fontWeight: 500 }}>{doc.type}</span>
+                    <span style={{
+                      fontSize: '0.68rem', padding: '2px 8px', borderRadius: '9999px', fontWeight: 500,
+                      background: doc.status === 'Approved' ? 'rgba(52,211,153,0.12)' : doc.status === 'Under Review' ? 'rgba(251,191,36,0.12)' : doc.status === 'Final' ? 'rgba(0,212,255,0.12)' : 'rgba(148,163,184,0.12)',
+                      color: doc.status === 'Approved' ? '#34D399' : doc.status === 'Under Review' ? '#FBBF24' : doc.status === 'Final' ? '#00D4FF' : '#94A3B8',
+                    }}>{doc.status}</span>
+                  </div>
+                  <div style={{ fontSize: '0.68rem', color: '#334155', marginTop: '0.4rem' }}>{doc.date}</div>
+                  <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.5rem', justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
+                    <button onClick={() => togglePin(doc.id)} style={{ padding: '0.25rem', background: 'none', border: 'none', cursor: 'pointer', color: pinnedIds.has(doc.id) ? '#F59E0B' : '#475569', borderRadius: '4px' }} aria-label={pinnedIds.has(doc.id) ? `Unpin ${doc.name}` : `Pin ${doc.name}`} aria-pressed={pinnedIds.has(doc.id)}><Star size={12} /></button>
+                    <button onClick={() => navigate(`/documents/${doc.id}`)} style={{ padding: '0.25rem', background: 'none', border: 'none', cursor: 'pointer', color: '#475569', borderRadius: '4px' }} aria-label={`Open ${doc.name}`}><ExternalLink size={12} /></button>
+                    <button onClick={() => setConfirmDelete(doc.id)} style={{ padding: '0.25rem', background: 'none', border: 'none', cursor: 'pointer', color: '#475569', borderRadius: '4px' }} aria-label={`Delete ${doc.name}`}><Trash2 size={12} /></button>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
             <table className="data-table" style={{ tableLayout: 'fixed' }}>

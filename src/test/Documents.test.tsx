@@ -4932,3 +4932,93 @@ describe('Documents – Sort by Newest DOM Order', () => {
     expect(newEl.compareDocumentPosition(oldEl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
+
+// ────────────────────────────────────────────────────────────
+describe('Documents – View Mode Toggle', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    mockGetDocuments.mockResolvedValue([mockDoc]);
+    mockGetWorkspaces.mockResolvedValue([mockWorkspace]);
+  });
+  afterEach(() => localStorage.clear());
+
+  it('renders list view toggle button', async () => {
+    renderDocuments();
+    await screen.findByText('NCA Enterprise Architecture BRD v2.3');
+    expect(screen.getByRole('button', { name: /switch to list view/i })).toBeInTheDocument();
+  });
+
+  it('renders grid view toggle button', async () => {
+    renderDocuments();
+    await screen.findByText('NCA Enterprise Architecture BRD v2.3');
+    expect(screen.getByRole('button', { name: /switch to grid view/i })).toBeInTheDocument();
+  });
+
+  it('list view button is aria-pressed true by default', async () => {
+    renderDocuments();
+    await screen.findByText('NCA Enterprise Architecture BRD v2.3');
+    const listBtn = screen.getByRole('button', { name: /switch to list view/i });
+    expect(listBtn).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('grid view button is aria-pressed false by default', async () => {
+    renderDocuments();
+    await screen.findByText('NCA Enterprise Architecture BRD v2.3');
+    const gridBtn = screen.getByRole('button', { name: /switch to grid view/i });
+    expect(gridBtn).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('switching to grid view shows grid container', async () => {
+    renderDocuments();
+    await screen.findByText('NCA Enterprise Architecture BRD v2.3');
+    const gridBtn = screen.getByRole('button', { name: /switch to grid view/i });
+    await userEvent.click(gridBtn);
+    expect(screen.getByLabelText('Documents grid view')).toBeInTheDocument();
+  });
+
+  it('switching to grid updates aria-pressed states', async () => {
+    renderDocuments();
+    await screen.findByText('NCA Enterprise Architecture BRD v2.3');
+    const gridBtn = screen.getByRole('button', { name: /switch to grid view/i });
+    const listBtn = screen.getByRole('button', { name: /switch to list view/i });
+    await userEvent.click(gridBtn);
+    expect(gridBtn).toHaveAttribute('aria-pressed', 'true');
+    expect(listBtn).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('grid view renders document cards', async () => {
+    renderDocuments();
+    await screen.findByText('NCA Enterprise Architecture BRD v2.3');
+    const gridBtn = screen.getByRole('button', { name: /switch to grid view/i });
+    await userEvent.click(gridBtn);
+    expect(screen.getByLabelText(/document card: NCA Enterprise Architecture BRD v2.3/i)).toBeInTheDocument();
+  });
+
+  it('grid mode persists to localStorage', async () => {
+    renderDocuments();
+    await screen.findByText('NCA Enterprise Architecture BRD v2.3');
+    const gridBtn = screen.getByRole('button', { name: /switch to grid view/i });
+    await userEvent.click(gridBtn);
+    expect(localStorage.getItem('documents_view_mode')).toBe('grid');
+  });
+
+  it('switching back to list view restores table', async () => {
+    renderDocuments();
+    await screen.findByText('NCA Enterprise Architecture BRD v2.3');
+    const gridBtn = screen.getByRole('button', { name: /switch to grid view/i });
+    const listBtn = screen.getByRole('button', { name: /switch to list view/i });
+    await userEvent.click(gridBtn);
+    await userEvent.click(listBtn);
+    expect(listBtn).toHaveAttribute('aria-pressed', 'true');
+    expect(localStorage.getItem('documents_view_mode')).toBe('list');
+  });
+
+  it('loads grid mode from localStorage on mount', async () => {
+    localStorage.setItem('documents_view_mode', 'grid');
+    renderDocuments();
+    await screen.findByText('NCA Enterprise Architecture BRD v2.3');
+    const gridBtn = screen.getByRole('button', { name: /switch to grid view/i });
+    expect(gridBtn).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByLabelText('Documents grid view')).toBeInTheDocument();
+  });
+});
