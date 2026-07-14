@@ -4114,3 +4114,100 @@ describe('Automations – Sort by Last Run DOM Order', () => {
     });
   });
 });
+
+// ────────────────────────────────────────────────────────────
+describe('Automations – Enable/Disable Toggle', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+  afterEach(() => localStorage.clear());
+
+  it('renders an enable/disable toggle switch for each automation', async () => {
+    renderAutomations();
+    await screen.findByText('BRD Generator');
+    const toggles = screen.getAllByRole('switch');
+    expect(toggles.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('toggle has aria-label including automation name', async () => {
+    renderAutomations();
+    await screen.findByText('BRD Generator');
+    expect(screen.getByRole('switch', { name: /toggle automation: BRD Generator/i })).toBeInTheDocument();
+  });
+
+  it('active automation toggle is aria-checked true', async () => {
+    renderAutomations();
+    await screen.findByText('BRD Generator');
+    const toggle = screen.getByRole('switch', { name: /toggle automation: BRD Generator/i });
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('shows "Enabled" label for active automations', async () => {
+    renderAutomations();
+    await screen.findByText('BRD Generator');
+    const enabledLabels = screen.getAllByText('Enabled');
+    expect(enabledLabels.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('clicking toggle disables an active automation', async () => {
+    renderAutomations();
+    await screen.findByText('BRD Generator');
+    const toggle = screen.getByRole('switch', { name: /toggle automation: BRD Generator/i });
+    await userEvent.click(toggle);
+    await waitFor(() => {
+      expect(toggle).toHaveAttribute('aria-checked', 'false');
+    });
+  });
+
+  it('disabled automation shows "Disabled" label', async () => {
+    renderAutomations();
+    await screen.findByText('BRD Generator');
+    const toggle = screen.getByRole('switch', { name: /toggle automation: BRD Generator/i });
+    await userEvent.click(toggle);
+    await waitFor(() => {
+      expect(screen.getByRole('switch', { name: /toggle automation: BRD Generator/i })).toHaveAttribute('aria-checked', 'false');
+    });
+  });
+
+  it('clicking toggle again re-enables the automation', async () => {
+    renderAutomations();
+    await screen.findByText('BRD Generator');
+    const toggle = screen.getByRole('switch', { name: /toggle automation: BRD Generator/i });
+    await userEvent.click(toggle);
+    await userEvent.click(toggle);
+    await waitFor(() => {
+      expect(toggle).toHaveAttribute('aria-checked', 'true');
+    });
+  });
+
+  it('persists disabled state to localStorage', async () => {
+    renderAutomations();
+    await screen.findByText('BRD Generator');
+    const toggle = screen.getByRole('switch', { name: /toggle automation: BRD Generator/i });
+    await userEvent.click(toggle);
+    await waitFor(() => {
+      const stored = JSON.parse(localStorage.getItem('automation_statuses') ?? '{}') as Record<string, string>;
+      expect(stored['auto-001']).toBe('Inactive');
+    });
+  });
+
+  it('persists enabled state to localStorage after re-enable', async () => {
+    renderAutomations();
+    await screen.findByText('BRD Generator');
+    const toggle = screen.getByRole('switch', { name: /toggle automation: BRD Generator/i });
+    await userEvent.click(toggle);
+    await userEvent.click(toggle);
+    await waitFor(() => {
+      const stored = JSON.parse(localStorage.getItem('automation_statuses') ?? '{}') as Record<string, string>;
+      expect(stored['auto-001']).toBe('Active');
+    });
+  });
+
+  it('loads toggle state from localStorage on mount', async () => {
+    localStorage.setItem('automation_statuses', JSON.stringify({ 'auto-001': 'Inactive' }));
+    renderAutomations();
+    await screen.findByText('BRD Generator');
+    const toggle = screen.getByRole('switch', { name: /toggle automation: BRD Generator/i });
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+  });
+});

@@ -135,6 +135,24 @@ export default function Automations() {
     }, 3000);
   }, [runningId, automations]);
 
+  // Per-automation status overrides (enabled/disabled toggle)
+  const AUTO_STATUS_KEY = 'automation_statuses';
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, 'Active' | 'Inactive'>>(() => {
+    try { return JSON.parse(localStorage.getItem(AUTO_STATUS_KEY) ?? '{}') as Record<string, 'Active' | 'Inactive'>; } catch { return {}; }
+  });
+  function toggleAutomationStatus(id: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    setStatusOverrides(prev => {
+      const currentStatus = prev[id] ?? automations.find(a => a.id === id)?.status ?? 'Active';
+      const next = { ...prev, [id]: currentStatus === 'Active' ? 'Inactive' as const : 'Active' as const };
+      try { localStorage.setItem(AUTO_STATUS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }
+  function getEffectiveStatus(auto: { id: string; status: string }): string {
+    return statusOverrides[auto.id] ?? auto.status;
+  }
+
   // Computed stats
   const totalAutomations = automations.length;
   const activeCount = automations.filter(a => a.status === 'Active').length;
@@ -151,7 +169,7 @@ export default function Automations() {
         a.description.toLowerCase().includes(q) ||
         a.category.toLowerCase().includes(q);
       const matchStarred = !starredOnly || starred.has(a.id);
-      const matchStatus = statusFilter === 'All' || a.status === statusFilter;
+      const matchStatus = statusFilter === 'All' || getEffectiveStatus(a) === statusFilter;
       const matchNeverRun = !neverRunOnly || (a.runCount ?? 0) === 0;
       const matchHighSuccess = !highSuccessOnly || (a.successRate ?? 0) >= 90;
       const matchMinRuns = (a.runCount ?? 0) >= minRunsFilter;
@@ -629,6 +647,34 @@ export default function Automations() {
                     <div style={{ width: '6px', height: '6px', borderRadius: '9999px', background: '#10B981', boxShadow: '0 0 5px rgba(16,185,129,0.6)' }} />
                     <span style={{ fontSize: '0.72rem', color: '#34D399', fontWeight: 600 }}>{auto.successRate}%</span>
                   </div>
+                </div>
+
+                {/* Enable/Disable toggle */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.625rem' }} onClick={e => e.stopPropagation()}>
+                  <button
+                    onClick={e => toggleAutomationStatus(auto.id, e)}
+                    aria-label={`Toggle automation: ${auto.name}`}
+                    aria-pressed={getEffectiveStatus(auto) === 'Active'}
+                    role="switch"
+                    aria-checked={getEffectiveStatus(auto) === 'Active'}
+                    style={{
+                      width: '36px', height: '20px', borderRadius: '10px', border: 'none', cursor: 'pointer', padding: '2px', position: 'relative',
+                      background: getEffectiveStatus(auto) === 'Active' ? 'rgba(16,185,129,0.4)' : 'rgba(71,85,105,0.4)',
+                      transition: 'background 0.2s', flexShrink: 0,
+                    }}
+                  >
+                    <span style={{
+                      position: 'absolute', top: '2px',
+                      left: getEffectiveStatus(auto) === 'Active' ? '18px' : '2px',
+                      width: '16px', height: '16px', borderRadius: '50%',
+                      background: getEffectiveStatus(auto) === 'Active' ? '#10B981' : '#475569',
+                      transition: 'left 0.2s, background 0.2s',
+                      display: 'block',
+                    }} />
+                  </button>
+                  <span style={{ fontSize: '0.7rem', color: getEffectiveStatus(auto) === 'Active' ? '#34D399' : '#475569', fontWeight: 600 }}>
+                    {getEffectiveStatus(auto) === 'Active' ? 'Enabled' : 'Disabled'}
+                  </span>
                 </div>
 
                 {/* Action Buttons */}
