@@ -5,7 +5,7 @@ import {
   TrendingUp, TrendingDown, Upload, Video, Sparkles, ArrowRight,
   Bot, Check, X, RefreshCw, Eye,
   Calendar, BarChart3, DollarSign, Target, Activity,
-  Brain, Layers, Users, ChevronRight, UserPlus, ListTodo, ClipboardCopy, Download,
+  Brain, Layers, Users, ChevronRight, UserPlus, ListTodo, ClipboardCopy, Download, Eraser,
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip,
@@ -154,6 +154,7 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [activityFilter, setActivityFilter] = useState<string>('All');
   const [activityUserFilter, setActivityUserFilter] = useState<string>('All');
+  const [activitySearch, setActivitySearch] = useState('');
   const [taskPriorityFilter, setTaskPriorityFilter] = useState<'All' | 'Overdue' | 'High' | 'Medium'>('All');
   const [milestoneStatusFilter, setMilestoneStatusFilter] = useState<'All' | 'On Track' | 'At Risk' | 'Delayed'>('All');
   const [milestoneWorkspaceFilter, setMilestoneWorkspaceFilter] = useState<string>('All');
@@ -170,6 +171,25 @@ export default function Dashboard() {
     } catch { /* ignore */ }
     return new Set();
   });
+  const [quickNotes, setQuickNotes] = useState<string>(() => {
+    try { return localStorage.getItem('dashboard_quick_notes') ?? ''; } catch { return ''; }
+  });
+  const [notesCopied, setNotesCopied] = useState(false);
+  function handleSaveNotes(value: string) {
+    setQuickNotes(value);
+    try { localStorage.setItem('dashboard_quick_notes', value); } catch { /* ignore */ }
+  }
+  function handleClearNotes() {
+    setQuickNotes('');
+    try { localStorage.removeItem('dashboard_quick_notes'); } catch { /* ignore */ }
+  }
+  function handleCopyNotes() {
+    if (!quickNotes.trim()) return;
+    navigator.clipboard.writeText(quickNotes).then(() => {
+      setNotesCopied(true);
+      setTimeout(() => setNotesCopied(false), 2000);
+    }).catch(() => {});
+  }
 
   // Live Supabase data
   const [activities, setActivities] = useState<ActivityRow[]>([]);
@@ -338,10 +358,13 @@ export default function Dashboard() {
 
   const activityTypes = ['All', 'Document', 'Meeting', 'Automation', 'Task'];
   const activityUserOptions = ['All', ...Array.from(new Set(activities.map(a => a.user).filter(Boolean))).sort()];
-  const filteredActivities = activities.filter(a =>
-    (activityFilter === 'All' || a.type === activityFilter.toLowerCase()) &&
-    (activityUserFilter === 'All' || a.user === activityUserFilter)
-  );
+  const filteredActivities = activities.filter(a => {
+    const matchType = activityFilter === 'All' || a.type === activityFilter.toLowerCase();
+    const matchUser = activityUserFilter === 'All' || a.user === activityUserFilter;
+    const q = activitySearch.toLowerCase().trim();
+    const matchSearch = !q || a.action.toLowerCase().includes(q) || (a.target ?? '').toLowerCase().includes(q) || a.user.toLowerCase().includes(q);
+    return matchType && matchUser && matchSearch;
+  });
 
   const quickActions = [
     { icon: <Upload size={18} />, label: 'Upload Doc', color: '#0EA5E9', bg: 'rgba(14,165,233,0.08)', border: 'rgba(14,165,233,0.18)', action: () => setShowUploadModal(true) },
@@ -1584,7 +1607,21 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+          {activities.length > 0 && (
+            <div style={{ padding: '0.5rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <input
+                aria-label="Search activity log"
+                placeholder="Search actions, users, targets…"
+                value={activitySearch}
+                onChange={e => setActivitySearch(e.target.value)}
+                style={{ width: '100%', padding: '0.35rem 0.65rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.03)', color: '#E2E8F0', fontSize: '0.72rem', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+          )}
           <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
+            {filteredActivities.length === 0 && activitySearch && (
+              <div style={{ padding: '1.5rem', textAlign: 'center', color: '#475569', fontSize: '0.78rem' }}>No activity matches "{activitySearch}"</div>
+            )}
             {filteredActivities.slice(0, 12).map((activity, i) => (
               <div key={i} style={{
                 padding: '0.75rem 1.25rem', display: 'flex', alignItems: 'flex-start', gap: '0.75rem',
@@ -1654,6 +1691,41 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* ── Quick Notes ──────────────────────────────────────────────── */}
+      <div className="section-card" style={{ overflow: 'hidden' }}>
+        <div className="section-card-header">
+          <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>Quick Notes</span>
+          <div style={{ display: 'flex', gap: '0.375rem' }}>
+            <button
+              onClick={handleCopyNotes}
+              disabled={!quickNotes.trim()}
+              aria-label="Copy quick notes to clipboard"
+              style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '0.25rem 0.5rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.03)', cursor: quickNotes.trim() ? 'pointer' : 'not-allowed', color: notesCopied ? '#34D399' : '#64748B', fontSize: '0.72rem', fontFamily: 'inherit', opacity: quickNotes.trim() ? 1 : 0.4 }}
+            >
+              <ClipboardCopy size={11} />{notesCopied ? 'Copied!' : 'Copy'}
+            </button>
+            <button
+              onClick={handleClearNotes}
+              disabled={!quickNotes.trim()}
+              aria-label="Clear quick notes"
+              style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '0.25rem 0.5rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.03)', cursor: quickNotes.trim() ? 'pointer' : 'not-allowed', color: '#64748B', fontSize: '0.72rem', fontFamily: 'inherit', opacity: quickNotes.trim() ? 1 : 0.4 }}
+            >
+              <Eraser size={11} />Clear
+            </button>
+          </div>
+        </div>
+        <div style={{ padding: '0.75rem 1rem' }}>
+          <textarea
+            aria-label="Quick notes"
+            placeholder="Jot down quick thoughts, reminders, or action items…"
+            value={quickNotes}
+            onChange={e => handleSaveNotes(e.target.value)}
+            rows={4}
+            style={{ width: '100%', resize: 'vertical', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '0.8rem', fontFamily: 'inherit', padding: '0.625rem 0.75rem', outline: 'none', boxSizing: 'border-box', lineHeight: 1.6 }}
+          />
         </div>
       </div>
 

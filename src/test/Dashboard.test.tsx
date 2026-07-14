@@ -4447,3 +4447,247 @@ describe('Dashboard – Board Decisions', () => {
     });
   });
 });
+
+// ─────────────────────────────────────────────────────────────
+describe('Dashboard – Activity Search', () => {
+  const actA = { id: 'a1', action: 'Report generated', target: 'SC-10 Pack', project: 'MOCI', workspace: 'MOCI', user: 'Ahmed Khalil', time: '2h ago', timestamp: '2h ago', type: 'automation' };
+  const actB = { id: 'a2', action: 'Meeting scheduled', target: 'Steering Q1', project: 'NCA', workspace: 'NCA', user: 'Rania Taleb', time: '3h ago', timestamp: '3h ago', type: 'meeting' };
+  const actC = { id: 'a3', action: 'Document uploaded', target: 'BRD v2.0', project: 'MOCI', workspace: 'MOCI', user: 'Ahmed Khalil', time: '4h ago', timestamp: '4h ago', type: 'document' };
+
+  beforeEach(() => {
+    mockGetActivities.mockResolvedValue([actA, actB, actC]);
+    mockGetMilestones.mockResolvedValue([]);
+    mockGetWorkspaceFinancials.mockResolvedValue([]);
+    mockGetWorkspaces.mockResolvedValue([]);
+    mockGetTasks.mockResolvedValue([]);
+    mockGetRisks.mockResolvedValue([]);
+    mockGetWorkspaceRagStatuses.mockResolvedValue([]);
+    mockGetApprovals.mockResolvedValue([]);
+  });
+
+  it('renders the activity search input when activities exist', async () => {
+    renderDashboard();
+    await screen.findByText('Report generated SC-10 Pack');
+    expect(screen.getByRole('textbox', { name: /search activity log/i })).toBeInTheDocument();
+  });
+
+  it('search input starts empty', async () => {
+    renderDashboard();
+    await screen.findByText('Report generated SC-10 Pack');
+    const searchInput = screen.getByRole('textbox', { name: /search activity log/i });
+    expect((searchInput as HTMLInputElement).value).toBe('');
+  });
+
+  it('filters activities by action text', async () => {
+    renderDashboard();
+    await screen.findByText('Report generated SC-10 Pack');
+    const searchInput = screen.getByRole('textbox', { name: /search activity log/i });
+    fireEvent.change(searchInput, { target: { value: 'Meeting' } });
+    await waitFor(() => {
+      expect(screen.getByText('Meeting scheduled Steering Q1')).toBeInTheDocument();
+      expect(screen.queryByText('Report generated SC-10 Pack')).not.toBeInTheDocument();
+      expect(screen.queryByText('Document uploaded BRD v2.0')).not.toBeInTheDocument();
+    });
+  });
+
+  it('filters activities by target text', async () => {
+    renderDashboard();
+    await screen.findByText('Report generated SC-10 Pack');
+    const searchInput = screen.getByRole('textbox', { name: /search activity log/i });
+    fireEvent.change(searchInput, { target: { value: 'BRD' } });
+    await waitFor(() => {
+      expect(screen.getByText('Document uploaded BRD v2.0')).toBeInTheDocument();
+      expect(screen.queryByText('Report generated SC-10 Pack')).not.toBeInTheDocument();
+    });
+  });
+
+  it('filters activities by user name', async () => {
+    renderDashboard();
+    await screen.findByText('Report generated SC-10 Pack');
+    const searchInput = screen.getByRole('textbox', { name: /search activity log/i });
+    fireEvent.change(searchInput, { target: { value: 'Rania' } });
+    await waitFor(() => {
+      expect(screen.getByText('Meeting scheduled Steering Q1')).toBeInTheDocument();
+      expect(screen.queryByText('Report generated SC-10 Pack')).not.toBeInTheDocument();
+    });
+  });
+
+  it('search is case-insensitive', async () => {
+    renderDashboard();
+    await screen.findByText('Report generated SC-10 Pack');
+    const searchInput = screen.getByRole('textbox', { name: /search activity log/i });
+    fireEvent.change(searchInput, { target: { value: 'report' } });
+    await waitFor(() => {
+      expect(screen.getByText('Report generated SC-10 Pack')).toBeInTheDocument();
+    });
+  });
+
+  it('shows empty-state message when no activity matches search', async () => {
+    renderDashboard();
+    await screen.findByText('Report generated SC-10 Pack');
+    const searchInput = screen.getByRole('textbox', { name: /search activity log/i });
+    fireEvent.change(searchInput, { target: { value: 'xyznotfound' } });
+    await waitFor(() => {
+      expect(screen.getByText(/no activity matches/i)).toBeInTheDocument();
+    });
+  });
+
+  it('clearing search restores all activities', async () => {
+    renderDashboard();
+    await screen.findByText('Report generated SC-10 Pack');
+    const searchInput = screen.getByRole('textbox', { name: /search activity log/i });
+    fireEvent.change(searchInput, { target: { value: 'Meeting' } });
+    await waitFor(() => expect(screen.queryByText('Report generated SC-10 Pack')).not.toBeInTheDocument());
+    fireEvent.change(searchInput, { target: { value: '' } });
+    await waitFor(() => {
+      expect(screen.getByText('Report generated SC-10 Pack')).toBeInTheDocument();
+      expect(screen.getByText('Meeting scheduled Steering Q1')).toBeInTheDocument();
+      expect(screen.getByText('Document uploaded BRD v2.0')).toBeInTheDocument();
+    });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+describe('Dashboard – Quick Notes', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    mockGetActivities.mockResolvedValue([]);
+    mockGetMilestones.mockResolvedValue([]);
+    mockGetWorkspaceFinancials.mockResolvedValue([]);
+    mockGetWorkspaces.mockResolvedValue([]);
+    mockGetTasks.mockResolvedValue([]);
+    mockGetRisks.mockResolvedValue([]);
+    mockGetWorkspaceRagStatuses.mockResolvedValue([]);
+    mockGetApprovals.mockResolvedValue([]);
+  });
+
+  it('renders the Quick Notes textarea', async () => {
+    renderDashboard();
+    await waitFor(() => {
+      expect(screen.getByRole('textbox', { name: /quick notes/i })).toBeInTheDocument();
+    });
+  });
+
+  it('renders the Quick Notes heading', async () => {
+    renderDashboard();
+    await waitFor(() => {
+      expect(screen.getByText('Quick Notes')).toBeInTheDocument();
+    });
+  });
+
+  it('starts with empty notes when localStorage is empty', async () => {
+    renderDashboard();
+    await waitFor(() => {
+      const ta = screen.getByRole('textbox', { name: /quick notes/i }) as HTMLTextAreaElement;
+      expect(ta.value).toBe('');
+    });
+  });
+
+  it('loads saved notes from localStorage on mount', async () => {
+    localStorage.setItem('dashboard_quick_notes', 'Remember to review SC-10 risks');
+    renderDashboard();
+    await waitFor(() => {
+      const ta = screen.getByRole('textbox', { name: /quick notes/i }) as HTMLTextAreaElement;
+      expect(ta.value).toBe('Remember to review SC-10 risks');
+    });
+  });
+
+  it('typing in the notes textarea updates the value', async () => {
+    renderDashboard();
+    await waitFor(() => expect(screen.getByRole('textbox', { name: /quick notes/i })).toBeInTheDocument());
+    const ta = screen.getByRole('textbox', { name: /quick notes/i });
+    fireEvent.change(ta, { target: { value: 'New note content' } });
+    expect((ta as HTMLTextAreaElement).value).toBe('New note content');
+  });
+
+  it('typing in notes saves to localStorage', async () => {
+    renderDashboard();
+    await waitFor(() => expect(screen.getByRole('textbox', { name: /quick notes/i })).toBeInTheDocument());
+    const ta = screen.getByRole('textbox', { name: /quick notes/i });
+    fireEvent.change(ta, { target: { value: 'Saved note' } });
+    expect(localStorage.getItem('dashboard_quick_notes')).toBe('Saved note');
+  });
+
+  it('Clear button is disabled when notes are empty', async () => {
+    renderDashboard();
+    await waitFor(() => {
+      const clearBtn = screen.getByRole('button', { name: /clear quick notes/i });
+      expect(clearBtn).toBeDisabled();
+    });
+  });
+
+  it('Clear button is enabled when notes have content', async () => {
+    localStorage.setItem('dashboard_quick_notes', 'Some note');
+    renderDashboard();
+    await waitFor(() => {
+      const clearBtn = screen.getByRole('button', { name: /clear quick notes/i });
+      expect(clearBtn).not.toBeDisabled();
+    });
+  });
+
+  it('clicking Clear removes notes and clears localStorage', async () => {
+    localStorage.setItem('dashboard_quick_notes', 'Note to clear');
+    renderDashboard();
+    await waitFor(() => {
+      const ta = screen.getByRole('textbox', { name: /quick notes/i }) as HTMLTextAreaElement;
+      expect(ta.value).toBe('Note to clear');
+    });
+    await userEvent.click(screen.getByRole('button', { name: /clear quick notes/i }));
+    await waitFor(() => {
+      const ta = screen.getByRole('textbox', { name: /quick notes/i }) as HTMLTextAreaElement;
+      expect(ta.value).toBe('');
+    });
+    expect(localStorage.getItem('dashboard_quick_notes')).toBeNull();
+  });
+
+  it('Copy button is disabled when notes are empty', async () => {
+    renderDashboard();
+    await waitFor(() => {
+      const copyBtn = screen.getByRole('button', { name: /copy quick notes to clipboard/i });
+      expect(copyBtn).toBeDisabled();
+    });
+  });
+
+  it('Copy button is enabled when notes have content', async () => {
+    localStorage.setItem('dashboard_quick_notes', 'Some note');
+    renderDashboard();
+    await waitFor(() => {
+      const copyBtn = screen.getByRole('button', { name: /copy quick notes to clipboard/i });
+      expect(copyBtn).not.toBeDisabled();
+    });
+  });
+
+  it('clicking Copy calls clipboard.writeText with notes content', async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText: writeTextMock } });
+    localStorage.setItem('dashboard_quick_notes', 'Clipboard note');
+    renderDashboard();
+    await waitFor(() => expect(screen.getByRole('button', { name: /copy quick notes to clipboard/i })).not.toBeDisabled());
+    await userEvent.click(screen.getByRole('button', { name: /copy quick notes to clipboard/i }));
+    await waitFor(() => {
+      expect(writeTextMock).toHaveBeenCalledWith('Clipboard note');
+    });
+    vi.unstubAllGlobals();
+  });
+
+  it('Copy button shows "Copied!" after clicking', async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText: writeTextMock } });
+    localStorage.setItem('dashboard_quick_notes', 'Note to copy');
+    renderDashboard();
+    await waitFor(() => expect(screen.getByRole('button', { name: /copy quick notes to clipboard/i })).not.toBeDisabled());
+    await userEvent.click(screen.getByRole('button', { name: /copy quick notes to clipboard/i }));
+    await waitFor(() => {
+      expect(screen.getByText('Copied!')).toBeInTheDocument();
+    });
+    vi.unstubAllGlobals();
+  });
+
+  it('placeholder text is shown when notes are empty', async () => {
+    renderDashboard();
+    await waitFor(() => {
+      const ta = screen.getByRole('textbox', { name: /quick notes/i }) as HTMLTextAreaElement;
+      expect(ta.placeholder).toContain('Jot down');
+    });
+  });
+});
