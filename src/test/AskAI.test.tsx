@@ -4542,3 +4542,91 @@ describe('AskAI – Message Search', () => {
     });
   });
 });
+
+// ────────────────────────────────────────────────────────────
+describe('AskAI – Message Reactions', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    mockOpenRouterSuccess('Great analysis done.');
+  });
+  afterEach(() => localStorage.clear());
+
+  async function sendAndGetAIResponse() {
+    render(<AskAI />);
+    const chatInput = screen.getByRole('textbox', { name: /chat input/i });
+    await userEvent.type(chatInput, 'Analyze portfolio');
+    fireEvent.keyDown(chatInput, { key: 'Enter', shiftKey: false });
+    await screen.findByText('Great analysis done.');
+  }
+
+  it('shows thumbs up button on AI responses', async () => {
+    await sendAndGetAIResponse();
+    const upBtns = screen.getAllByRole('button', { name: /thumbs up for message/i });
+    expect(upBtns.length).toBeGreaterThan(0);
+  });
+
+  it('shows thumbs down button on AI responses', async () => {
+    await sendAndGetAIResponse();
+    const downBtns = screen.getAllByRole('button', { name: /thumbs down for message/i });
+    expect(downBtns.length).toBeGreaterThan(0);
+  });
+
+  it('thumbs up is aria-pressed false initially', async () => {
+    await sendAndGetAIResponse();
+    const upBtn = screen.getAllByRole('button', { name: /thumbs up for message/i })[0];
+    expect(upBtn).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('thumbs down is aria-pressed false initially', async () => {
+    await sendAndGetAIResponse();
+    const downBtn = screen.getAllByRole('button', { name: /thumbs down for message/i })[0];
+    expect(downBtn).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('clicking thumbs up sets aria-pressed to true', async () => {
+    await sendAndGetAIResponse();
+    const upBtn = screen.getAllByRole('button', { name: /thumbs up for message/i })[0];
+    await userEvent.click(upBtn);
+    expect(upBtn).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('clicking thumbs down sets aria-pressed to true', async () => {
+    await sendAndGetAIResponse();
+    const downBtn = screen.getAllByRole('button', { name: /thumbs down for message/i })[0];
+    await userEvent.click(downBtn);
+    expect(downBtn).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('clicking thumbs up again toggles it off', async () => {
+    await sendAndGetAIResponse();
+    const upBtn = screen.getAllByRole('button', { name: /thumbs up for message/i })[0];
+    await userEvent.click(upBtn);
+    await userEvent.click(upBtn);
+    expect(upBtn).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('clicking thumbs down after thumbs up switches reaction', async () => {
+    await sendAndGetAIResponse();
+    const upBtn = screen.getAllByRole('button', { name: /thumbs up for message/i })[0];
+    const downBtn = screen.getAllByRole('button', { name: /thumbs down for message/i })[0];
+    await userEvent.click(upBtn);
+    await userEvent.click(downBtn);
+    expect(upBtn).toHaveAttribute('aria-pressed', 'false');
+    expect(downBtn).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('reaction persists to localStorage', async () => {
+    await sendAndGetAIResponse();
+    const upBtn = screen.getAllByRole('button', { name: /thumbs up for message/i })[0];
+    await userEvent.click(upBtn);
+    const stored = JSON.parse(localStorage.getItem('askai_message_reactions') ?? '{}');
+    const values = Object.values(stored);
+    expect(values).toContain('up');
+  });
+
+  it('does not show reaction buttons on user messages', async () => {
+    await sendAndGetAIResponse();
+    const allUpBtns = screen.getAllByRole('button', { name: /thumbs up for message/i });
+    expect(allUpBtns.length).toBe(1);
+  });
+});

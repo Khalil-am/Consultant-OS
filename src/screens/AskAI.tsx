@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Send, Mic, Plus, Sparkles, ChevronDown, Share2, History,
   User, Image, FileText, Code2, MessageSquare, Bot, Menu, X, Download, Eraser, ClipboardCopy, Search,
+  ThumbsUp, ThumbsDown,
 } from 'lucide-react';
 import { useLayout } from '../hooks/useLayout';
 import {
@@ -310,6 +311,24 @@ export default function AskAI() {
   const [copiedFullConversation, setCopiedFullConversation] = useState(false);
   const [txtExported, setTxtExported] = useState(false);
   const [messageSearch, setMessageSearch] = useState('');
+
+  // Message reactions
+  const REACTIONS_KEY = 'askai_message_reactions';
+  const [reactions, setReactions] = useState<Record<string, 'up' | 'down'>>(() => {
+    try { return JSON.parse(localStorage.getItem(REACTIONS_KEY) ?? '{}') as Record<string, 'up' | 'down'>; } catch { return {}; }
+  });
+  function handleReaction(msgId: string, reaction: 'up' | 'down') {
+    setReactions(prev => {
+      const next = { ...prev };
+      if (next[msgId] === reaction) {
+        delete next[msgId];
+      } else {
+        next[msgId] = reaction;
+      }
+      try { localStorage.setItem(REACTIONS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -1111,6 +1130,40 @@ export default function AskAI() {
                   }}>
                     {msg.role === 'user' ? msg.content : renderMarkdown(msg.content)}
                   </div>
+
+                  {/* Reaction buttons for AI messages */}
+                  {msg.role === 'assistant' && (
+                    <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                      <button
+                        onClick={() => handleReaction(msg.id, 'up')}
+                        aria-label={`Thumbs up for message ${msg.id}`}
+                        aria-pressed={reactions[msg.id] === 'up'}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 3,
+                          padding: '3px 8px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                          background: reactions[msg.id] === 'up' ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.04)',
+                          color: reactions[msg.id] === 'up' ? '#10B981' : '#475569',
+                          fontSize: '0.7rem', transition: 'all 0.15s',
+                        }}
+                      >
+                        <ThumbsUp size={11} />
+                      </button>
+                      <button
+                        onClick={() => handleReaction(msg.id, 'down')}
+                        aria-label={`Thumbs down for message ${msg.id}`}
+                        aria-pressed={reactions[msg.id] === 'down'}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 3,
+                          padding: '3px 8px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                          background: reactions[msg.id] === 'down' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)',
+                          color: reactions[msg.id] === 'down' ? '#EF4444' : '#475569',
+                          fontSize: '0.7rem', transition: 'all 0.15s',
+                        }}
+                      >
+                        <ThumbsDown size={11} />
+                      </button>
+                    </div>
+                  )}
 
                   {/* Timestamp for user messages */}
                   {msg.role === 'user' && (
