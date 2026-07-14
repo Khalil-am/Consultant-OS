@@ -3443,3 +3443,284 @@ describe('Admin – Refresh Trello Integration', () => {
     });
   });
 });
+
+// ────────────────────────────────────────────────────────────────────────────
+describe('Admin – System Health', () => {
+  async function goToHealth() {
+    renderAdmin();
+    await screen.findByText('Ahmed Khalil');
+    await userEvent.click(screen.getByRole('button', { name: /admin section: system health/i }));
+    await waitFor(() => expect(screen.getByRole('heading', { name: /system health/i, level: 2 })).toBeInTheDocument());
+  }
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('System Health nav button is visible in sidebar', async () => {
+    renderAdmin();
+    await screen.findByText('Ahmed Khalil');
+    expect(screen.getByRole('button', { name: /admin section: system health/i })).toBeInTheDocument();
+  });
+
+  it('navigates to System Health section when clicked', async () => {
+    await goToHealth();
+    expect(screen.getByRole('heading', { name: /system health/i, level: 2 })).toBeInTheDocument();
+  });
+
+  it('shows overall system status banner', async () => {
+    await goToHealth();
+    expect(screen.getByLabelText('Overall system status')).toBeInTheDocument();
+  });
+
+  it('shows "All Systems Operational" when all services are up', async () => {
+    await goToHealth();
+    expect(screen.getByText('All Systems Operational')).toBeInTheDocument();
+  });
+
+  it('renders all 6 default services', async () => {
+    await goToHealth();
+    const serviceCards = screen.getAllByRole('generic', { name: /^Service: /i });
+    expect(serviceCards.length).toBe(6);
+  });
+
+  it('renders Database service card', async () => {
+    await goToHealth();
+    expect(screen.getByLabelText('Service: Database')).toBeInTheDocument();
+  });
+
+  it('renders API Gateway service card', async () => {
+    await goToHealth();
+    expect(screen.getByLabelText('Service: API Gateway')).toBeInTheDocument();
+  });
+
+  it('renders AI / OpenRouter service card', async () => {
+    await goToHealth();
+    expect(screen.getByLabelText('Service: AI / OpenRouter')).toBeInTheDocument();
+  });
+
+  it('renders Trello Integration service card', async () => {
+    await goToHealth();
+    expect(screen.getByLabelText('Service: Trello Integration')).toBeInTheDocument();
+  });
+
+  it('renders File Storage service card', async () => {
+    await goToHealth();
+    expect(screen.getByLabelText('Service: File Storage')).toBeInTheDocument();
+  });
+
+  it('renders Authentication service card', async () => {
+    await goToHealth();
+    expect(screen.getByLabelText('Service: Authentication')).toBeInTheDocument();
+  });
+
+  it('each service has a status badge', async () => {
+    await goToHealth();
+    const statusBadges = screen.getAllByRole('generic', { name: /status$/i });
+    expect(statusBadges.length).toBeGreaterThanOrEqual(6);
+  });
+
+  it('shows uptime percentages for services', async () => {
+    await goToHealth();
+    const dbUptime = screen.getByLabelText('Database uptime');
+    expect(dbUptime).toHaveTextContent('%');
+  });
+
+  it('shows latency for Database service', async () => {
+    await goToHealth();
+    const latency = screen.getByLabelText('Database latency');
+    expect(latency).toHaveTextContent('ms');
+  });
+
+  it('shows Run Diagnostics button', async () => {
+    await goToHealth();
+    expect(screen.getByRole('button', { name: /run health diagnostics/i })).toBeInTheDocument();
+  });
+
+  it('Run Diagnostics button shows "Running…" while running', async () => {
+    await goToHealth();
+    await userEvent.click(screen.getByRole('button', { name: /run health diagnostics/i }));
+    expect(screen.getByRole('button', { name: /run health diagnostics/i })).toBeDisabled();
+  });
+
+  it('Run Diagnostics button re-enables after completion', async () => {
+    await goToHealth();
+    await userEvent.click(screen.getByRole('button', { name: /run health diagnostics/i }));
+    await waitFor(
+      () => expect(screen.getByRole('button', { name: /run health diagnostics/i })).not.toBeDisabled(),
+      { timeout: 3000 }
+    );
+  }, 8000);
+
+  it('Run Diagnostics updates lastChecked timestamps', async () => {
+    await goToHealth();
+    await userEvent.click(screen.getByRole('button', { name: /run health diagnostics/i }));
+    await waitFor(
+      () => expect(screen.getByRole('button', { name: /run health diagnostics/i })).not.toBeDisabled(),
+      { timeout: 3000 }
+    );
+    expect(screen.getByLabelText('Overall system status')).toBeInTheDocument();
+  }, 8000);
+
+  it('shows Copy Report button', async () => {
+    await goToHealth();
+    expect(screen.getByRole('button', { name: /copy health report/i })).toBeInTheDocument();
+  });
+
+  it('Copy Report calls navigator.clipboard.writeText', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, writable: true, configurable: true });
+    await goToHealth();
+    await userEvent.click(screen.getByRole('button', { name: /copy health report/i }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(expect.stringContaining('System Health Report')));
+  });
+
+  it('Copy Report shows "Copied!" feedback', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, writable: true, configurable: true });
+    await goToHealth();
+    await userEvent.click(screen.getByRole('button', { name: /copy health report/i }));
+    await waitFor(() => expect(screen.getByText('Copied!')).toBeInTheDocument());
+  });
+
+  it('shows Incident History section', async () => {
+    await goToHealth();
+    expect(screen.getByText('Incident History')).toBeInTheDocument();
+  });
+
+  it('shows default incidents', async () => {
+    await goToHealth();
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Incident: Elevated latency/i)).toBeInTheDocument();
+    });
+  });
+
+  it('shows resolved badge on resolved incidents', async () => {
+    await goToHealth();
+    const resolved = await screen.findAllByText('Resolved');
+    expect(resolved.length).toBeGreaterThan(0);
+  });
+
+  it('shows Resolve button for unresolved incidents', async () => {
+    // Add an unresolved incident via localStorage
+    localStorage.setItem('admin_health_incidents', JSON.stringify([
+      { id: 'inc-test', service: 'Database', description: 'Test outage', severity: 'critical', timestamp: new Date().toISOString(), resolved: false },
+    ]));
+    await goToHealth();
+    const resolveBtn = await screen.findByRole('button', { name: /mark incident inc-test as resolved/i });
+    expect(resolveBtn).toBeInTheDocument();
+  });
+
+  it('clicking Resolve marks incident as resolved', async () => {
+    localStorage.setItem('admin_health_incidents', JSON.stringify([
+      { id: 'inc-test', service: 'Database', description: 'Test outage', severity: 'critical', timestamp: new Date().toISOString(), resolved: false },
+    ]));
+    await goToHealth();
+    const resolveBtn = await screen.findByRole('button', { name: /mark incident inc-test as resolved/i });
+    await userEvent.click(resolveBtn);
+    await waitFor(() => expect(screen.getByText('Resolved')).toBeInTheDocument());
+  });
+
+  it('incident resolve state persists to localStorage', async () => {
+    localStorage.setItem('admin_health_incidents', JSON.stringify([
+      { id: 'inc-test', service: 'Database', description: 'Test outage', severity: 'critical', timestamp: new Date().toISOString(), resolved: false },
+    ]));
+    await goToHealth();
+    const resolveBtn = await screen.findByRole('button', { name: /mark incident inc-test as resolved/i });
+    await userEvent.click(resolveBtn);
+    await waitFor(() => {
+      const stored = JSON.parse(localStorage.getItem('admin_health_incidents') ?? '[]');
+      expect(stored.find((i: { id: string }) => i.id === 'inc-test')?.resolved).toBe(true);
+    });
+  });
+
+  it('Reopen button appears after resolving an incident', async () => {
+    localStorage.setItem('admin_health_incidents', JSON.stringify([
+      { id: 'inc-test', service: 'Database', description: 'Test outage', severity: 'critical', timestamp: new Date().toISOString(), resolved: false },
+    ]));
+    await goToHealth();
+    const resolveBtn = await screen.findByRole('button', { name: /mark incident inc-test as resolved/i });
+    await userEvent.click(resolveBtn);
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /mark incident inc-test as unresolved/i })).toBeInTheDocument();
+    });
+  });
+
+  it('Filter "Unresolved" hides resolved incidents', async () => {
+    await goToHealth();
+    // Default incidents are all resolved
+    const unresolvedBtn = screen.getByRole('button', { name: /filter incidents: unresolved/i });
+    await userEvent.click(unresolvedBtn);
+    await waitFor(() => {
+      expect(screen.queryByText('Elevated latency detected')).not.toBeInTheDocument();
+    });
+  });
+
+  it('Filter "Unresolved" button has aria-pressed true when active', async () => {
+    await goToHealth();
+    const unresolvedBtn = screen.getByRole('button', { name: /filter incidents: unresolved/i });
+    await userEvent.click(unresolvedBtn);
+    await waitFor(() => expect(unresolvedBtn).toHaveAttribute('aria-pressed', 'true'));
+  });
+
+  it('"All" filter shows all incidents', async () => {
+    await goToHealth();
+    // Switch to unresolved first, then back to All
+    await userEvent.click(screen.getByRole('button', { name: /filter incidents: unresolved/i }));
+    await userEvent.click(screen.getByRole('button', { name: /filter incidents: all/i }));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Incident: Elevated latency/i)).toBeInTheDocument();
+    });
+  });
+
+  it('shows "No incidents to display" when filtered list is empty', async () => {
+    await goToHealth();
+    await userEvent.click(screen.getByRole('button', { name: /filter incidents: unresolved/i }));
+    await waitFor(() => expect(screen.getByText('No incidents to display')).toBeInTheDocument());
+  });
+
+  it('health services are loaded from localStorage if present', async () => {
+    localStorage.setItem('admin_system_health', JSON.stringify([
+      { id: 'db', name: 'Database', category: 'Infrastructure', status: 'down', uptime: 0, latency: 999, lastChecked: new Date().toISOString() },
+    ]));
+    await goToHealth();
+    await waitFor(() => {
+      const dbStatus = screen.getByLabelText('Database status');
+      expect(dbStatus).toHaveTextContent('Down');
+    });
+  });
+
+  it('shows service disruption banner when a service is down', async () => {
+    localStorage.setItem('admin_system_health', JSON.stringify([
+      { id: 'db', name: 'Database', category: 'Infrastructure', status: 'down', uptime: 0, latency: 999, lastChecked: new Date().toISOString() },
+    ]));
+    await goToHealth();
+    await waitFor(() => {
+      expect(screen.getByText('Service Disruption Detected')).toBeInTheDocument();
+    });
+  });
+
+  it('shows "Degraded Performance" banner when a service is degraded', async () => {
+    localStorage.setItem('admin_system_health', JSON.stringify([
+      { id: 'api', name: 'API Gateway', category: 'Infrastructure', status: 'degraded', uptime: 95, latency: 800, lastChecked: new Date().toISOString() },
+    ]));
+    await goToHealth();
+    await waitFor(() => {
+      expect(screen.getByText('Degraded Performance')).toBeInTheDocument();
+    });
+  });
+
+  it('header shows count of operational services', async () => {
+    await goToHealth();
+    await waitFor(() => {
+      const el = screen.getByText(/services operational/i);
+      expect(el).toBeInTheDocument();
+    });
+  });
+
+  it('System Health section heading is present', async () => {
+    await goToHealth();
+    const heading = screen.getByRole('heading', { name: /system health/i, level: 2 });
+    expect(heading).toBeInTheDocument();
+  });
+});

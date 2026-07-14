@@ -7,6 +7,7 @@ import {
   LayoutDashboard, BookOpen, Github, ScanLine, Sparkles, Brain,
   CheckCircle, ChevronLeft, ChevronRight, Download, Filter,
   Lock, Key, AlertTriangle, Info, Code2, Search, Trash2, ClipboardCopy, FileText,
+  Activity, Wifi, Database, Server, Clock,
 } from 'lucide-react';
 import { users } from '../data/mockData';
 import { fetchBATrafficBoard } from '../lib/trello';
@@ -16,6 +17,7 @@ const adminSections = [
   { id: 'users', label: 'Users & Roles', icon: <Users size={15} /> },
   { id: 'integrations', label: 'Integrations', icon: <Zap size={15} /> },
   { id: 'security', label: 'Security & Audit', icon: <Shield size={15} /> },
+  { id: 'health', label: 'System Health', icon: <Activity size={15} /> },
 ];
 
 interface AuditEvent {
@@ -41,6 +43,43 @@ const initialAuditEvents: AuditEvent[] = [
   { id: 'evt-008', actor: 'Rania Taleb', action: 'Password reset triggered', target: 'khalid.omar@firm.com', ip: '10.0.2.8', timestamp: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(), severity: 'warning' },
   { id: 'evt-009', actor: 'Ahmed Khalil', action: 'New workspace created', target: 'NCA Smart City Initiative', ip: '10.0.1.15', timestamp: new Date(Date.now() - 1000 * 60 * 60 * 18).toISOString(), severity: 'info' },
   { id: 'evt-010', actor: 'System', action: 'Suspicious login blocked', target: 'admin@firm.com from unknown device', ip: '45.33.32.156', timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), severity: 'critical' },
+];
+
+// ── System Health ─────────────────────────────────────────────────────────────
+interface HealthService {
+  id: string;
+  name: string;
+  category: string;
+  status: 'operational' | 'degraded' | 'down';
+  uptime: number; // percentage
+  latency: number; // ms
+  lastChecked: string; // ISO
+}
+
+interface HealthIncident {
+  id: string;
+  service: string;
+  description: string;
+  severity: 'info' | 'warning' | 'critical';
+  timestamp: string;
+  resolved: boolean;
+}
+
+const HEALTH_KEY = 'admin_system_health';
+const HEALTH_INCIDENTS_KEY = 'admin_health_incidents';
+
+const defaultHealthServices: HealthService[] = [
+  { id: 'db', name: 'Database', category: 'Infrastructure', status: 'operational', uptime: 99.9, latency: 12, lastChecked: new Date(Date.now() - 1000 * 30).toISOString() },
+  { id: 'api', name: 'API Gateway', category: 'Infrastructure', status: 'operational', uptime: 99.7, latency: 48, lastChecked: new Date(Date.now() - 1000 * 30).toISOString() },
+  { id: 'ai', name: 'AI / OpenRouter', category: 'Services', status: 'operational', uptime: 98.2, latency: 320, lastChecked: new Date(Date.now() - 1000 * 30).toISOString() },
+  { id: 'trello', name: 'Trello Integration', category: 'Integrations', status: 'operational', uptime: 99.1, latency: 85, lastChecked: new Date(Date.now() - 1000 * 30).toISOString() },
+  { id: 'storage', name: 'File Storage', category: 'Infrastructure', status: 'operational', uptime: 99.95, latency: 22, lastChecked: new Date(Date.now() - 1000 * 30).toISOString() },
+  { id: 'auth', name: 'Authentication', category: 'Services', status: 'operational', uptime: 99.8, latency: 31, lastChecked: new Date(Date.now() - 1000 * 30).toISOString() },
+];
+
+const defaultHealthIncidents: HealthIncident[] = [
+  { id: 'inc-001', service: 'AI / OpenRouter', description: 'Elevated latency detected (>500ms p99)', severity: 'warning', timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(), resolved: true },
+  { id: 'inc-002', service: 'Database', description: 'Read replica lag spike — auto-recovered', severity: 'info', timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(), resolved: true },
 ];
 
 const roleColors: Record<string, { bg: string; text: string }> = {
@@ -89,7 +128,7 @@ const lastActivityTimes: Record<string, string> = {
 };
 
 // Suppress unused import warnings
-void Code2;
+void Code2; void Clock;
 
 export default function Admin() {
   const { width, isMobile, isTablet } = useLayout();
@@ -133,6 +172,70 @@ export default function Admin() {
   const [usersTxtExported, setUsersTxtExported] = useState(false);
   const [auditSummaryCopied, setAuditSummaryCopied] = useState(false);
   const [integrationStatusCopied, setIntegrationStatusCopied] = useState(false);
+
+  // ── System Health state ───────────────────────────────────────────────────
+  const [healthServices, setHealthServices] = useState<HealthService[]>(() => {
+    try {
+      const saved = localStorage.getItem(HEALTH_KEY);
+      if (saved) return JSON.parse(saved) as HealthService[];
+    } catch { /* ignore */ }
+    return defaultHealthServices;
+  });
+  const [healthIncidents, setHealthIncidents] = useState<HealthIncident[]>(() => {
+    try {
+      const saved = localStorage.getItem(HEALTH_INCIDENTS_KEY);
+      if (saved) return JSON.parse(saved) as HealthIncident[];
+    } catch { /* ignore */ }
+    return defaultHealthIncidents;
+  });
+  const [healthRunning, setHealthRunning] = useState(false);
+  const [healthReportCopied, setHealthReportCopied] = useState(false);
+  const [healthIncidentFilter, setHealthIncidentFilter] = useState<'all' | 'unresolved'>('all');
+
+  function runHealthDiagnostics() {
+    setHealthRunning(true);
+    setTimeout(() => {
+      const now = new Date().toISOString();
+      const updated = healthServices.map(svc => ({
+        ...svc,
+        latency: Math.max(5, svc.latency + Math.round((Math.random() - 0.5) * 20)),
+        lastChecked: now,
+      }));
+      setHealthServices(updated);
+      try { localStorage.setItem(HEALTH_KEY, JSON.stringify(updated)); } catch { /* ignore */ }
+      setHealthRunning(false);
+    }, 1200);
+  }
+
+  function toggleIncidentResolved(id: string) {
+    setHealthIncidents(prev => {
+      const next = prev.map(inc => inc.id === id ? { ...inc, resolved: !inc.resolved } : inc);
+      try { localStorage.setItem(HEALTH_INCIDENTS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }
+
+  function handleCopyHealthReport() {
+    const operational = healthServices.filter(s => s.status === 'operational').length;
+    const degraded = healthServices.filter(s => s.status === 'degraded').length;
+    const down = healthServices.filter(s => s.status === 'down').length;
+    const avgUptime = (healthServices.reduce((acc, s) => acc + s.uptime, 0) / healthServices.length).toFixed(2);
+    const lines = [
+      `System Health Report`,
+      `Services: ${healthServices.length} total · ${operational} operational · ${degraded} degraded · ${down} down`,
+      `Avg Uptime: ${avgUptime}%`,
+      '',
+      ...healthServices.map(s => `${s.status === 'operational' ? '✓' : s.status === 'degraded' ? '⚠' : '✗'} ${s.name} — ${s.uptime}% uptime · ${s.latency}ms`),
+    ].join('\n');
+    navigator.clipboard.writeText(lines).then(() => {
+      setHealthReportCopied(true);
+      setTimeout(() => setHealthReportCopied(false), 2000);
+    }).catch(() => {});
+  }
+
+  const filteredIncidents = healthIncidentFilter === 'unresolved'
+    ? healthIncidents.filter(i => !i.resolved)
+    : healthIncidents;
 
   function handleExportAuditLogCSV() {
     if (filteredAuditEvents.length === 0) return;
@@ -1430,6 +1533,169 @@ export default function Admin() {
                           <div style={{ fontSize: '0.68rem', color: 'var(--text-faint)', textAlign: 'right' }}>{fmtAuditTime(evt.timestamp)}</div>
                         </>
                       )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ═══ System Health ═══ */}
+        {activeSection === 'health' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div>
+                <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#F1F5F9', margin: 0, marginBottom: '0.25rem' }}>System Health</h2>
+                <p style={{ fontSize: '0.8rem', color: '#64748B', margin: 0 }}>
+                  {healthServices.filter(s => s.status === 'operational').length}/{healthServices.length} services operational
+                  {healthIncidents.filter(i => !i.resolved).length > 0 && (
+                    <span style={{ color: '#F59E0B', marginLeft: '0.5rem' }}>
+                      · {healthIncidents.filter(i => !i.resolved).length} active incident{healthIncidents.filter(i => !i.resolved).length !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button
+                  className="btn-ghost"
+                  aria-label="Copy health report to clipboard"
+                  onClick={handleCopyHealthReport}
+                  style={{ fontSize: '0.72rem', height: '32px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                >
+                  <ClipboardCopy size={11} /> {healthReportCopied ? 'Copied!' : 'Copy Report'}
+                </button>
+                <button
+                  className="btn-primary"
+                  aria-label="Run health diagnostics"
+                  onClick={runHealthDiagnostics}
+                  disabled={healthRunning}
+                  style={{ fontSize: '0.72rem', height: '32px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                >
+                  <RefreshCw size={11} style={{ animation: healthRunning ? 'spin 1s linear infinite' : 'none' }} />
+                  {healthRunning ? 'Running…' : 'Run Diagnostics'}
+                </button>
+              </div>
+            </div>
+
+            {/* Overall status banner */}
+            {(() => {
+              const allOk = healthServices.every(s => s.status === 'operational');
+              const anyDown = healthServices.some(s => s.status === 'down');
+              const color = allOk ? '#10B981' : anyDown ? '#EF4444' : '#F59E0B';
+              const label = allOk ? 'All Systems Operational' : anyDown ? 'Service Disruption Detected' : 'Degraded Performance';
+              return (
+                <div aria-label="Overall system status" style={{
+                  padding: '0.75rem 1rem', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.625rem',
+                  background: `${color}12`, border: `1px solid ${color}30`,
+                }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: color, boxShadow: `0 0 6px ${color}80`, flexShrink: 0 }} />
+                  <span style={{ fontSize: '0.82rem', fontWeight: 600, color }}>{label}</span>
+                  <span style={{ fontSize: '0.75rem', color: '#64748B', marginLeft: 'auto' }}>
+                    Last checked: {fmtAuditTime(healthServices[0]?.lastChecked ?? new Date().toISOString())}
+                  </span>
+                </div>
+              );
+            })()}
+
+            {/* Services Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width >= 1024 ? 3 : width >= 640 ? 2 : 1}, 1fr)`, gap: '0.75rem' }}>
+              {healthServices.map(svc => {
+                const statusColor = svc.status === 'operational' ? '#10B981' : svc.status === 'degraded' ? '#F59E0B' : '#EF4444';
+                const statusLabel = svc.status === 'operational' ? 'Operational' : svc.status === 'degraded' ? 'Degraded' : 'Down';
+                const SvcIcon = svc.id === 'db' ? Database : svc.id === 'api' || svc.id === 'auth' ? Server : svc.id === 'trello' ? Wifi : Cloud;
+                return (
+                  <div key={svc.id} className="section-card" aria-label={`Service: ${svc.name}`} style={{ padding: '1rem 1.125rem', position: 'relative' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.625rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: `${statusColor}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: statusColor }}>
+                          <SvcIcon size={13} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#F1F5F9' }}>{svc.name}</div>
+                          <div style={{ fontSize: '0.65rem', color: '#64748B' }}>{svc.category}</div>
+                        </div>
+                      </div>
+                      <span aria-label={`${svc.name} status`} style={{ fontSize: '0.62rem', fontWeight: 600, padding: '2px 7px', borderRadius: '9999px', background: `${statusColor}18`, color: statusColor, border: `1px solid ${statusColor}30` }}>
+                        {statusLabel}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+                      <div>
+                        <div style={{ fontSize: '0.62rem', color: '#64748B', marginBottom: '1px' }}>Uptime</div>
+                        <div aria-label={`${svc.name} uptime`} style={{ fontSize: '0.9rem', fontWeight: 700, color: statusColor }}>{svc.uptime}%</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.62rem', color: '#64748B', marginBottom: '1px' }}>Latency</div>
+                        <div aria-label={`${svc.name} latency`} style={{ fontSize: '0.9rem', fontWeight: 700, color: '#94A3B8' }}>{svc.latency}ms</div>
+                      </div>
+                    </div>
+                    {/* Uptime bar */}
+                    <div style={{ marginTop: '0.625rem', height: '3px', borderRadius: '9999px', background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${svc.uptime}%`, background: statusColor, borderRadius: '9999px', transition: 'width 0.5s ease' }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Incidents */}
+            <div className="section-card" style={{ padding: 0 }}>
+              <div style={{ padding: '0.875rem 1.125rem', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#F1F5F9', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                  <AlertTriangle size={13} style={{ color: '#F59E0B' }} /> Incident History
+                </span>
+                <div style={{ display: 'flex', gap: '0.375rem' }}>
+                  {(['all', 'unresolved'] as const).map(f => (
+                    <button
+                      key={f}
+                      aria-label={`Filter incidents: ${f}`}
+                      aria-pressed={healthIncidentFilter === f}
+                      onClick={() => setHealthIncidentFilter(f)}
+                      style={{
+                        fontSize: '0.68rem', fontWeight: 500, padding: '3px 10px', borderRadius: '9999px',
+                        cursor: 'pointer', fontFamily: 'inherit',
+                        background: healthIncidentFilter === f ? 'rgba(245,158,11,0.15)' : 'transparent',
+                        color: healthIncidentFilter === f ? '#F59E0B' : '#64748B',
+                        border: healthIncidentFilter === f ? '1px solid rgba(245,158,11,0.3)' : '1px solid transparent',
+                      }}
+                    >
+                      {f === 'all' ? 'All' : 'Unresolved'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {filteredIncidents.length === 0 ? (
+                <div style={{ padding: '2rem 1.5rem', textAlign: 'center', color: '#64748B', fontSize: '0.8rem' }}>
+                  <Clock size={20} style={{ color: '#334155', display: 'block', margin: '0 auto 0.5rem' }} />
+                  No incidents to display
+                </div>
+              ) : (
+                filteredIncidents.map(inc => {
+                  const incColor = inc.severity === 'critical' ? '#EF4444' : inc.severity === 'warning' ? '#F59E0B' : '#38BDF8';
+                  return (
+                    <div key={inc.id} aria-label={`Incident: ${inc.description}`} style={{ padding: '0.75rem 1.125rem', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+                      <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: incColor, marginTop: '4px', flexShrink: 0, boxShadow: inc.resolved ? 'none' : `0 0 5px ${incColor}80` }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#F1F5F9' }}>{inc.service}</span>
+                          {inc.resolved ? (
+                            <span style={{ fontSize: '0.6rem', padding: '1px 6px', borderRadius: '9999px', background: 'rgba(16,185,129,0.12)', color: '#34D399', border: '1px solid rgba(16,185,129,0.2)' }}>Resolved</span>
+                          ) : (
+                            <span style={{ fontSize: '0.6rem', padding: '1px 6px', borderRadius: '9999px', background: `${incColor}18`, color: incColor, border: `1px solid ${incColor}30` }}>Active</span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#94A3B8', marginTop: '2px' }}>{inc.description}</div>
+                        <div style={{ fontSize: '0.65rem', color: '#475569', marginTop: '3px' }}>{fmtAuditTime(inc.timestamp)}</div>
+                      </div>
+                      <button
+                        aria-label={inc.resolved ? `Mark incident ${inc.id} as unresolved` : `Mark incident ${inc.id} as resolved`}
+                        onClick={() => toggleIncidentResolved(inc.id)}
+                        style={{ fontSize: '0.65rem', padding: '3px 8px', borderRadius: '5px', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0, background: inc.resolved ? 'rgba(100,116,139,0.08)' : 'rgba(16,185,129,0.1)', color: inc.resolved ? '#64748B' : '#34D399', border: `1px solid ${inc.resolved ? 'rgba(100,116,139,0.15)' : 'rgba(16,185,129,0.2)'}` }}
+                      >
+                        {inc.resolved ? 'Reopen' : 'Resolve'}
+                      </button>
                     </div>
                   );
                 })
