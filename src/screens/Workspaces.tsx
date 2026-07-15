@@ -4,7 +4,7 @@ import {
   Search, Plus, Grid3X3, List, FileText, Video, CheckSquare,
   ChevronRight, TrendingUp, TrendingDown, DollarSign, RefreshCw,
   X, AlertCircle, Briefcase, CalendarDays, MoreVertical,
-  AlertTriangle, Pencil, Trash2, Archive, Copy, Download, ClipboardCopy,
+  AlertTriangle, Pencil, Trash2, Archive, Copy, Download, ClipboardCopy, Pin,
 } from 'lucide-react';
 import { useLayout } from '../hooks/useLayout';
 import {
@@ -193,6 +193,9 @@ export default function Workspaces() {
   const [starredWorkspaces, setStarredWorkspaces] = useState<Set<string>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem('workspaces_starred') ?? '[]')); } catch { return new Set(); }
   });
+  const [pinnedWorkspaces, setPinnedWorkspaces] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('workspaces_pinned') ?? '[]')); } catch { return new Set(); }
+  });
   const [starredWorkspacesOnly, setStarredWorkspacesOnly] = useState(false);
   const [wsSummaryCopied, setWsSummaryCopied] = useState(false);
   const [wsTxtExported, setWsTxtExported] = useState(false);
@@ -204,6 +207,17 @@ export default function Workspaces() {
       if (next.has(wsId)) next.delete(wsId);
       else next.add(wsId);
       try { localStorage.setItem('workspaces_starred', JSON.stringify([...next])); } catch { /* ignore */ }
+      return next;
+    });
+  }
+
+  function handleTogglePinWorkspace(wsId: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    setPinnedWorkspaces(prev => {
+      const next = new Set(prev);
+      if (next.has(wsId)) next.delete(wsId);
+      else next.add(wsId);
+      try { localStorage.setItem('workspaces_pinned', JSON.stringify([...next])); } catch { /* ignore */ }
       return next;
     });
   }
@@ -310,7 +324,11 @@ export default function Workspaces() {
       return [...base].sort((a, b) => (contractByWs[b.id] ?? 0) - (contractByWs[a.id] ?? 0));
     }
     return base;
-  })();
+  })().sort((a, b) => {
+    const aPinned = pinnedWorkspaces.has(a.id) ? 0 : 1;
+    const bPinned = pinnedWorkspaces.has(b.id) ? 0 : 1;
+    return aPinned - bPinned;
+  });
 
   const gridCols = width >= 1200 ? 3 : width >= 768 ? 2 : 1;
 
@@ -986,7 +1004,18 @@ export default function Workspaces() {
                       )}
                     </div>
 
-                    {/* Edit + Archive + Delete actions */}
+                    {/* Pin + Star + Edit + Archive + Delete actions */}
+                    <button
+                      onClick={e => handleTogglePinWorkspace(ws.id, e)}
+                      title={pinnedWorkspaces.has(ws.id) ? 'Unpin workspace' : 'Pin workspace to top'}
+                      aria-label={pinnedWorkspaces.has(ws.id) ? `Unpin ${ws.name}` : `Pin ${ws.name}`}
+                      aria-pressed={pinnedWorkspaces.has(ws.id)}
+                      style={{ width: 28, height: 28, borderRadius: '6px', border: 'none', background: pinnedWorkspaces.has(ws.id) ? 'rgba(99,102,241,0.12)' : 'transparent', cursor: 'pointer', color: pinnedWorkspaces.has(ws.id) ? '#818CF8' : '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s', fontFamily: 'inherit', fontSize: '0.75rem' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.12)'; e.currentTarget.style.color = '#818CF8'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = pinnedWorkspaces.has(ws.id) ? 'rgba(99,102,241,0.12)' : 'transparent'; e.currentTarget.style.color = pinnedWorkspaces.has(ws.id) ? '#818CF8' : '#475569'; }}
+                    >
+                      <Pin size={13} />
+                    </button>
                     <button
                       onClick={e => handleToggleStarWorkspace(ws.id, e)}
                       title={starredWorkspaces.has(ws.id) ? 'Unstar workspace' : 'Star workspace'}

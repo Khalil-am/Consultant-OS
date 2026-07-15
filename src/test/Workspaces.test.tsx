@@ -4497,3 +4497,84 @@ describe('Workspaces – Sort by Status', () => {
     expect(sel.value).toBe('default');
   });
 });
+
+// ─────────────────────────────────────────────────────────────
+describe('Workspaces – Pin to Top', () => {
+  afterEach(() => localStorage.clear());
+
+  it('renders a Pin button for each workspace card', async () => {
+    renderWorkspaces();
+    await screen.findByText('NCA Enterprise Platform');
+    expect(screen.getByRole('button', { name: /^pin nca enterprise platform$/i })).toBeInTheDocument();
+  });
+
+  it('pin button has aria-pressed false initially', async () => {
+    renderWorkspaces();
+    await screen.findByText('NCA Enterprise Platform');
+    expect(screen.getByRole('button', { name: /^pin nca enterprise platform$/i })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('clicking pin button sets aria-pressed true', async () => {
+    renderWorkspaces();
+    await screen.findByText('NCA Enterprise Platform');
+    await userEvent.click(screen.getByRole('button', { name: /^pin nca enterprise platform$/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^unpin nca enterprise platform$/i })).toHaveAttribute('aria-pressed', 'true');
+    });
+  });
+
+  it('clicking again unpins the workspace', async () => {
+    renderWorkspaces();
+    await screen.findByText('NCA Enterprise Platform');
+    await userEvent.click(screen.getByRole('button', { name: /^pin nca enterprise platform$/i }));
+    await waitFor(() => screen.getByRole('button', { name: /^unpin nca enterprise platform$/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^unpin nca enterprise platform$/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^pin nca enterprise platform$/i })).toHaveAttribute('aria-pressed', 'false');
+    });
+  });
+
+  it('persists pin to localStorage', async () => {
+    renderWorkspaces();
+    await screen.findByText('NCA Enterprise Platform');
+    await userEvent.click(screen.getByRole('button', { name: /^pin nca enterprise platform$/i }));
+    await waitFor(() => {
+      const stored = JSON.parse(localStorage.getItem('workspaces_pinned') ?? '[]');
+      expect(stored).toContain('ws-1');
+    });
+  });
+
+  it('persists unpin to localStorage', async () => {
+    localStorage.setItem('workspaces_pinned', JSON.stringify(['ws-1']));
+    renderWorkspaces();
+    await waitFor(() => screen.getByRole('button', { name: /^unpin nca enterprise platform$/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^unpin nca enterprise platform$/i }));
+    await waitFor(() => {
+      const stored = JSON.parse(localStorage.getItem('workspaces_pinned') ?? '[]');
+      expect(stored).not.toContain('ws-1');
+    });
+  });
+
+  it('loads pinned state from localStorage on mount', async () => {
+    localStorage.setItem('workspaces_pinned', JSON.stringify(['ws-1']));
+    renderWorkspaces();
+    expect(await screen.findByRole('button', { name: /^unpin nca enterprise platform$/i })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('pinned workspace appears before unpinned in DOM', async () => {
+    mockGetWorkspaces.mockResolvedValue([mockWs2, mockWs1]);
+    localStorage.setItem('workspaces_pinned', JSON.stringify(['ws-1']));
+    renderWorkspaces();
+    await screen.findByText('NCA Enterprise Platform');
+    const ncaEl = screen.getByText('NCA Enterprise Platform');
+    const mociEl = screen.getByText('MOCI Procurement Reform');
+    expect(ncaEl.compareDocumentPosition(mociEl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('both pin buttons render when two workspaces exist', async () => {
+    renderWorkspaces();
+    await screen.findByText('NCA Enterprise Platform');
+    expect(screen.getByRole('button', { name: /^pin nca enterprise platform$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^pin moci procurement reform$/i })).toBeInTheDocument();
+  });
+});
