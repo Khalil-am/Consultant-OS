@@ -1,70 +1,34 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 // ── Hoisted mocks ────────────────────────────────────────────
-const {
-  mockGetActivities, mockGetMilestones, mockGetWorkspaceFinancials,
-  mockGetWorkspaces, mockGetTasks, mockGetRisks, mockGetWorkspaceRagStatuses,
-  mockGetApprovals, mockUpdateApproval, mockUpsertApproval,
-} = vi.hoisted(() => ({
+const { mockGetActivities, mockGetMilestones, mockGetWorkspaceFinancials, mockGetRagStatusWithWorkspaces, mockGetApprovals, mockUpdateApproval, mockUpsertApproval, mockGetBoardDecisions, mockGetDocuments } = vi.hoisted(() => ({
   mockGetActivities: vi.fn(),
   mockGetMilestones: vi.fn(),
   mockGetWorkspaceFinancials: vi.fn(),
-  mockGetWorkspaces: vi.fn(),
-  mockGetTasks: vi.fn(),
-  mockGetRisks: vi.fn(),
-  mockGetWorkspaceRagStatuses: vi.fn(),
+  mockGetRagStatusWithWorkspaces: vi.fn(),
   mockGetApprovals: vi.fn(),
   mockUpdateApproval: vi.fn(),
   mockUpsertApproval: vi.fn(),
+  mockGetBoardDecisions: vi.fn(),
+  mockGetDocuments: vi.fn(),
 }));
 
 vi.mock('../lib/db', () => ({
   getActivities: mockGetActivities,
   getMilestones: mockGetMilestones,
   getWorkspaceFinancials: mockGetWorkspaceFinancials,
-  getWorkspaces: mockGetWorkspaces,
-  getTasks: mockGetTasks,
-  getRisks: mockGetRisks,
-  getWorkspaceRagStatuses: mockGetWorkspaceRagStatuses,
+  getRagStatusWithWorkspaces: mockGetRagStatusWithWorkspaces,
   getApprovals: mockGetApprovals,
   updateApproval: mockUpdateApproval,
   upsertApproval: mockUpsertApproval,
+  getBoardDecisions: mockGetBoardDecisions,
+  getDocuments: mockGetDocuments,
 }));
 
 vi.mock('../hooks/useLayout', () => ({
   useLayout: () => ({ width: 1280, isMobile: false, isTablet: false }),
-}));
-
-vi.mock('recharts', () => ({
-  AreaChart: ({ children }: { children: React.ReactNode }) => <div data-testid="area-chart">{children}</div>,
-  Area: () => <div />,
-  XAxis: () => <div />,
-  YAxis: () => <div />,
-  Tooltip: () => <div />,
-  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  PieChart: ({ children }: { children: React.ReactNode }) => <div data-testid="pie-chart">{children}</div>,
-  Pie: () => <div />,
-  Cell: () => <div />,
-}));
-
-vi.mock('../data/mockData', () => ({
-  automationRunsData: [],
-  documentsByTypeData: [],
-  portfolioKPIs: [
-    { id: 'kpi-1', label: 'Active Engagements', value: '8', unit: '', trend: '+1', trendDir: 'up', trendUp: true, icon: 'briefcase', color: '#0EA5E9', subValue: '2 new this month' },
-    { id: 'kpi-2', label: 'Pipeline Revenue', value: 'SAR 32M', unit: '', trend: '+6%', trendDir: 'up', trendUp: true, icon: 'revenue', color: '#10B981', subValue: 'YTD recognized' },
-  ],
-  ragStatusData: [
-    { workspace: 'NCA', rag: 'Green', lastUpdated: '2026-03-15' },
-    { workspace: 'MOCI', rag: 'Amber', lastUpdated: '2026-03-14' },
-  ],
-  deliveryTrendData: [],
-  boardDecisions: [
-    { id: 'bd-1', project: 'MOCI', title: 'Approve vendor shortlist', dueDate: '2026-03-20', priority: 'High', status: 'Open' },
-  ],
 }));
 
 import Dashboard from '../screens/Dashboard';
@@ -78,15 +42,22 @@ function renderDashboard() {
 }
 
 const mockActivity = {
-  id: 'a1', action: 'Report generated', target: '', project: 'MOCI', workspace: 'MOCI',
-  user: 'Ahmed Khalil', time: '2h ago', timestamp: '2h ago', type: 'automation',
+  id: 'a1', action: 'generated', target: 'MOCI report', workspace: 'MOCI',
+  workspace_id: 'ws-1', user: 'Ahmed Khalil', time: '2h ago', type: 'automation',
+  created_at: new Date().toISOString(),
 };
 
-const mockMilestone = {
-  id: 'ms-1', title: 'Phase 1 Delivery', status: 'On Track', due_date: '2026-04-01',
-  workspace_id: 'ws-1', owner: 'AM', description: null, progress: 60,
-  created_at: '', updated_at: '',
-};
+const MOCK_APPROVALS = [
+  { id: 'appr-001', title: 'NCA BRD v2.3', requester: 'AM', type: 'Document Approval', urgency: 'High', status: 'pending' as const, workspace_id: null, notes: null, created_at: '', updated_at: '' },
+  { id: 'appr-002', title: 'SC-10 Budget SAR 2.4M', requester: 'RT', type: 'Budget Approval', urgency: 'High', status: 'pending' as const, workspace_id: null, notes: null, created_at: '', updated_at: '' },
+  { id: 'appr-003', title: 'MOCI Vendor Shortlist', requester: 'FH', type: 'Procurement Decision', urgency: 'Medium', status: 'pending' as const, workspace_id: null, notes: null, created_at: '', updated_at: '' },
+  { id: 'appr-004', title: 'Healthcare Strategy Report', requester: 'SK', type: 'Report Sign-off', urgency: 'Low', status: 'pending' as const, workspace_id: null, notes: null, created_at: '', updated_at: '' },
+];
+
+const MOCK_RAG = [
+  { workspace_id: 'ws-1', workspace: 'NCA', rag: 'Green' as const, budget: 'Green' as const, schedule: 'Green' as const, risk: 'Amber' as const, lastUpdated: '' },
+  { workspace_id: 'ws-2', workspace: 'MOCI', rag: 'Amber' as const, budget: 'Amber' as const, schedule: 'Green' as const, risk: 'Green' as const, lastUpdated: '' },
+];
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -94,31 +65,34 @@ beforeEach(() => {
   mockGetActivities.mockResolvedValue([]);
   mockGetMilestones.mockResolvedValue([]);
   mockGetWorkspaceFinancials.mockResolvedValue([]);
-  mockGetWorkspaces.mockResolvedValue([]);
-  mockGetTasks.mockResolvedValue([]);
-  mockGetRisks.mockResolvedValue([]);
-  mockGetWorkspaceRagStatuses.mockResolvedValue([]);
-  mockGetApprovals.mockResolvedValue([]);
+  mockGetRagStatusWithWorkspaces.mockResolvedValue(MOCK_RAG);
+  mockGetApprovals.mockResolvedValue(MOCK_APPROVALS);
   mockUpdateApproval.mockResolvedValue({});
   mockUpsertApproval.mockResolvedValue({});
+  mockGetBoardDecisions.mockResolvedValue([]);
+  mockGetDocuments.mockResolvedValue([]);
 });
 
 // ────────────────────────────────────────────────────────────
 describe('Dashboard – Render', () => {
-  it('renders the dashboard hero banner', async () => {
+  it('renders the greeting hero', async () => {
     renderDashboard();
-    expect(await screen.findByText(/live · board overview/i)).toBeInTheDocument();
+    expect(await screen.findByText(/good morning, khalil/i)).toBeInTheDocument();
   });
 
-  it('renders KPI cards from mockData', async () => {
+  it('renders KPI cards from live data', async () => {
     renderDashboard();
-    expect(await screen.findByText('Active Engagements')).toBeInTheDocument();
-    expect(screen.getByText('Pipeline Revenue')).toBeInTheDocument();
+    expect(await screen.findByText('Total Portfolio Value')).toBeInTheDocument();
+    expect(screen.getByText('Revenue Recognized')).toBeInTheDocument();
+    expect(screen.getByText('Budget at Risk')).toBeInTheDocument();
+    expect(screen.getByText('Milestones Due')).toBeInTheDocument();
+    expect(screen.getByText('On-Time Delivery')).toBeInTheDocument();
+    expect(screen.getByText('Client Satisfaction')).toBeInTheDocument();
   });
 
   it('renders quick actions section', async () => {
     renderDashboard();
-    await screen.findByText(/live · board overview/i);
+    await screen.findByText(/good morning, khalil/i);
     expect(screen.getByText('Quick Actions')).toBeInTheDocument();
     expect(screen.getByText('Upload Doc')).toBeInTheDocument();
     expect(screen.getByText('Run Automation')).toBeInTheDocument();
@@ -144,10 +118,10 @@ describe('Dashboard – Render', () => {
 
 // ────────────────────────────────────────────────────────────
 describe('Dashboard – Approvals', () => {
-  it('renders Pending Approvals section', async () => {
+  it('renders the action inbox section', async () => {
     renderDashboard();
-    await screen.findByText(/live · board overview/i);
-    expect(screen.getByText('Pending Approvals')).toBeInTheDocument();
+    await screen.findByText(/good morning, khalil/i);
+    expect(screen.getByText(/needs your attention/i)).toBeInTheDocument();
   });
 
   it('renders specific approval items', async () => {
@@ -169,7 +143,6 @@ describe('Dashboard – Approvals', () => {
     const approveButtons = screen.getAllByRole('button', { name: /approve/i });
     fireEvent.click(approveButtons[0]);
     await waitFor(() => {
-      // The status badge changes from urgency to item.status = "approved"
       expect(screen.getAllByText('approved').length).toBeGreaterThan(0);
     });
   });
@@ -199,7 +172,7 @@ describe('Dashboard – Approvals', () => {
 describe('Dashboard – Activity feed', () => {
   it('shows Activity Feed section header', async () => {
     renderDashboard();
-    await screen.findByText(/live · board overview/i);
+    await screen.findByText(/good morning, khalil/i);
     expect(screen.getByText('Activity Feed')).toBeInTheDocument();
   });
 
@@ -207,154 +180,17 @@ describe('Dashboard – Activity feed', () => {
     mockGetActivities.mockResolvedValueOnce([mockActivity]);
     renderDashboard();
     await waitFor(() => {
-      expect(screen.getByText(/Report generated/i)).toBeInTheDocument();
-    });
-  });
-
-  it('shows activity type filter buttons', async () => {
-    renderDashboard();
-    await screen.findByText('Activity Feed');
-    expect(screen.getByRole('button', { name: /filter activity: all/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /filter activity: document/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /filter activity: meeting/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /filter activity: automation/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /filter activity: task/i })).toBeInTheDocument();
-  });
-
-  it('filters activities by Document type', async () => {
-    const docActivity = { ...mockActivity, id: 'a2', action: 'Document uploaded', type: 'document' };
-    const mtgActivity = { ...mockActivity, id: 'a3', action: 'Meeting scheduled', type: 'meeting' };
-    mockGetActivities.mockResolvedValueOnce([mockActivity, docActivity, mtgActivity]);
-    renderDashboard();
-    await waitFor(() => expect(screen.getByText(/Report generated/i)).toBeInTheDocument());
-
-    await userEvent.click(screen.getByRole('button', { name: /filter activity: document/i }));
-    expect(screen.getByText(/Document uploaded/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Report generated/i)).not.toBeInTheDocument();
-  });
-});
-
-// ────────────────────────────────────────────────────────────
-describe('Dashboard – Milestones', () => {
-  it('shows Milestones section header', async () => {
-    renderDashboard();
-    await screen.findByText(/live · board overview/i);
-    expect(screen.getByText('Milestones')).toBeInTheDocument();
-  });
-
-  it('renders milestones from supabase', async () => {
-    mockGetMilestones.mockResolvedValueOnce([mockMilestone]);
-    renderDashboard();
-    await waitFor(() => {
-      expect(screen.getByText('Phase 1 Delivery')).toBeInTheDocument();
-    });
-  });
-
-  it('does not render Phase 1 Delivery when milestones is empty', async () => {
-    renderDashboard();
-    await waitFor(() => expect(mockGetMilestones).toHaveBeenCalled());
-    expect(screen.queryByText('Phase 1 Delivery')).not.toBeInTheDocument();
-  });
-});
-
-// ────────────────────────────────────────────────────────────
-describe('Dashboard – Board Decisions', () => {
-  it('renders Board Decisions section', async () => {
-    renderDashboard();
-    await screen.findByText(/live · board overview/i);
-    expect(screen.getByText('Board Decisions')).toBeInTheDocument();
-  });
-
-  it('shows a pending decision from mockData', async () => {
-    renderDashboard();
-    expect(await screen.findByText('Approve vendor shortlist')).toBeInTheDocument();
-  });
-
-  it('removes decision on Done button click', async () => {
-    renderDashboard();
-    await screen.findByText('Approve vendor shortlist');
-    // The Done button in board decisions
-    const doneBtn = screen.getByRole('button', { name: /done/i });
-    await userEvent.click(doneBtn);
-    await waitFor(() => {
-      expect(screen.queryByText('Approve vendor shortlist')).not.toBeInTheDocument();
-    });
-  });
-
-  it('shows "All Clear" when all decisions complete', async () => {
-    renderDashboard();
-    await screen.findByText('Approve vendor shortlist');
-    await userEvent.click(screen.getByRole('button', { name: /done/i }));
-    await waitFor(() => {
-      expect(screen.getByText('All Clear')).toBeInTheDocument();
+      expect(screen.getByText(/MOCI report/i)).toBeInTheDocument();
     });
   });
 });
 
 // ────────────────────────────────────────────────────────────
-describe('Dashboard – AI Recommendations', () => {
-  it('shows AI Recommendations section', async () => {
+describe('Dashboard – Active workspaces', () => {
+  it('shows active workspaces section', async () => {
     renderDashboard();
-    await screen.findByText(/live · board overview/i);
-    expect(screen.getByText('AI Recommendations')).toBeInTheDocument();
-  });
-
-  it('renders initial recommendation items', async () => {
-    renderDashboard();
-    expect(await screen.findByText(/generate sc-10 committee pack/i)).toBeInTheDocument();
-    expect(screen.getByText(/review 3 critical risks/i)).toBeInTheDocument();
-  });
-
-  it('shows active count badge', async () => {
-    renderDashboard();
-    await screen.findByText(/live · board overview/i);
-    expect(screen.getByText(/3 active/i)).toBeInTheDocument();
-  });
-});
-
-// ────────────────────────────────────────────────────────────
-describe('Dashboard – Refresh button', () => {
-  it('shows Refresh text on desktop', async () => {
-    renderDashboard();
-    await screen.findByText(/live · board overview/i);
-    // On desktop (isMobile=false), shows "Refresh" text
-    expect(screen.getByText('Refresh')).toBeInTheDocument();
-  });
-
-  it('clicking Refresh does not crash the app', async () => {
-    renderDashboard();
-    await screen.findByText('Refresh');
-    await userEvent.click(screen.getByText('Refresh'));
-    expect(screen.getByText('Refresh')).toBeInTheDocument();
-  });
-});
-
-// ────────────────────────────────────────────────────────────
-describe('Dashboard – Period selector', () => {
-  it('shows Today, Week, Month period tabs', async () => {
-    renderDashboard();
-    await screen.findByText(/live · board overview/i);
-    // Period tabs render as "Today", "Week", "Month"
-    expect(screen.getByRole('button', { name: /period: today/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /period: week/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /period: month/i })).toBeInTheDocument();
-  });
-
-  it('switches period on click without crashing', async () => {
-    renderDashboard();
-    await screen.findByText(/live · board overview/i);
-    await userEvent.click(screen.getByRole('button', { name: /period: today/i }));
-    await userEvent.click(screen.getByRole('button', { name: /period: month/i }));
-    expect(screen.getByRole('button', { name: /period: today/i })).toBeInTheDocument();
-  });
-});
-
-// ────────────────────────────────────────────────────────────
-describe('Dashboard – Client Health Matrix', () => {
-  it('shows Client Health Matrix section', async () => {
-    renderDashboard();
-    await screen.findByText(/live · board overview/i);
-    expect(screen.getByText('Client Health Matrix')).toBeInTheDocument();
+    await screen.findByText(/good morning, khalil/i);
+    expect(screen.getAllByText(/active workspaces/i).length).toBeGreaterThan(0);
   });
 
   it('shows workspace items when workspaces are loaded', async () => {
@@ -363,70 +199,39 @@ describe('Dashboard – Client Health Matrix', () => {
       { id: 'ws-2', name: 'MOCI Procurement Reform', status: 'Active', progress: 45, last_activity: '2026-03-11', client: 'MOCI', sector: 'Government', sector_color: '#0EA5E9', type: 'Client', language: 'EN', docs_count: 4, meetings_count: 2, tasks_count: 6, contributors: ['FH'], description: '', created_at: '', updated_at: '' },
     ]);
     renderDashboard();
-    await screen.findByText(/live · board overview/i);
-    expect(screen.getAllByText('NCA Digital Transformation').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('MOCI Procurement Reform').length).toBeGreaterThan(0);
+    await screen.findByText(/good morning, khalil/i);
+    expect(screen.getAllByText('NCA').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('MOCI').length).toBeGreaterThan(0);
   });
 });
 
 // ────────────────────────────────────────────────────────────
-describe('Dashboard – Overdue alert banner', () => {
-  it('shows overdue tasks alert', async () => {
-    renderDashboard();
-    await screen.findByText(/live · board overview/i);
-    // When no live data, shows dynamic count (0 overdue tasks) or static fallback
-    expect(screen.getByText(/overdue task/i)).toBeInTheDocument();
-  });
-
-  it('shows Review Tasks button', async () => {
-    renderDashboard();
-    await screen.findByText(/live · board overview/i);
-    expect(screen.getByRole('button', { name: /review tasks/i })).toBeInTheDocument();
-  });
-});
-
-// ────────────────────────────────────────────────────────────
-describe('Dashboard – Approval localStorage persistence', () => {
-  it('saves approved status to localStorage', async () => {
+describe('Dashboard – Approval Supabase persistence', () => {
+  it('calls updateApproval with approved status when Approve is clicked', async () => {
     renderDashboard();
     await screen.findByText('NCA BRD v2.3');
     const approveButtons = screen.getAllByRole('button', { name: /approve/i });
     fireEvent.click(approveButtons[0]);
     await waitFor(() => {
-      const stored = localStorage.getItem('dashboard_approvals');
-      expect(stored).not.toBeNull();
-      const parsed = JSON.parse(stored!);
-      const approved = parsed.find((a: { id: number }) => a.id === 1);
-      expect(approved?.status).toBe('approved');
+      expect(mockUpdateApproval).toHaveBeenCalledWith('appr-001', { status: 'approved' });
     });
   });
 
-  it('saves rejected status to localStorage', async () => {
+  it('calls updateApproval with rejected status when Reject is clicked', async () => {
     renderDashboard();
     await screen.findByText('NCA BRD v2.3');
     const rejectButtons = screen.getAllByRole('button', { name: /reject/i });
     fireEvent.click(rejectButtons[0]);
     await waitFor(() => {
-      const stored = localStorage.getItem('dashboard_approvals');
-      expect(stored).not.toBeNull();
-      const parsed = JSON.parse(stored!);
-      const rejected = parsed.find((a: { id: number }) => a.id === 1);
-      expect(rejected?.status).toBe('rejected');
+      expect(mockUpdateApproval).toHaveBeenCalledWith('appr-001', { status: 'rejected' });
     });
   });
 
-  it('restores approval state from localStorage on mount', async () => {
-    const savedApprovals = [
-      { id: 1, title: 'NCA BRD v2.3', requester: 'AM', type: 'Document Approval', urgency: 'High', status: 'approved' },
-      { id: 2, title: 'SC-10 Budget SAR 2.4M', requester: 'RT', type: 'Budget Approval', urgency: 'High', status: 'pending' },
-      { id: 3, title: 'MOCI Vendor Shortlist', requester: 'FH', type: 'Procurement Decision', urgency: 'Medium', status: 'pending' },
-      { id: 4, title: 'Healthcare Strategy Report', requester: 'SK', type: 'Report Sign-off', urgency: 'Low', status: 'pending' },
-    ];
-    localStorage.setItem('dashboard_approvals', JSON.stringify(savedApprovals));
+  it('loads and displays approvals from Supabase on mount', async () => {
     renderDashboard();
-    await screen.findByText('NCA BRD v2.3');
+    expect(await screen.findByText('NCA BRD v2.3')).toBeInTheDocument();
     await waitFor(() => {
-      expect(screen.getByText('approved')).toBeInTheDocument();
+      expect(mockGetApprovals).toHaveBeenCalledTimes(1);
     });
   });
 });

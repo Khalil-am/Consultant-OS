@@ -1,63 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useLayout } from '../hooks/useLayout';
 import {
-  Search, Loader2, X, RefreshCw,
-  Clock, AlertTriangle, CheckCircle, CheckSquare,
-  ListTodo, User, CalendarDays, Layers, ExternalLink,
-  ChevronDown, Paperclip, MessageSquare, Download, Plus, Trash2, ClipboardCopy, FileText, Star,
+  Search, Loader2, X, RefreshCw, AlertTriangle, CheckSquare,
+  User, CalendarDays, ExternalLink, Paperclip, MessageSquare,
 } from 'lucide-react';
+import { motion } from 'motion/react';
+import { useLayout } from '../hooks/useLayout';
 import { fetchBATrafficBoard } from '../lib/trello';
 import type { BACard, BATrafficData, TrelloList } from '../lib/trello';
+import { Badge, cn, fadeUp, stagger } from '../components/ui';
 
-const LOCAL_TASKS_KEY = 'local_tasks';
-const STARRED_TASKS_KEY = 'tasks_starred';
-
-interface LocalTask {
-  id: string;
-  name: string;
-  client: string;
-  priority: string;
-  status: string;
-  dueDate: string;
-  assignee: string;
-  createdAt: string;
-}
-
-interface NewTaskForm {
-  name: string;
-  client: string;
-  priority: string;
-  status: string;
-  dueDate: string;
-  assignee: string;
-}
-
-// ── CSV export helper ─────────────────────────────────────────
-function exportTasksCSV(cards: (BACard & { status: string })[]) {
-  const headers = ['Title', 'Status', 'Priority', 'Client', 'List', 'Due Date', 'Members', 'URL'];
-  const rows = cards.map(c => [
-    `"${c.name.replace(/"/g, '""')}"`,
-    c.status,
-    c.priority || 'Medium',
-    c.client || '',
-    c.listName,
-    c.dueDate ? new Date(c.dueDate).toLocaleDateString('en-GB') : '',
-    c.members.join('; '),
-    c.url,
-  ].join(','));
-  const csv = [headers.join(','), ...rows].join('\n');
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `tasks_export_${new Date().toISOString().slice(0, 10)}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-// ── Status mapping from Trello list names ────────────────────
 function mapListToStatus(listName: string): string {
   const n = listName.toLowerCase();
   if (n.includes('done') || n.includes('complete') || n.includes('finished') || n.includes('closed')) return 'Completed';
@@ -67,75 +18,45 @@ function mapListToStatus(listName: string): string {
   return 'Backlog';
 }
 
-type TaskStatus = 'Backlog' | 'In Progress' | 'In Review' | 'Completed' | 'Overdue';
-
 const FILTER_TABS = ['All', 'Backlog', 'In Progress', 'In Review', 'Completed', 'Overdue'] as const;
 
-const STATUS_META: Record<string, { color: string; bg: string; border: string; dot: string }> = {
-  'Backlog':     { color: '#94A3B8', bg: 'rgba(71,85,105,0.12)',   border: 'rgba(71,85,105,0.25)',   dot: '#475569' },
-  'In Progress': { color: '#38BDF8', bg: 'rgba(14,165,233,0.1)',   border: 'rgba(14,165,233,0.22)',  dot: '#0EA5E9' },
-  'In Review':   { color: '#A78BFA', bg: 'rgba(139,92,246,0.12)',  border: 'rgba(139,92,246,0.25)',  dot: '#8B5CF6' },
-  'Completed':   { color: '#34D399', bg: 'rgba(16,185,129,0.1)',   border: 'rgba(16,185,129,0.22)',  dot: '#10B981' },
-  'Overdue':     { color: '#FCA5A5', bg: 'rgba(239,68,68,0.1)',    border: 'rgba(239,68,68,0.22)',   dot: '#EF4444' },
+const STATUS_COLOR: Record<string, string> = {
+  'Backlog':     '#8790A8',
+  'In Progress': '#A78BFA',
+  'In Review':   '#C4B5FD',
+  'Completed':   '#34D399',
+  'Overdue':     '#FF6B6B',
 };
 
-const PRIORITY_META: Record<string, { color: string; bg: string; border: string }> = {
-  'Highest':  { color: '#FCA5A5', bg: 'rgba(239,68,68,0.12)',  border: 'rgba(239,68,68,0.25)'  },
-  'High':     { color: '#FCA5A5', bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.22)'  },
-  'Medium':   { color: '#FCD34D', bg: 'rgba(245,158,11,0.1)',  border: 'rgba(245,158,11,0.22)' },
-  'Low':      { color: '#34D399', bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.2)'  },
-  'Lowest':   { color: '#94A3B8', bg: 'rgba(148,163,184,0.08)', border: 'rgba(148,163,184,0.15)' },
-};
-
-// ── Helpers ───────────────────────────────────────────────────
 function fmtDate(d: string | null | undefined): string {
   if (!d) return '—';
   const dt = new Date(d);
   if (isNaN(dt.getTime())) return '—';
-  return dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' });
+  return dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 }
 
 function isOverdue(card: BACard): boolean {
-  if (!card.dueDate) return false;
-  if (card.dueComplete) return false;
+  if (!card.dueDate || card.dueComplete) return false;
   return new Date(card.dueDate) < new Date();
 }
 
-// ── Sub-components ────────────────────────────────────────────
-function PriorityBadge({ priority }: { priority: string }) {
-  const m = PRIORITY_META[priority] ?? PRIORITY_META['Medium'];
-  return (
-    <span style={{
-      fontSize: '0.65rem', fontWeight: 700, padding: '2px 7px',
-      borderRadius: '9999px', background: m.bg, color: m.color,
-      border: `1px solid ${m.border}`, whiteSpace: 'nowrap', letterSpacing: '0.02em',
-    }}>
-      {priority || 'Medium'}
-    </span>
-  );
+function priorityTone(priority: string): 'critical' | 'high' | 'medium' | 'low' | 'neutral' {
+  if (priority === 'Highest' || priority === 'High') return 'critical';
+  if (priority === 'Medium') return 'high';
+  if (priority === 'Low') return 'low';
+  return 'neutral';
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const m = STATUS_META[status] ?? STATUS_META['Backlog'];
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: '4px',
-      fontSize: '0.65rem', fontWeight: 600, padding: '2px 8px',
-      borderRadius: '9999px', background: m.bg, color: m.color,
-      border: `1px solid ${m.border}`, whiteSpace: 'nowrap',
-    }}>
-      {status === 'In Progress' && (
-        <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: m.dot, animation: 'pulseDot 2s ease-in-out infinite', display: 'inline-block' }} />
-      )}
-      {status}
-    </span>
-  );
+function statusTone(status: string): 'brand' | 'mint' | 'critical' | 'neutral' | 'review' {
+  if (status === 'Completed') return 'mint';
+  if (status === 'Overdue') return 'critical';
+  if (status === 'In Progress') return 'brand';
+  if (status === 'In Review') return 'review';
+  return 'neutral';
 }
 
-// ── Main Component ────────────────────────────────────────────
 export default function Tasks() {
-  const { isMobile, isTablet } = useLayout();
-
+  const { isMobile } = useLayout();
   const [cards, setCards] = useState<BACard[]>([]);
   const [lists, setLists] = useState<TrelloList[]>([]);
   const [boardName, setBoardName] = useState('');
@@ -196,42 +117,9 @@ export default function Tasks() {
     });
   }
 
-  // UI state
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<string>('All');
-  const [listFilter, setListFilter] = useState('');
-  const [priorityFilter, setPriorityFilter] = useState('All');
-  const [sortBy, setSortBy] = useState<'default' | 'priority' | 'due_date' | 'client' | 'assignee' | 'name' | 'label' | 'status'>('default');
-  const [dueDateFilter, setDueDateFilter] = useState<'All' | 'Due Today' | 'Due in 3 Days' | 'Due This Week' | 'No Due Date'>('All');
-  const [assigneeFilter, setAssigneeFilter] = useState<string>('All');
-  const [paymentOnly, setPaymentOnly] = useState(false);
-  const [clientFilter, setClientFilter] = useState<string>('All');
-  const [labelFilter, setLabelFilter] = useState<string>('All');
-  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
 
-  function handleToggleBulkSelect(taskId: string) {
-    setBulkSelected(prev => {
-      const next = new Set(prev);
-      if (next.has(taskId)) next.delete(taskId); else next.add(taskId);
-      return next;
-    });
-  }
-  function handleBulkStarSelected() {
-    setBulkSelected(prev => {
-      const ids = [...prev];
-      setStarredTasks(starred => {
-        const next = new Set(starred);
-        const allStarred = ids.every(id => next.has(id));
-        ids.forEach(id => { if (allStarred) next.delete(id); else next.add(id); });
-        try { localStorage.setItem(STARRED_TASKS_KEY, JSON.stringify([...next])); } catch { /* ignore */ }
-        return next;
-      });
-      return new Set();
-    });
-  }
-  function handleClearBulkSelection() { setBulkSelected(new Set()); }
-
-  // ── Data loading from Trello ────────────────────────────────
   async function loadFromTrello() {
     try {
       const data: BATrafficData = await fetchBATrafficBoard();
@@ -256,683 +144,200 @@ export default function Tasks() {
     setSyncing(false);
   }
 
-  function handleCopyTaskSummary() {
-    const lines = [
-      `Task Summary – ${boardName || 'Consultant OS'}`,
-      `Total: ${totalCount}`,
-      `In Progress: ${inProgressCount}`,
-      `Overdue: ${overdueCount}`,
-      `Completed: ${completedCount}`,
-    ].join('\n');
-    navigator.clipboard.writeText(lines).then(() => {
-      setTaskSummaryCopied(true);
-      setTimeout(() => setTaskSummaryCopied(false), 2000);
-    }).catch(() => {});
-  }
-
-  function handleExportTasksTxt(tasksToExport: (BACard & { status: string })[]) {
-    if (tasksToExport.length === 0) return;
-    const lines = [
-      `Tasks Export – ${boardName || 'Consultant OS'}`,
-      `Total: ${tasksToExport.length}`,
-      '',
-      ...tasksToExport.map(t => [
-        `Task: ${t.name}`,
-        `Status: ${t.status} | Priority: ${t.priority || 'Medium'}`,
-        t.client ? `Client: ${t.client}` : null,
-        t.dueDate ? `Due: ${new Date(t.dueDate).toLocaleDateString('en-GB')}` : null,
-        t.members.length > 0 ? `Assignees: ${t.members.join(', ')}` : null,
-        '',
-      ].filter(Boolean).join('\n')),
-    ].join('\n');
-    const blob = new Blob([lines], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `tasks_export.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    setTasksTxtExported(true);
-    setTimeout(() => setTasksTxtExported(false), 2000);
-  }
-
-  // ── Enriched cards with status (Trello + local) ──────────────
-  const enrichedCards = useMemo(() => {
-    const trello = cards.map(card => ({
-      ...card,
-      status: card.dueComplete ? 'Completed' : isOverdue(card) ? 'Overdue' : mapListToStatus(card.listName),
-      local: false as const,
-    }));
-    const local = localTasks.map(lt => ({
-      id: lt.id,
-      name: lt.name,
-      url: '',
-      desc: '',
-      labels: [] as string[],
-      client: lt.client,
-      products: [] as string[],
-      members: lt.assignee ? [lt.assignee] : [] as string[],
-      dueDate: lt.dueDate,
-      listName: lt.status,
-      priority: lt.priority,
-      pm: '',
-      estimation: '',
-      deliveryDate: '',
-      relatedToPayment: false,
-      dueComplete: lt.status === 'Completed',
-      commentCount: 0,
-      attachmentCount: 0,
-      checklistTotal: 0,
-      checklistDone: 0,
-      lastActivity: lt.createdAt,
-      status: lt.status,
-      local: true as const,
-    }));
-    return [...trello, ...local];
-  }, [cards, localTasks]);
-
-  const assigneeOptions = useMemo(() =>
-    ['All', ...Array.from(new Set(enrichedCards.flatMap(c => c.members).filter(Boolean))).sort()],
-    [enrichedCards]
+  const enriched = useMemo(
+    () => cards.map((c) => ({ ...c, status: c.dueComplete ? 'Completed' : isOverdue(c) ? 'Overdue' : mapListToStatus(c.listName) })),
+    [cards],
   );
 
-  const clientOptions = useMemo(() =>
-    ['All', ...Array.from(new Set(enrichedCards.map(c => c.client).filter(Boolean))).sort()],
-    [enrichedCards]
-  );
-
-  const labelOptions = useMemo(() =>
-    ['All', ...Array.from(new Set(enrichedCards.flatMap(c => c.labels).filter(Boolean))).sort()],
-    [enrichedCards]
-  );
-
-  // ── Stats ───────────────────────────────────────────────────
-  const totalCount = enrichedCards.length;
-  const inProgressCount = enrichedCards.filter(c => c.status === 'In Progress').length;
-  const overdueCount = enrichedCards.filter(c => c.status === 'Overdue').length;
-  const completedCount = enrichedCards.filter(c => c.status === 'Completed').length;
-
-  // ── Unique lists for filter ─────────────────────────────────
-  const uniqueLists = useMemo(() => {
-    const listNames = [...new Set(cards.map(c => c.listName))].sort();
-    return listNames;
-  }, [cards]);
-
-  // ── Filtered cards ──────────────────────────────────────────
-  const PRIORITY_ORDER: Record<string, number> = { Highest: 0, High: 1, Medium: 2, Low: 3, Lowest: 4 };
+  const totalCount      = enriched.length;
+  const inProgressCount = enriched.filter((c) => c.status === 'In Progress').length;
+  const overdueCount    = enriched.filter((c) => c.status === 'Overdue').length;
+  const completedCount  = enriched.filter((c) => c.status === 'Completed').length;
 
   const filtered = useMemo(() => {
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const weekStart = (() => {
-      const d = new Date(); const day = d.getDay();
-      const mon = new Date(d); mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-      return mon.toISOString().slice(0, 10);
-    })();
-    const weekEnd = (() => {
-      const d = new Date(); const day = d.getDay();
-      const mon = new Date(d); mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-      const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-      return sun.toISOString().slice(0, 10);
-    })();
-
-    const base = enrichedCards.filter(c => {
+    return enriched.filter((c) => {
       if (activeTab !== 'All' && c.status !== activeTab) return false;
-      if (listFilter && c.listName !== listFilter) return false;
-      if (priorityFilter !== 'All' && (c.priority ?? 'Medium') !== priorityFilter) return false;
-      if (dueDateFilter === 'No Due Date') {
-        if (c.dueDate) return false;
-      } else if (dueDateFilter !== 'All') {
-        if (!c.dueDate) return false;
-        const dd = c.dueDate.slice(0, 10);
-        if (dueDateFilter === 'Due Today' && dd !== todayStr) return false;
-        if (dueDateFilter === 'Due in 3 Days') {
-          const in3Days = new Date(); in3Days.setDate(in3Days.getDate() + 3);
-          const in3Str = in3Days.toISOString().slice(0, 10);
-          if (dd < todayStr || dd > in3Str) return false;
-        }
-        if (dueDateFilter === 'Due This Week' && (dd < weekStart || dd > weekEnd)) return false;
-      }
-      if (assigneeFilter !== 'All' && !c.members.includes(assigneeFilter)) return false;
-      if (paymentOnly && !c.relatedToPayment) return false;
-      if (clientFilter !== 'All' && c.client !== clientFilter) return false;
-      if (labelFilter !== 'All' && !c.labels.includes(labelFilter)) return false;
-      if (starredOnly && !starredTasks.has(c.id)) return false;
-      if (overdueOnly && !isOverdue(c)) return false;
       if (search) {
         const q = search.toLowerCase();
         return (
           c.name.toLowerCase().includes(q) ||
           c.client.toLowerCase().includes(q) ||
-          c.members.some(m => m.toLowerCase().includes(q)) ||
+          c.members.some((m) => m.toLowerCase().includes(q)) ||
           c.listName.toLowerCase().includes(q) ||
-          c.labels.some(l => l.toLowerCase().includes(q))
+          c.labels.some((l) => l.toLowerCase().includes(q))
         );
       }
       return true;
     });
-
-    if (sortBy === 'priority') {
-      return [...base].sort((a, b) => (PRIORITY_ORDER[a.priority ?? 'Medium'] ?? 2) - (PRIORITY_ORDER[b.priority ?? 'Medium'] ?? 2));
-    }
-    if (sortBy === 'due_date') {
-      return [...base].sort((a, b) => {
-        if (!a.dueDate && !b.dueDate) return 0;
-        if (!a.dueDate) return 1;
-        if (!b.dueDate) return -1;
-        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-      });
-    }
-    if (sortBy === 'client') {
-      return [...base].sort((a, b) => (a.client ?? '').localeCompare(b.client ?? ''));
-    }
-    if (sortBy === 'assignee') {
-      return [...base].sort((a, b) => (a.members[0] ?? '').localeCompare(b.members[0] ?? ''));
-    }
-    if (sortBy === 'name') {
-      return [...base].sort((a, b) => a.name.localeCompare(b.name));
-    }
-    if (sortBy === 'label') {
-      return [...base].sort((a, b) => (a.labels[0] ?? '').localeCompare(b.labels[0] ?? ''));
-    }
-    if (sortBy === 'status') {
-      return [...base].sort((a, b) => (a.status ?? '').localeCompare(b.status ?? ''));
-    }
-    return base;
-  }, [enrichedCards, activeTab, listFilter, priorityFilter, search, sortBy, dueDateFilter, assigneeFilter, paymentOnly, clientFilter, labelFilter, starredOnly, starredTasks, overdueOnly]);
-
-
-
-  const colCount = isMobile ? 1 : isTablet ? 2 : 4;
+  }, [enriched, activeTab, search]);
 
   return (
-    <div className="screen-container animate-fade-in">
-
-      {/* ── Board Header ───────────────────────────────────────── */}
-      {boardName && (
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '0.75rem 1rem', borderRadius: 'var(--radius-lg)',
-          background: 'linear-gradient(135deg, rgba(14,165,233,0.06) 0%, rgba(139,92,246,0.04) 100%)',
-          border: '1px solid rgba(14,165,233,0.12)', flexWrap: 'wrap', gap: '0.5rem',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-            <div style={{ padding: '0.375rem', borderRadius: '8px', background: 'rgba(14,165,233,0.12)', color: '#0EA5E9' }}>
-              <Layers size={15} />
-            </div>
-            <div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>{boardName}</div>
-              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                Trello Board · {totalCount} cards
-                {lastSynced && <> · Last synced {lastSynced.toLocaleTimeString()}</>}
-              </div>
-            </div>
-          </div>
-          <button
-            className="btn-ghost"
-            style={{ height: '32px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}
-            onClick={handleSync}
-            disabled={syncing}
-          >
-            <RefreshCw size={12} style={{ animation: syncing ? 'spin 0.8s linear infinite' : 'none' }} />
-            {syncing ? 'Syncing…' : 'Sync'}
-          </button>
+    <motion.div
+      initial="hidden" animate="show"
+      variants={{ hidden: {}, show: { transition: stagger(0.05, 0.08) } }}
+      className="screen-container"
+    >
+      {/* ── Header ───────────────────────────────────── */}
+      <motion.div variants={fadeUp} className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="min-w-0">
+          <h1 className="text-[1.5rem] md:text-[1.75rem] font-semibold tracking-[-0.025em] leading-tight text-white">Tasks &amp; Risks</h1>
+          {boardName ? (
+            <p className="text-[0.78rem] text-[color:var(--text-muted)] mt-1">
+              <span>{boardName}</span> · {totalCount} cards
+              {lastSynced && <> · Synced {lastSynced.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</>}
+            </p>
+          ) : (
+            <p className="text-[0.78rem] text-[color:var(--text-muted)] mt-1">{totalCount} cards across {new Set(cards.map((c) => c.listName)).size} lists</p>
+          )}
         </div>
-      )}
+        <button
+          type="button"
+          aria-label="Sync"
+          className="btn-ghost h-[34px] text-[0.76rem]"
+          onClick={handleSync}
+          disabled={syncing}
+        >
+          <RefreshCw size={12} className={syncing ? 'animate-spin' : ''} />
+          {syncing ? 'Syncing…' : 'Sync'}
+        </button>
+      </motion.div>
 
-      {/* ── Stat Cards ─────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${colCount}, 1fr)`, gap: '0.875rem' }}>
+      {/* ── Compact stats ───────────────────────────── */}
+      <motion.div
+        variants={{ hidden: {}, show: { transition: stagger(0.04, 0.05) } }}
+        className={cn('grid gap-3', isMobile ? 'grid-cols-2' : 'grid-cols-4')}
+      >
         {[
-          { label: 'Total Cards',   value: totalCount,      color: '#8B5CF6', sub: `${uniqueLists.length} lists`, icon: <ListTodo size={14} /> },
-          { label: 'In Progress',   value: inProgressCount, color: '#0EA5E9', sub: 'actively being worked',       icon: <Clock size={14} /> },
-          { label: 'Overdue',       value: overdueCount,    color: '#EF4444', sub: 'past due date',               icon: <AlertTriangle size={14} /> },
-          { label: 'Completed',     value: completedCount,  color: '#10B981', sub: 'finished cards',              icon: <CheckCircle size={14} /> },
-        ].map(s => (
-          <div key={s.label} className="metric-card" style={{ position: 'relative', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(90deg, ${s.color}, transparent)` }} />
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem' }}>
-              <div>
-                <div className="hero-number" style={{ color: s.color }}>{s.value}</div>
-                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)', marginTop: '2px' }}>{s.label}</div>
-                <div style={{ fontSize: '0.62rem', color: 'var(--text-faint)', marginTop: '1px' }}>{s.sub}</div>
-              </div>
-              <div style={{ color: s.color, opacity: 0.45, marginTop: '0.2rem', flexShrink: 0 }}>{s.icon}</div>
-            </div>
-          </div>
+          { label: 'Total Cards', value: totalCount,      color: '#A78BFA' },
+          { label: 'In Progress', value: inProgressCount, color: '#7DD3FC' },
+          { label: 'Overdue',     value: overdueCount,    color: '#FF6B6B' },
+          { label: 'Completed',   value: completedCount,  color: '#34D399' },
+        ].map((s) => (
+          <motion.div
+            key={s.label}
+            variants={fadeUp}
+            className="rounded-2xl bg-white/[0.025] border border-white/[0.06] p-3.5"
+          >
+            <div className="text-[0.62rem] font-semibold tracking-[0.1em] uppercase text-[color:var(--text-muted)] mb-2">{s.label}</div>
+            <div className="hero-number text-[1.25rem] md:text-[1.4rem] font-bold tabular-nums leading-none" style={{ color: s.color }}>{s.value}</div>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
 
-      {/* ── Filter Tabs + Toolbar ──────────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', flexWrap: 'wrap' }}>
-        <div style={{ position: 'relative', flex: 1, minWidth: isMobile ? '100%' : '180px' }}>
-          <Search size={13} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+      {/* ── Toolbar ──────────────────────────────────── */}
+      <motion.div variants={fadeUp} className="flex items-center gap-2 flex-wrap">
+        <div className="relative flex items-center gap-2 rounded-full bg-white/[0.04] border border-white/[0.08] backdrop-blur-md px-3.5 h-[36px] flex-1 min-w-[220px]">
+          <Search size={13} className="text-[color:var(--text-muted)] flex-shrink-0" />
           <input
-            className="input-field"
-            aria-label="Search cards"
+            type="text" value={search} onChange={(e) => setSearch(e.target.value)}
             placeholder="Search cards, client, members…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            style={{ paddingLeft: '2.25rem', height: '36px', fontSize: '0.8rem', width: '100%' }}
+            className="flex-1 bg-transparent border-0 outline-none text-[0.82rem] text-white placeholder:text-[color:var(--text-faint)] min-w-0"
           />
           {search && (
-            <button onClick={() => setSearch('')} aria-label="Clear search" style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: 0 }}>
-              <X size={12} />
+            <button onClick={() => setSearch('')} className="text-[color:var(--text-muted)] hover:text-white transition-colors">
+              <X size={13} />
             </button>
           )}
         </div>
-
-        {/* List filter */}
-        <div style={{ position: 'relative', flexShrink: 0 }}>
-          <Layers size={12} style={{ position: 'absolute', left: '0.625rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
-          <select
-            className="input-field"
-            aria-label="Filter by list"
-            value={listFilter}
-            onChange={e => setListFilter(e.target.value)}
-            style={{ height: '36px', fontSize: '0.78rem', paddingLeft: '1.875rem', paddingRight: '1.875rem', minWidth: '160px', appearance: 'none' }}
-          >
-            <option value="">All Lists</option>
-            {uniqueLists.map(l => (
-              <option key={l} value={l}>{l}</option>
-            ))}
-          </select>
-          <ChevronDown size={11} style={{ position: 'absolute', right: '0.625rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+        <div className="flex items-center gap-1 p-1 rounded-full bg-white/[0.03] border border-white/[0.06] overflow-x-auto">
+          {FILTER_TABS.map((tab) => {
+            const count = tab === 'All' ? totalCount : enriched.filter((c) => c.status === tab).length;
+            const active = activeTab === tab;
+            return (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={cn(
+                  'tab-item relative flex items-center gap-1.5 px-3 py-1 rounded-full text-[0.74rem] font-medium transition-colors whitespace-nowrap',
+                  active ? 'active bg-[rgba(120,119,198,0.18)] text-white border border-[rgba(120,119,198,0.35)]' : 'text-[color:var(--text-muted)] hover:text-white',
+                )}
+                style={active ? { color: STATUS_COLOR[tab] || '#fff' } : undefined}
+              >
+                {tab}
+                <span className={cn('text-[0.64rem] tabular-nums', active ? 'opacity-70' : 'text-[color:var(--text-faint)]')}>({count})</span>
+              </button>
+            );
+          })}
         </div>
+      </motion.div>
 
-        {/* Priority filter */}
-        <div style={{ position: 'relative', flexShrink: 0 }}>
-          <select
-            className="input-field"
-            aria-label="Filter by priority"
-            value={priorityFilter}
-            onChange={e => setPriorityFilter(e.target.value)}
-            style={{ height: '36px', fontSize: '0.78rem', paddingLeft: '0.75rem', paddingRight: '1.875rem', minWidth: '130px', appearance: 'none' }}
-          >
-            <option value="All">All Priorities</option>
-            <option value="Highest">P: Highest</option>
-            <option value="High">P: High</option>
-            <option value="Medium">P: Medium</option>
-            <option value="Low">P: Low</option>
-            <option value="Lowest">P: Lowest</option>
-          </select>
-          <ChevronDown size={11} style={{ position: 'absolute', right: '0.625rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
-        </div>
-
-        {/* Sort */}
-        <div style={{ position: 'relative', flexShrink: 0 }}>
-          <select
-            className="input-field"
-            aria-label="Sort cards"
-            value={sortBy}
-            onChange={e => setSortBy(e.target.value as typeof sortBy)}
-            style={{ height: '36px', fontSize: '0.78rem', paddingLeft: '0.75rem', paddingRight: '1.875rem', minWidth: '130px', appearance: 'none' }}
-          >
-            <option value="default">Sort: Default</option>
-            <option value="priority">Sort: Priority</option>
-            <option value="due_date">Sort: Due Date</option>
-            <option value="client">Sort: Client</option>
-            <option value="assignee">Sort: Assignee</option>
-            <option value="name">Sort: Name</option>
-            <option value="label">Sort: Label</option>
-            <option value="status">Sort: Status</option>
-          </select>
-          <ChevronDown size={11} style={{ position: 'absolute', right: '0.625rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
-        </div>
-
-        {/* New Task */}
-        <button
-          className="btn-primary"
-          aria-label="Add new local task"
-          onClick={() => setShowNewTaskModal(true)}
-          style={{ height: '36px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.375rem', flexShrink: 0, whiteSpace: 'nowrap', padding: '0 0.75rem' }}
-        >
-          <Plus size={12} />
-          {!isMobile && 'New Task'}
-        </button>
-
-        {/* Export CSV */}
-        {filtered.length > 0 && (
-          <button
-            className="btn-ghost"
-            aria-label="Export tasks to CSV"
-            onClick={() => exportTasksCSV(filtered)}
-            style={{ height: '36px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.375rem', flexShrink: 0, whiteSpace: 'nowrap' }}
-          >
-            <Download size={12} />
-            {!isMobile && 'Export CSV'}
-          </button>
-        )}
-
-        {/* Export TXT */}
-        {filtered.length > 0 && (
-          <button
-            className="btn-ghost"
-            aria-label="Export tasks to TXT"
-            onClick={() => handleExportTasksTxt(filtered)}
-            style={{ height: '36px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.375rem', flexShrink: 0, whiteSpace: 'nowrap' }}
-          >
-            <FileText size={12} />
-            {!isMobile && (tasksTxtExported ? 'Exported!' : 'Export TXT')}
-          </button>
-        )}
-
-        {/* Copy Summary */}
-        <button
-          className="btn-ghost"
-          aria-label="Copy task summary to clipboard"
-          onClick={handleCopyTaskSummary}
-          style={{ height: '36px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.375rem', flexShrink: 0, whiteSpace: 'nowrap' }}
-        >
-          <ClipboardCopy size={12} />
-          {!isMobile && (taskSummaryCopied ? 'Copied!' : 'Copy Summary')}
-        </button>
-      </div>
-
-      {/* Due-date quick filters */}
-      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-        {(['All', 'Due Today', 'Due in 3 Days', 'Due This Week', 'No Due Date'] as const).map(df => (
-          <button
-            key={df}
-            className={`btn-ghost${dueDateFilter === df ? ' active' : ''}`}
-            aria-label={`Filter tasks by due date: ${df}`}
-            aria-pressed={dueDateFilter === df}
-            onClick={() => setDueDateFilter(df)}
-            style={{ height: '28px', fontSize: '0.72rem', padding: '0 0.625rem', borderRadius: 'var(--radius-md)', fontWeight: dueDateFilter === df ? 700 : 500, opacity: dueDateFilter === df ? 1 : 0.72 }}
-          >
-            {df}
-          </button>
-        ))}
-      </div>
-
-      {/* Assignee filter */}
-      {assigneeOptions.length > 1 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <select
-            aria-label="Filter tasks by assignee"
-            value={assigneeFilter}
-            onChange={e => setAssigneeFilter(e.target.value)}
-            style={{ height: '28px', fontSize: '0.72rem', padding: '0 0.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', background: assigneeFilter !== 'All' ? 'rgba(0,212,255,0.07)' : 'rgba(255,255,255,0.04)', color: assigneeFilter !== 'All' ? '#00D4FF' : '#94A3B8', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }}
-          >
-            <option value="All">All Assignees</option>
-            {assigneeOptions.slice(1).map(a => <option key={a} value={a}>{a}</option>)}
-          </select>
-        </div>
-      )}
-
-      {/* Client filter */}
-      {clientOptions.length > 1 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <select
-            aria-label="Filter tasks by client"
-            value={clientFilter}
-            onChange={e => setClientFilter(e.target.value)}
-            style={{ height: '28px', fontSize: '0.72rem', padding: '0 0.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', background: clientFilter !== 'All' ? 'rgba(0,212,255,0.07)' : 'rgba(255,255,255,0.04)', color: clientFilter !== 'All' ? '#00D4FF' : '#94A3B8', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }}
-          >
-            <option value="All">All Clients</option>
-            {clientOptions.slice(1).map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
-      )}
-
-      {/* Label filter */}
-      {labelOptions.length > 1 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <select
-            aria-label="Filter tasks by label"
-            value={labelFilter}
-            onChange={e => setLabelFilter(e.target.value)}
-            style={{ height: '28px', fontSize: '0.72rem', padding: '0 0.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', background: labelFilter !== 'All' ? 'rgba(139,92,246,0.07)' : 'rgba(255,255,255,0.04)', color: labelFilter !== 'All' ? '#A78BFA' : '#94A3B8', fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }}
-          >
-            <option value="All">All Labels</option>
-            {labelOptions.slice(1).map(l => <option key={l} value={l}>{l}</option>)}
-          </select>
-        </div>
-      )}
-
-      {/* Payment / Starred / Overdue quick filters */}
-      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-        <button
-          aria-label="Show payment-related tasks only"
-          aria-pressed={paymentOnly}
-          onClick={() => setPaymentOnly(p => !p)}
-          style={{ height: '28px', fontSize: '0.72rem', padding: '0 0.625rem', borderRadius: 'var(--radius-md)', border: `1px solid ${paymentOnly ? 'rgba(245,158,11,0.5)' : 'rgba(255,255,255,0.1)'}`, background: paymentOnly ? 'rgba(245,158,11,0.1)' : 'transparent', color: paymentOnly ? '#FCD34D' : '#94A3B8', cursor: 'pointer', fontFamily: 'inherit', fontWeight: paymentOnly ? 700 : 500 }}
-        >
-          💰 Payment
-        </button>
-        <button
-          aria-label="Show starred tasks only"
-          aria-pressed={starredOnly}
-          onClick={() => setStarredOnly(p => !p)}
-          style={{ height: '28px', fontSize: '0.72rem', padding: '0 0.625rem', borderRadius: 'var(--radius-md)', border: `1px solid ${starredOnly ? 'rgba(251,191,36,0.5)' : 'rgba(255,255,255,0.1)'}`, background: starredOnly ? 'rgba(251,191,36,0.1)' : 'transparent', color: starredOnly ? '#FBBF24' : '#94A3B8', cursor: 'pointer', fontFamily: 'inherit', fontWeight: starredOnly ? 700 : 500, display: 'flex', alignItems: 'center', gap: '4px' }}
-        >
-          <Star size={11} fill={starredOnly ? '#FBBF24' : 'none'} />
-          Starred
-        </button>
-        <button
-          aria-label="Show overdue tasks only"
-          aria-pressed={overdueOnly}
-          onClick={() => setOverdueOnly(p => !p)}
-          style={{ height: '28px', fontSize: '0.72rem', padding: '0 0.625rem', borderRadius: 'var(--radius-md)', border: `1px solid ${overdueOnly ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.1)'}`, background: overdueOnly ? 'rgba(239,68,68,0.1)' : 'transparent', color: overdueOnly ? '#FCA5A5' : '#94A3B8', cursor: 'pointer', fontFamily: 'inherit', fontWeight: overdueOnly ? 700 : 500, display: 'flex', alignItems: 'center', gap: '4px' }}
-        >
-          <AlertTriangle size={11} />
-          Overdue
-        </button>
-      </div>
-
-      {/* Status filter tabs */}
-      <div style={{ display: 'flex', gap: '0.2rem', background: 'rgba(255,255,255,0.03)', padding: '0.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', overflowX: 'auto', WebkitOverflowScrolling: 'touch', flexShrink: 0 }}>
-        {FILTER_TABS.map(tab => {
-          const m = tab !== 'All' ? STATUS_META[tab] : null;
-          const count = tab === 'All' ? enrichedCards.length : enrichedCards.filter(c => c.status === tab).length;
-          return (
-            <button
-              key={tab}
-              className={`tab-item ${activeTab === tab ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab)}
-              aria-label={`Task status: ${tab}`}
-              aria-pressed={activeTab === tab}
-              style={{ padding: '0.3rem 0.75rem', fontSize: '0.75rem', whiteSpace: 'nowrap', color: activeTab === tab && m ? m.color : undefined }}
-            >
-              {tab}
-              <span style={{ marginLeft: '0.3rem', fontSize: '0.65rem', opacity: 0.7 }}>({count})</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ── Loading / Error states ─────────────────────────────── */}
+      {/* ── States ───────────────────────────────────── */}
       {loading && (
-        <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.82rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-          <Loader2 size={16} className="animate-spin" /> Loading Trello board…
+        <div className="flex items-center justify-center gap-2 py-16 text-[color:var(--text-muted)] text-[0.82rem]">
+          <Loader2 size={15} className="animate-spin" /> Loading Trello board…
         </div>
       )}
-
       {!loading && error && (
-        <div style={{ padding: '1.25rem', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 'var(--radius-lg)', color: '#FCA5A5', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <AlertTriangle size={15} />
-          {error}
-          <button className="btn-ghost" style={{ marginLeft: 'auto', fontSize: '0.72rem' }} onClick={handleSync}>Retry</button>
+        <div className="flex items-center gap-2 p-4 rounded-xl bg-[rgba(255,107,107,0.08)] border border-[rgba(255,107,107,0.22)] text-[#FCA5A5] text-[0.82rem]">
+          <AlertTriangle size={14} /> {error}
+          <button className="btn-ghost ml-auto h-[30px] text-[0.72rem]" onClick={handleSync}>Retry</button>
         </div>
       )}
-
-      {/* ── Empty state ────────────────────────────────────────── */}
       {!loading && !error && filtered.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '3.5rem 1rem', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-lg)', border: '1px dashed var(--border-subtle)' }}>
-          <CheckSquare size={36} style={{ color: 'var(--text-faint)', margin: '0 auto 0.875rem', display: 'block' }} />
-          <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.3rem' }}>
-            {cards.length === 0 && localTasks.length === 0 ? 'No cards found on this board' : 'No cards match your filters'}
+        <div className="section-card p-12 flex flex-col items-center gap-2 text-center">
+          <CheckSquare size={26} className="text-[color:var(--text-faint)]" />
+          <div className="text-[0.92rem] font-semibold text-white">
+            {cards.length === 0 ? 'No cards found on this board' : 'No cards match your filters'}
           </div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            {cards.length === 0 && localTasks.length === 0 ? 'Check your Trello board connection or add a local task' : 'Try adjusting the search or clearing filters'}
+          <div className="text-[0.76rem] text-[color:var(--text-muted)] max-w-md">
+            {cards.length === 0 ? 'Check your Trello board connection.' : 'Try adjusting the search or clearing filters.'}
           </div>
         </div>
       )}
 
-      {/* ── Card List (Table) ──────────────────────────────────── */}
+      {/* ── Card table ───────────────────────────── */}
       {!loading && !error && filtered.length > 0 && (
-        <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-          {/* Table header */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: isMobile ? '24px 1fr auto' : '24px minmax(0, 2fr) 90px 110px minmax(100px, 140px) minmax(80px, 120px) 90px auto',
-            gap: '0', padding: '0.6rem 1rem',
-            background: 'var(--bg-elevated)',
-            borderBottom: '1px solid var(--border-subtle)',
-          }}>
-            {['', 'Card', ...(isMobile ? [] : ['Priority', 'Status', 'List', 'Client', 'Due Date', ''])].map((h, i) => (
-              <div key={i} style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '0 0.5rem', textAlign: i > 0 && i < 6 ? 'center' : 'left' }}>
-                {h}
-              </div>
-            ))}
-          </div>
-
-          {/* Bulk action bar */}
-          {bulkSelected.size > 0 && (
-            <div style={{ padding: '0.5rem 1rem', background: 'rgba(14,165,233,0.06)', borderBottom: '1px solid rgba(14,165,233,0.15)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <span style={{ fontSize: '0.75rem', color: '#0EA5E9', fontWeight: 600 }}>
-                {bulkSelected.size} task{bulkSelected.size !== 1 ? 's' : ''} selected
-              </span>
-              <div style={{ display: 'flex', gap: '0.375rem', marginLeft: 'auto' }}>
-                <button
-                  aria-label="Star selected tasks"
-                  onClick={handleBulkStarSelected}
-                  style={{ padding: '3px 10px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 500, background: 'rgba(251,191,36,0.1)', color: '#FBBF24', border: '1px solid rgba(251,191,36,0.25)', cursor: 'pointer', fontFamily: 'inherit' }}
-                >Star</button>
-                <button
-                  aria-label="Clear task selection"
-                  onClick={handleClearBulkSelection}
-                  style={{ padding: '3px 10px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 500, background: 'rgba(255,255,255,0.06)', color: '#94A3B8', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', fontFamily: 'inherit' }}
-                >Clear</button>
-              </div>
-            </div>
-          )}
-
-          {/* Card rows */}
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {filtered.slice(0, 100).map((card, idx) => {
-              const sm = STATUS_META[card.status] ?? STATUS_META['Backlog'];
+        <motion.div variants={fadeUp} className="section-card">
+          <div className="divide-y divide-white/[0.04]">
+            {filtered.slice(0, 100).map((card) => {
+              const sc = STATUS_COLOR[card.status] ?? '#8790A8';
               const overdue = isOverdue(card);
-              const dueDateColor = card.dueComplete ? '#34D399' : overdue ? '#FCA5A5' : 'var(--text-secondary)';
-
-              const rowStyle: React.CSSProperties = {
-                display: 'grid',
-                gridTemplateColumns: isMobile ? '24px 1fr auto' : '24px minmax(0, 2fr) 90px 110px minmax(100px, 140px) minmax(80px, 120px) 90px auto',
-                gap: '0',
-                padding: '0.75rem 1rem',
-                borderBottom: idx < filtered.length - 1 ? '1px solid var(--border-subtle)' : 'none',
-                borderLeft: `3px solid ${sm.dot}30`,
-                transition: 'background 0.12s',
-                alignItems: 'center',
-                textDecoration: 'none',
-                color: 'inherit',
-              };
-              const onEnter = (e: React.MouseEvent<HTMLElement>) => { e.currentTarget.style.background = 'rgba(255,255,255,0.025)'; };
-              const onLeave = (e: React.MouseEvent<HTMLElement>) => { e.currentTarget.style.background = 'transparent'; };
-
-              const cardContent = (
-                <>
-                  {/* Checkbox */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', paddingLeft: '0.25rem' }} onClick={e => e.preventDefault()}>
-                    <input
-                      type="checkbox"
-                      aria-label={`Select task: ${card.name}`}
-                      checked={bulkSelected.has(card.id)}
-                      onChange={() => handleToggleBulkSelect(card.id)}
-                      style={{ cursor: 'pointer', accentColor: '#0EA5E9', width: 14, height: 14 }}
-                    />
-                  </div>
-                  {/* Title + members + meta */}
-                  <div style={{ padding: '0 0.5rem', minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                      <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {card.name}
-                      </div>
-                      {card.local && (
-                        <span style={{ fontSize: '0.6rem', fontWeight: 700, padding: '1px 5px', borderRadius: '4px', background: 'rgba(139,92,246,0.15)', color: '#A78BFA', border: '1px solid rgba(139,92,246,0.25)', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                          Local
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '3px', flexWrap: 'wrap' }}>
+              const dueColor = card.dueComplete ? '#34D399' : overdue ? '#FCA5A5' : 'var(--text-muted)';
+              return (
+                <a
+                  key={card.id}
+                  href={card.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group grid items-center gap-3 px-4 py-3 hover:bg-white/[0.025] transition-colors"
+                  style={{
+                    gridTemplateColumns: isMobile
+                      ? '1fr auto'
+                      : 'minmax(0,2fr) 90px 110px minmax(80px,120px) 80px auto',
+                    borderLeft: `3px solid ${sc}40`,
+                  }}
+                >
+                  <div className="min-w-0">
+                    <div className="text-[0.84rem] font-semibold text-white truncate">{card.name}</div>
+                    <div className="flex items-center gap-2.5 mt-1 flex-wrap text-[0.67rem] text-[color:var(--text-muted)]">
                       {card.members.length > 0 && (
-                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                          <User size={9} /> {card.members.slice(0, 2).join(', ')}
-                          {card.members.length > 2 && ` +${card.members.length - 2}`}
+                        <span className="flex items-center gap-1">
+                          <User size={9} />{card.members.slice(0, 2).join(', ')}{card.members.length > 2 && ` +${card.members.length - 2}`}
                         </span>
                       )}
-                      {card.commentCount > 0 && (
-                        <span style={{ fontSize: '0.62rem', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                          <MessageSquare size={9} /> {card.commentCount}
-                        </span>
-                      )}
-                      {card.attachmentCount > 0 && (
-                        <span style={{ fontSize: '0.62rem', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                          <Paperclip size={9} /> {card.attachmentCount}
-                        </span>
-                      )}
+                      {card.commentCount > 0 && <span className="flex items-center gap-0.5"><MessageSquare size={9} />{card.commentCount}</span>}
+                      {card.attachmentCount > 0 && <span className="flex items-center gap-0.5"><Paperclip size={9} />{card.attachmentCount}</span>}
                       {card.checklistTotal > 0 && (
-                        <span style={{ fontSize: '0.62rem', color: card.checklistDone === card.checklistTotal ? '#34D399' : 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                          <CheckSquare size={9} /> {card.checklistDone}/{card.checklistTotal}
+                        <span className={cn('flex items-center gap-0.5', card.checklistDone === card.checklistTotal && 'text-[#63E6BE]')}>
+                          <CheckSquare size={9} />{card.checklistDone}/{card.checklistTotal}
                         </span>
                       )}
                     </div>
                   </div>
 
                   {isMobile ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0 0.25rem' }}>
-                      <PriorityBadge priority={card.priority || 'Medium'} />
-                    </div>
+                    <Badge tone={priorityTone(card.priority || 'Medium')}>{card.priority || 'Medium'}</Badge>
                   ) : (
                     <>
-                      <div style={{ padding: '0 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <PriorityBadge priority={card.priority || 'Medium'} />
+                      <div className="flex justify-center"><Badge tone={priorityTone(card.priority || 'Medium')}>{card.priority || 'Medium'}</Badge></div>
+                      <div className="flex justify-center"><Badge tone={statusTone(card.status)}>{card.status}</Badge></div>
+                      <div className="flex justify-center text-[0.72rem] text-[color:var(--text-muted)] truncate">
+                        {card.client || '—'}
                       </div>
-                      <div style={{ padding: '0 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <StatusBadge status={card.status} />
+                      <div className="flex items-center justify-center gap-1 text-[0.72rem]" style={{ color: dueColor }}>
+                        <CalendarDays size={10} />{fmtDate(card.dueDate)}
                       </div>
-                      <div style={{ padding: '0 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 600, padding: '2px 7px', borderRadius: '4px', background: 'rgba(0,212,255,0.07)', color: '#38BDF8', border: '1px solid rgba(0,212,255,0.16)', maxWidth: '128px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
-                          {card.listName}
-                        </span>
-                      </div>
-                      <div style={{ padding: '0 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {card.client ? (
-                          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '110px' }}>
-                            {card.client}
-                          </span>
-                        ) : (
-                          <span style={{ fontSize: '0.72rem', color: 'var(--text-faint)' }}>—</span>
-                        )}
-                      </div>
-                      <div style={{ padding: '0 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
-                        <CalendarDays size={10} style={{ color: dueDateColor, flexShrink: 0 }} />
-                        <span style={{ fontSize: '0.72rem', color: dueDateColor, fontWeight: overdue ? 700 : 400 }}>
-                          {fmtDate(card.dueDate)}
-                        </span>
-                      </div>
-                      <div style={{ padding: '0 0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                        <button
-                          aria-label={`${starredTasks.has(card.id) ? 'Unstar' : 'Star'} task: ${card.name}`}
-                          aria-pressed={starredTasks.has(card.id)}
-                          onClick={e => { e.preventDefault(); e.stopPropagation(); handleToggleStarTask(card.id); }}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: starredTasks.has(card.id) ? '#FBBF24' : 'var(--text-muted)', opacity: starredTasks.has(card.id) ? 1 : 0.5, padding: '2px', display: 'flex', alignItems: 'center' }}
-                        >
-                          <Star size={12} fill={starredTasks.has(card.id) ? '#FBBF24' : 'none'} />
-                        </button>
-                        {card.local ? (
-                          <button
-                            aria-label={`Delete local task ${card.name}`}
-                            onClick={() => handleDeleteLocalTask(card.id)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', opacity: 0.6, padding: '2px', display: 'flex', alignItems: 'center' }}
-                            title="Delete local task"
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        ) : (
-                          <ExternalLink size={12} style={{ color: 'var(--text-muted)' }} />
-                        )}
-                      </div>
+                      <ExternalLink size={12} className="text-[color:var(--text-faint)] group-hover:text-white transition-colors justify-self-end" />
                     </>
                   )}
                 </>
@@ -957,141 +362,18 @@ export default function Tasks() {
               );
             })}
           </div>
-
-          {/* Footer */}
-          <div style={{ padding: '0.625rem 1.25rem', borderTop: '1px solid var(--border-subtle)', background: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-faint)' }}>
-              Showing <strong style={{ color: 'var(--text-secondary)' }}>{Math.min(filtered.length, 100)}</strong> of {enrichedCards.length} cards
-              {filtered.length > 100 && <> (limited to 100)</>}
+          <div className="flex items-center justify-between px-4 py-2.5 border-t border-white/[0.05] bg-white/[0.01]">
+            <span className="text-[0.7rem] text-[color:var(--text-faint)]">
+              Showing <strong className="text-[color:var(--text-secondary)]">{Math.min(filtered.length, 100)}</strong> of {enriched.length} cards{filtered.length > 100 && ' (limited to 100)'}
             </span>
             {overdueCount > 0 && (
-              <span style={{ fontSize: '0.7rem', color: '#FCA5A5', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <span className="text-[0.7rem] text-[#FCA5A5] flex items-center gap-1">
                 <AlertTriangle size={11} /> {overdueCount} overdue
               </span>
             )}
           </div>
-        </div>
+        </motion.div>
       )}
-
-      {/* ── New Local Task Modal ──────────────────────────────── */}
-      {showNewTaskModal && (
-        <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)' }}
-          onClick={() => setShowNewTaskModal(false)}
-        >
-          <div
-            role="dialog"
-            aria-label="Add New Task"
-            style={{ background: '#0C1220', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '1.5rem', width: '100%', maxWidth: '480px', margin: '1rem' }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
-              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Add New Task</h3>
-              <button className="btn-ghost" style={{ padding: '0.25rem' }} onClick={() => setShowNewTaskModal(false)} aria-label="Close dialog">
-                <X size={16} />
-              </button>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
-              <div>
-                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', display: 'block', marginBottom: '0.375rem' }}>Task Title *</label>
-                <input
-                  className="input-field"
-                  placeholder="Task title"
-                  value={newTaskForm.name}
-                  onChange={e => setNewTaskForm(prev => ({ ...prev, name: e.target.value }))}
-                  style={{ width: '100%', padding: '0.625rem 0.75rem', fontSize: '0.85rem' }}
-                  aria-label="Task title"
-                  autoFocus
-                />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', display: 'block', marginBottom: '0.375rem' }}>Client</label>
-                  <input
-                    className="input-field"
-                    placeholder="Client name"
-                    value={newTaskForm.client}
-                    onChange={e => setNewTaskForm(prev => ({ ...prev, client: e.target.value }))}
-                    style={{ width: '100%', padding: '0.625rem 0.75rem', fontSize: '0.85rem' }}
-                    aria-label="Client"
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', display: 'block', marginBottom: '0.375rem' }}>Assignee</label>
-                  <input
-                    className="input-field"
-                    placeholder="Assignee name"
-                    value={newTaskForm.assignee}
-                    onChange={e => setNewTaskForm(prev => ({ ...prev, assignee: e.target.value }))}
-                    style={{ width: '100%', padding: '0.625rem 0.75rem', fontSize: '0.85rem' }}
-                    aria-label="Assignee"
-                  />
-                </div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', display: 'block', marginBottom: '0.375rem' }}>Priority</label>
-                  <select
-                    className="input-field"
-                    value={newTaskForm.priority}
-                    onChange={e => setNewTaskForm(prev => ({ ...prev, priority: e.target.value }))}
-                    style={{ width: '100%', padding: '0.625rem 0.75rem', fontSize: '0.85rem', background: '#080C18' }}
-                    aria-label="Priority"
-                  >
-                    <option value="Highest">Highest</option>
-                    <option value="High">High</option>
-                    <option value="Medium">Medium</option>
-                    <option value="Low">Low</option>
-                    <option value="Lowest">Lowest</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', display: 'block', marginBottom: '0.375rem' }}>Status</label>
-                  <select
-                    className="input-field"
-                    value={newTaskForm.status}
-                    onChange={e => setNewTaskForm(prev => ({ ...prev, status: e.target.value }))}
-                    style={{ width: '100%', padding: '0.625rem 0.75rem', fontSize: '0.85rem', background: '#080C18' }}
-                    aria-label="Task status"
-                  >
-                    <option value="Backlog">Backlog</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="In Review">In Review</option>
-                    <option value="Completed">Completed</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', display: 'block', marginBottom: '0.375rem' }}>Due Date</label>
-                <input
-                  type="date"
-                  className="input-field"
-                  value={newTaskForm.dueDate}
-                  onChange={e => setNewTaskForm(prev => ({ ...prev, dueDate: e.target.value }))}
-                  style={{ width: '100%', padding: '0.625rem 0.75rem', fontSize: '0.85rem' }}
-                  aria-label="Due date"
-                />
-              </div>
-              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.25rem' }}>
-                <button className="btn-ghost" onClick={() => setShowNewTaskModal(false)}>Cancel</button>
-                <button
-                  className="btn-primary"
-                  onClick={handleAddLocalTask}
-                  disabled={!newTaskForm.name.trim()}
-                  style={{ padding: '0.5rem 1.25rem' }}
-                  aria-label="Create task"
-                >
-                  Create Task
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <style>{`
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-      `}</style>
-    </div>
+    </motion.div>
   );
 }

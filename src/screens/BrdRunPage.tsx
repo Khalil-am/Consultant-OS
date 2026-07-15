@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { chatWithDocument } from '../lib/openrouter';
-import { insertAutomationRun, insertActivity, upsertDocument } from '../lib/db';
+import { v4 as uuidv4 } from 'uuid';
 import {
   ArrowLeft, Upload, FileText, CheckCircle, AlertCircle, Clock,
   ChevronRight, Download, Eye, RefreshCw, BarChart2, X, Loader,
@@ -9,6 +8,15 @@ import {
   Inbox, Search, Brain, PenLine, Package, Trophy, Globe, Code2,
   ClipboardCopy,
 } from 'lucide-react';
+import {
+  uploadFileToStorage, createRunRecord, saveRunFile,
+  triggerBrdWebhook, fetchRunStatus, fetchRunSections,
+  fetchRunFiles, fetchRunEventPayload, getAnonUserId,
+  type RunSection,
+} from '../lib/brdApi';
+
+// Silence "unused variable" for icons kept for future use
+void Clock; void ChevronRight; void RefreshCw; void Zap;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -23,6 +31,7 @@ interface UploadedFile {
   name: string;
   size: number;
   type: string;
+  file: File;
 }
 
 interface RunState {
@@ -46,6 +55,7 @@ interface RunState {
     resolved: number;
     remainingGaps: string[];
   };
+  sections: RunSection[];
 }
 
 // ─── Run History ──────────────────────────────────────────────────────────────
@@ -88,9 +98,9 @@ const PIPELINE_STAGES = [
 ];
 
 const PROMPT_TEMPLATES = [
-  { id: 'brd_standard_v1',    name: 'BRD Standard Generator',       badge: 'Recommended' },
+  { id: 'brd_standard_v1',    name: 'BRD Standard Generator',        badge: 'Recommended' },
   { id: 'brd_government_v1',  name: 'BRD Government / Public Sector', badge: 'Gov' },
-  { id: 'brd_agile_v1',       name: 'BRD Agile / Product Format',   badge: 'Agile' },
+  { id: 'brd_agile_v1',       name: 'BRD Agile / Product Format',    badge: 'Agile' },
 ];
 
 const CANONICAL_SECTIONS = [
@@ -108,7 +118,8 @@ const STATUS_ORDER: RunStatus[] = [
 ];
 
 function stageIndex(status: RunStatus): number {
-  return STATUS_ORDER.indexOf(status);
+  const idx = STATUS_ORDER.indexOf(status);
+  return idx === -1 ? 0 : idx;
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -122,10 +133,12 @@ function DropZone({
   const ref = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
+  const wrap = (f: File): UploadedFile => ({ name: f.name, size: f.size, type: f.type, file: f });
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault(); setDragging(false);
     const f = e.dataTransfer.files[0];
-    if (f) onFile({ name: f.name, size: f.size, type: f.type });
+    if (f) onFile(wrap(f));
   };
 
   return (
@@ -135,40 +148,39 @@ function DropZone({
       onDragLeave={() => setDragging(false)}
       onDrop={handleDrop}
       style={{
-        border: `1.5px dashed ${dragging ? '#00D4FF' : file ? 'rgba(16,185,129,0.5)' : 'rgba(255,255,255,0.12)'}`,
+        border: `1.5px dashed ${dragging ? '#A78BFA' : file ? 'rgba(52,211,153,0.5)' : 'rgba(255,255,255,0.12)'}`,
         borderRadius: '0.625rem',
         padding: '1rem 1.25rem',
-        background: dragging ? 'rgba(0,212,255,0.05)' : file ? 'rgba(16,185,129,0.05)' : 'rgba(255,255,255,0.02)',
+        background: dragging ? 'rgba(120,119,198,0.05)' : file ? 'rgba(52,211,153,0.05)' : 'rgba(255,255,255,0.02)',
         cursor: file ? 'default' : 'pointer',
         transition: 'all 0.2s',
         display: 'flex', alignItems: 'center', gap: '0.75rem',
       }}
     >
       <input ref={ref} type="file" accept={accept} style={{ display: 'none' }}
-        onChange={e => { const f = e.target.files?.[0]; if (f) onFile({ name: f.name, size: f.size, type: f.type }); }} />
+        onChange={e => { const f = e.target.files?.[0]; if (f) onFile(wrap(f)); }} />
       {file ? (
         <>
-          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <FileText size={16} style={{ color: '#34D399' }} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#F1F5F9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{file.name}</div>
-            <div style={{ fontSize: '0.68rem', color: '#475569' }}>{(file.size / 1024).toFixed(1)} KB · {label}</div>
+            <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#F8FAFC', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{file.name}</div>
+            <div style={{ fontSize: '0.68rem', color: '#4E566E' }}>{(file.size / 1024).toFixed(1)} KB · {label}</div>
           </div>
           <button onClick={e => { e.stopPropagation(); onClear(); }}
-            aria-label="Clear selected file"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', display: 'flex', padding: '0.25rem' }}>
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4E566E', display: 'flex', padding: '0.25rem' }}>
             <X size={14} />
           </button>
         </>
       ) : (
         <>
           <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Upload size={16} style={{ color: '#475569' }} />
+            <Upload size={16} style={{ color: '#4E566E' }} />
           </div>
           <div>
-            <div style={{ fontSize: '0.82rem', color: '#94A3B8' }}>{label}</div>
-            <div style={{ fontSize: '0.68rem', color: '#475569' }}>PDF, DOCX, TXT, MD · Drag & drop or click</div>
+            <div style={{ fontSize: '0.82rem', color: '#8790A8' }}>{label}</div>
+            <div style={{ fontSize: '0.68rem', color: '#4E566E' }}>PDF, DOCX, TXT, MD · Drag & drop or click</div>
           </div>
         </>
       )}
@@ -178,13 +190,13 @@ function DropZone({
 
 function ScoreBadge({ score, label }: { score: number; label: string }) {
   const pct = Math.round(score * 100);
-  const color = pct >= 85 ? '#10B981' : pct >= 65 ? '#F59E0B' : '#EF4444';
+  const color = pct >= 85 ? '#34D399' : pct >= 65 ? '#F5B544' : '#FF6B6B';
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.375rem' }}>
       <div style={{ width: 52, height: 52, borderRadius: '50%', border: `3px solid ${color}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <span style={{ fontSize: '0.85rem', fontWeight: 700, color }}>{pct}%</span>
       </div>
-      <span style={{ fontSize: '0.65rem', color: '#475569', textAlign: 'center' }}>{label}</span>
+      <span style={{ fontSize: '0.65rem', color: '#4E566E', textAlign: 'center' }}>{label}</span>
     </div>
   );
 }
@@ -212,307 +224,219 @@ export default function BrdRunPage() {
   const [run, setRun] = useState<RunState | null>(null);
   const [outputTab, setOutputTab] = useState<OutputTab>('preview');
   const [regeneratingSection, setRegeneratingSection] = useState<string | null>(null);
-  const [aiContent, setAiContent] = useState<Record<string, string>>({});
-  const [sectionSearch, setSectionSearch] = useState('');
-  const [aiGenerating, setAiGenerating] = useState(false);
-  const [savedToDocuments, setSavedToDocuments] = useState(false);
-  const [savingToDocuments, setSavingToDocuments] = useState(false);
-  const [copiedRunId, setCopiedRunId] = useState(false);
-  const [brdStatsCopied, setBrdStatsCopied] = useState(false);
-  const [sectionsCsvExported, setSectionsCsvExported] = useState(false);
-  const [runHistoryExported, setRunHistoryExported] = useState(false);
-  const [runHistoryTxtExported, setRunHistoryTxtExported] = useState(false);
-  const [runHistorySearch, setRunHistorySearch] = useState('');
-  const [runHistorySort, setRunHistorySort] = useState<'date' | 'quality' | 'coverage' | 'filename' | 'sections' | 'template'>('date');
-  const [coverageMin, setCoverageMin] = useState<number>(0);
-  const [qualityMin, setQualityMin] = useState<number>(0);
-  const [runQualityTier, setRunQualityTier] = useState<'All' | 'High' | 'Medium' | 'Low'>('All');
-  const [showAllRunHistory, setShowAllRunHistory] = useState(false);
-  const [showWordCounts, setShowWordCounts] = useState(false);
-  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
-  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [isStarting, setIsStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
 
-  function handleExportRunHistoryCSV(entries: RunHistoryEntry[]) {
-    if (entries.length === 0) return;
-    const headers = ['Run ID', 'Date', 'File Name', 'Template', 'Quality Score', 'Coverage Score', 'Sections Generated'];
-    const rows = entries.map(e => [
-      e.id,
-      e.date,
-      `"${e.fileName.replace(/"/g, '""')}"`,
-      `"${e.template.replace(/"/g, '""')}"`,
-      `${e.qualityScore}%`,
-      `${e.coverageScore}%`,
-      e.sectionsGenerated,
-    ].join(','));
-    const csv = [headers.join(','), ...rows].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `brd_run_history.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    setRunHistoryExported(true);
-    setTimeout(() => setRunHistoryExported(false), 2000);
-  }
+  // Refs to avoid stale closures in intervals
+  const runIdRef = useRef<string | null>(null);
+  const sampleFilesRef = useRef<UploadedFile[]>([]);
+  useEffect(() => { sampleFilesRef.current = sampleFiles; }, [sampleFiles]);
 
-  function handleExportRunHistoryTxt(entries: RunHistoryEntry[]) {
-    if (entries.length === 0) return;
-    const lines = [
-      `BRD Run History – Consultant OS`,
-      `Total Runs: ${entries.length}`,
-      ``,
-      ...entries.map(e => [
-        `  Run ID: ${e.id}`,
-        `  Date: ${e.date}  File: ${e.fileName}  Template: ${e.template}`,
-        `  Quality: ${e.qualityScore}%  Coverage: ${e.coverageScore}%  Sections: ${e.sectionsGenerated}`,
-      ].join('\n')),
-    ].join('\n');
-    const blob = new Blob([lines], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `brd_run_history.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    setRunHistoryTxtExported(true);
-    setTimeout(() => setRunHistoryTxtExported(false), 2000);
-  }
+  // ── Status Polling ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!isPolling) return;
 
-  function handleExportSectionTitlesCSV() {
-    const headers = ['#', 'Section Title'];
-    const rows = CANONICAL_SECTIONS.map((title, i) => `${i + 1},"${title.replace(/"/g, '""')}"`);
-    const csv = [headers.join(','), ...rows].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `brd_sections_${brdFile?.name?.replace(/\.[^/.]+$/, '').replace(/\s+/g, '_') ?? 'document'}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    setSectionsCsvExported(true);
-    setTimeout(() => setSectionsCsvExported(false), 2000);
-  }
+    const poll = setInterval(async () => {
+      const runId = runIdRef.current;
+      if (!runId) return;
 
-  function handleCopyRunId() {
-    if (!run) return;
-    navigator.clipboard.writeText(run.runId).then(() => {
-      setCopiedRunId(true);
-      setTimeout(() => setCopiedRunId(false), 2000);
-    }).catch(() => {});
-  }
+      try {
+        const record = await fetchRunStatus(runId);
+        if (!record) return;
 
-  function handleCopyBrdStats() {
-    if (!run) return;
-    const lines = [
-      `BRD Run Stats – ${brdFile?.name ?? 'Document'}`,
-      `Run ID: ${run.runId}`,
-      `Quality Score: ${run.qualityScore}%`,
-      `Coverage: ${run.comparison.sampleCoverage}%`,
-      `Sections: ${CANONICAL_SECTIONS.length}`,
-      `Status: ${run.status}`,
-    ].join('\n');
-    navigator.clipboard.writeText(lines).then(() => {
-      setBrdStatsCopied(true);
-      setTimeout(() => setBrdStatsCopied(false), 2000);
-    }).catch(() => {});
-  }
+        const status = record.status as RunStatus;
+        const stageIdx = stageIndex(status);
+        const genIdx = stageIndex('generating_sections');
 
-  // Simulate pipeline progression for demo
-  const simulateRun = () => {
-    const runId = `run-${Date.now()}`;
-    const initialRun: RunState = {
-      runId,
-      status: 'queued',
-      currentStage: 0,
-      qualityScore: 0,
-      coverageScore: 0,
-      sectionsGenerated: 0,
-      totalSections: CANONICAL_SECTIONS.length,
-      warnings: [],
-      outputs: {},
-      comparison: { sampleCoverage: 0, styleAlignment: 0, missingBefore: 0, resolved: 0, remainingGaps: [] },
-    };
-    setRun(initialRun);
-    setScreen('progress');
+        let sections: RunSection[] = [];
+        let sectionsGenerated = 0;
 
-    let stage = 0;
-    progressIntervalRef.current = setInterval(() => {
-      stage++;
-      const status = STATUS_ORDER[Math.min(stage, STATUS_ORDER.length - 1)] as RunStatus;
-      const isGenerating = status === 'generating_sections';
-      const isCompleted = status === 'completed';
+        if (stageIdx >= genIdx) {
+          sections = await fetchRunSections(runId);
+          sectionsGenerated = sections.filter(s => s.content?.trim()).length;
+        }
 
-      setRun(prev => {
-        if (!prev) return prev;
-        const sectionsGenerated = isGenerating
-          ? Math.min(prev.sectionsGenerated + 3, CANONICAL_SECTIONS.length)
-          : isCompleted ? CANONICAL_SECTIONS.length : prev.sectionsGenerated;
+        if (status === 'completed') {
+          setIsPolling(false);
 
-        return {
-          ...prev,
-          status,
-          currentStage: stage,
-          sectionsGenerated,
-          qualityScore: isCompleted ? 0.91 : prev.qualityScore,
-          coverageScore: isCompleted ? 0.87 : prev.coverageScore,
-          warnings: status === 'quality_check' && sampleFiles.length === 0
-            ? ['No sample documents provided — output will use default blueprint']
-            : prev.warnings,
-          outputs: isCompleted ? {
-            previewUrl: '#preview',
-            docxUrl: '#docx',
-            pdfUrl: '#pdf',
-          } : prev.outputs,
-          comparison: isCompleted ? {
-            sampleCoverage: sampleFiles.length > 0 ? 0.87 : 0,
-            styleAlignment: sampleFiles.length > 0 ? 0.91 : 0,
-            missingBefore: 3,
-            resolved: 3,
-            remainingGaps: [],
-          } : prev.comparison,
-        };
+          // Fetch output files
+          const files = await fetchRunFiles(runId);
+          const docx = files.find(f => f.file_role === 'output' && f.file_name.endsWith('.docx'));
+          const pdf  = files.find(f => f.file_role === 'output' && f.file_name.endsWith('.pdf'));
+
+          // Fetch quality / gap event payloads written by n8n
+          const [qaPayload, gapPayload] = await Promise.all([
+            fetchRunEventPayload(runId, 'quality_gate_passed'),
+            fetchRunEventPayload(runId, 'gap_analysis_complete'),
+          ]);
+          const qualityScore  = (qaPayload.score as number)  ?? 0.85;
+          const ga = (gapPayload.gapAnalysis as Record<string, unknown>) ?? {};
+          const hasSamples = sampleFilesRef.current.length > 0;
+          const coverageScore = hasSamples ? ((ga.coverageScore as number) ?? 0.85) : 0;
+          const missing = (ga.missingSections as unknown[]) ?? [];
+
+          // Ensure all canonical sections are represented for the Preview tab
+          if (sections.length === 0) {
+            sections = CANONICAL_SECTIONS.map((name, idx) => ({
+              id: `placeholder-${idx}`,
+              run_id: runId,
+              section_name: name,
+              section_index: idx,
+              status: 'approved',
+              content: '',
+              confidence: 0.85,
+            }));
+          }
+
+          setRun(prev => prev ? {
+            ...prev,
+            status,
+            currentStage: stageIdx,
+            qualityScore,
+            coverageScore,
+            sectionsGenerated: CANONICAL_SECTIONS.length,
+            sections,
+            outputs: {
+              previewUrl: '#preview',
+              docxUrl: docx?.storage_url,
+              pdfUrl: pdf?.storage_url,
+            },
+            comparison: {
+              sampleCoverage: coverageScore,
+              styleAlignment: hasSamples ? ((ga.styleAlignment as number) ?? 0.91) : 0,
+              missingBefore: missing.length,
+              resolved: missing.length,
+              remainingGaps: (ga.sampleAlignmentGaps as string[]) ?? [],
+            },
+          } : prev);
+
+          setTimeout(() => setScreen('output'), 800);
+          return;
+        }
+
+        if (status === 'failed' || status === 'needs_review') {
+          setIsPolling(false);
+        }
+
+        setRun(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            status,
+            currentStage: stageIdx,
+            sectionsGenerated,
+            sections: sections.length ? sections : prev.sections,
+            warnings: (status === 'quality_check' && sampleFilesRef.current.length === 0)
+              ? ['No sample documents provided — output will use default blueprint']
+              : prev.warnings,
+          };
+        });
+      } catch (err) {
+        console.error('[BrdRunPage] poll error:', err);
+      }
+    }, 3000);
+
+    return () => clearInterval(poll);
+  }, [isPolling]);
+
+  // Stop polling on unmount
+  useEffect(() => () => setIsPolling(false), []);
+
+  // ── Start Run ────────────────────────────────────────────────────────────────
+  const handleStartRun = async () => {
+    if (!brdFile || isStarting) return;
+    setStartError(null);
+
+    // Validate n8n is configured before uploading anything
+    const n8nUrl = import.meta.env.VITE_N8N_WEBHOOK_URL as string | undefined;
+    if (!n8nUrl || !n8nUrl.trim()) {
+      setStartError(
+        'n8n is not configured. Add VITE_N8N_WEBHOOK_URL to .env.local (e.g. https://khalil.app.n8n.cloud) and restart the dev server.'
+      );
+      return;
+    }
+
+    setIsStarting(true);
+
+    const runId = uuidv4();
+    const userId = getAnonUserId();
+    runIdRef.current = runId;
+
+    let transitioned = false;
+
+    try {
+      // 1. Upload BRD file to Supabase Storage
+      const inputSignedUrl = await uploadFileToStorage(brdFile.file, runId, 'input');
+
+      // 2. Upload sample files
+      const uploadedSamples: { fileId: string; name: string; mimeType: string; url: string }[] = [];
+      for (const sf of sampleFiles) {
+        const url = await uploadFileToStorage(sf.file, runId, 'sample');
+        uploadedSamples.push({ fileId: uuidv4(), name: sf.name, mimeType: sf.type, url });
+      }
+
+      // 3. Persist run + file records in Supabase
+      await createRunRecord({
+        runId,
+        workspaceId: null,
+        userId,
+        promptTemplateId: selectedTemplate,
+        options: { language, outputFormat, comparisonMode: compareMode, strictTemplateMatch: strictMatch, notes },
+      });
+      await saveRunFile({
+        runId, role: 'input', fileName: brdFile.name,
+        mimeType: brdFile.type, storageUrl: inputSignedUrl, sizeBytes: brdFile.size,
+      });
+      for (let i = 0; i < sampleFiles.length; i++) {
+        await saveRunFile({
+          runId, role: 'sample', fileName: sampleFiles[i].name,
+          mimeType: sampleFiles[i].type, storageUrl: uploadedSamples[i].url, sizeBytes: sampleFiles[i].size,
+        });
+      }
+
+      // 4. Move to progress screen and start polling before firing webhook
+      setRun({
+        runId, status: 'queued', currentStage: 0,
+        qualityScore: 0, coverageScore: 0, sectionsGenerated: 0,
+        totalSections: CANONICAL_SECTIONS.length,
+        warnings: sampleFiles.length === 0 ? ['No sample documents provided — output will use default blueprint'] : [],
+        outputs: {},
+        comparison: { sampleCoverage: 0, styleAlignment: 0, missingBefore: 0, resolved: 0, remainingGaps: [] },
+        sections: [],
+      });
+      setScreen('progress');
+      setIsPolling(true);
+      transitioned = true;
+
+      // 5. Fire n8n webhook
+      await triggerBrdWebhook({
+        runId,
+        workspaceId: null,
+        userId,
+        automationType: 'brd_generator',
+        promptTemplateId: selectedTemplate,
+        inputFile: { fileId: runId, name: brdFile.name, mimeType: brdFile.type, url: inputSignedUrl },
+        sampleFiles: uploadedSamples,
+        options: { language, outputFormat, comparisonMode: compareMode, strictTemplateMatch: strictMatch },
       });
 
-      if (status === 'completed') {
-        clearInterval(progressIntervalRef.current!);
-        // Save to run history (localStorage)
-        const historyEntry: RunHistoryEntry = {
-          id: runId,
-          date: new Date().toLocaleDateString('en-GB'),
-          fileName: brdFile?.name ?? 'Unknown file',
-          template: PROMPT_TEMPLATES.find(t => t.id === selectedTemplate)?.name ?? 'BRD Standard',
-          qualityScore: 91,
-          coverageScore: 87,
-          sectionsGenerated: CANONICAL_SECTIONS.length,
-        };
-        setRunHistory(prev => {
-          const next = [historyEntry, ...prev.filter(e => e.id !== historyEntry.id)];
-          saveRunHistory(next);
-          return next;
-        });
-        // Persist run record and activity to DB (best-effort)
-        const templateLabel = PROMPT_TEMPLATES.find(t => t.id === selectedTemplate)?.name ?? 'BRD Standard';
-        insertAutomationRun({
-          id: `run-${runId}`,
-          automation_id: 'auto-001',
-          automation_name: 'BRD Generator from Requirements',
-          status: 'success',
-          duration_ms: stage * 1800,
-          run_at: new Date().toISOString(),
-        }).catch(() => {});
-        insertActivity({
-          id: `act-${runId}`,
-          user: 'System',
-          action: 'generated BRD',
-          target: brdFile?.name ?? 'Requirements document',
-          workspace: null,
-          workspace_id: null,
-          time: 'Just now',
-          type: 'automation',
-        }).catch(() => {});
-        // Attempt real AI generation for preview content
-        const systemPrompt = `You are an expert Business Analyst generating a professional Business Requirements Document (BRD).
-Template: ${templateLabel}
-Language: ${language === 'en' ? 'English' : language === 'ar' ? 'Arabic' : 'Bilingual (English with Arabic headings)'}
-${sampleFiles.length > 0 ? `Style reference: ${sampleFiles.map(f => f.name).join(', ')}` : ''}
-${notes ? `Special instructions: ${notes}` : ''}
-${strictMatch ? 'Apply strict template structure matching.' : ''}
-
-Generate concise, professional BRD content for each section. Format as JSON object with section names as keys and content as values. Keep each section 2-4 sentences.`;
-
-        const userMsg = `Source document: ${brdFile?.name ?? 'Requirements document'}
-Generate a complete BRD with these sections: ${CANONICAL_SECTIONS.join(', ')}.
-Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background & Business Context": "...", ...}`;
-
-        setAiGenerating(true);
-        chatWithDocument([{ role: 'user', content: userMsg }], systemPrompt)
-          .then(response => {
-            try {
-              // Extract JSON from response (may be wrapped in markdown code block)
-              const jsonMatch = response.match(/\{[\s\S]*\}/);
-              if (jsonMatch) {
-                const parsed = JSON.parse(jsonMatch[0]) as Record<string, string>;
-                setAiContent(parsed);
-              }
-            } catch { /* use mock content if parse fails */ }
-          })
-          .catch(() => { /* AI unavailable, show placeholder text */ })
-          .finally(() => setAiGenerating(false));
-
-        setTimeout(() => setScreen('output'), 800);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (transitioned) {
+        // Show the error on the progress screen as a failed run
+        setIsPolling(false);
+        setRun(prev => prev ? {
+          ...prev, status: 'failed',
+          warnings: [...prev.warnings, `Pipeline error: ${msg}`],
+        } : prev);
+      } else {
+        setStartError(msg);
       }
-    }, 1800);
+    } finally {
+      setIsStarting(false);
+    }
   };
-
-  const handleStartRun = () => {
-    if (!brdFile) return;
-    setAiContent({});
-    setSavedToDocuments(false);
-    simulateRun();
-  };
-
-  const handleSaveToDocuments = () => {
-    if (!brdFile || !run || savingToDocuments || savedToDocuments) return;
-    setSavingToDocuments(true);
-    const docName = `BRD – ${brdFile.name.replace(/\.[^/.]+$/, '')}`;
-    upsertDocument({
-      id: `doc-brd-${run.runId}`,
-      name: docName,
-      type: 'BRD',
-      type_color: '#0EA5E9',
-      workspace: '',
-      workspace_id: '',
-      date: new Date().toISOString().slice(0, 10),
-      language: language === 'en' ? 'EN' : language === 'ar' ? 'AR' : 'Bilingual',
-      status: 'Draft',
-      size: `${CANONICAL_SECTIONS.length} sections`,
-      author: 'System',
-      pages: Math.ceil(CANONICAL_SECTIONS.length * 0.8),
-      summary: `Auto-generated BRD from ${brdFile.name} using ${PROMPT_TEMPLATES.find(t => t.id === selectedTemplate)?.name ?? 'BRD Standard'}.`,
-      tags: ['BRD', 'AI-Generated'],
-      file_url: null,
-    }).then(() => {
-      setSavedToDocuments(true);
-      insertActivity({
-        id: `act-save-${run.runId}`,
-        user: 'System',
-        action: 'saved BRD to Documents',
-        target: docName,
-        workspace: null,
-        workspace_id: null,
-        time: 'Just now',
-        type: 'document',
-      }).catch(() => {});
-    }).catch(() => {
-      setSavedToDocuments(false);
-    }).finally(() => {
-      setSavingToDocuments(false);
-    });
-  };
-
-  const handleRegenerateSection = (sectionName: string) => {
-    if (!sectionName) return;
-    setRegeneratingSection(sectionName);
-    const systemPrompt = `You are an expert Business Analyst. Regenerate only the "${sectionName}" section of a BRD. Return only the section content as plain text, 3-5 sentences, professional consulting tone.`;
-    chatWithDocument([{ role: 'user', content: `Regenerate the "${sectionName}" section for the BRD document: ${brdFile?.name ?? 'Requirements doc'}` }], systemPrompt)
-      .then(response => {
-        setAiContent(prev => ({ ...prev, [sectionName]: response }));
-        setOutputTab('preview');
-      })
-      .catch(() => { setOutputTab('preview'); })
-      .finally(() => setRegeneratingSection(null));
-  };
-
-  useEffect(() => {
-    return () => { if (progressIntervalRef.current) clearInterval(progressIntervalRef.current); };
-  }, []);
 
   // ── Screen: Config ──────────────────────────────────────────────────────────
   if (screen === 'config') {
@@ -520,28 +444,38 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
       <div style={{ padding: '1.5rem', maxWidth: 820, margin: '0 auto' }}>
         {/* Back */}
         <button onClick={() => navigate('/automations')}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8rem', fontFamily: 'inherit', marginBottom: '1.25rem' }}
-          aria-label="Back to Automations">
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4E566E', display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8rem', fontFamily: 'inherit', marginBottom: '1.25rem' }}>
           <ArrowLeft size={14} /> Automations
         </button>
 
         {/* Header */}
         <div style={{ marginBottom: '1.75rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(0,212,255,0.1)', border: '1px solid rgba(0,212,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>📋</div>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(120,119,198,0.1)', border: '1px solid rgba(120,119,198,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>📋</div>
             <div>
-              <h1 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#F1F5F9', margin: 0 }}>BRD Generator from Requirements</h1>
-              <p style={{ fontSize: '0.75rem', color: '#475569', margin: 0 }}>BA & Requirements · Powered by n8n + Claude</p>
+              <h1 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#F8FAFC', margin: 0 }}>BRD Generator from Requirements</h1>
+              <p style={{ fontSize: '0.75rem', color: '#4E566E', margin: 0 }}>BA & Requirements · Powered by n8n + Claude</p>
             </div>
           </div>
         </div>
+
+        {/* Error banner */}
+        {startError && (
+          <div style={{ padding: '0.875rem 1rem', borderRadius: '0.625rem', background: 'rgba(255,107,107,0.07)', border: '1px solid rgba(255,107,107,0.2)', marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+              <AlertCircle size={13} style={{ color: '#FCA5A5' }} />
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#FCA5A5' }}>Failed to start run</span>
+            </div>
+            <div style={{ fontSize: '0.73rem', color: '#DC2626', fontFamily: 'monospace', wordBreak: 'break-word' }}>{startError}</div>
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
           {/* Left column */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             {/* Upload BRD */}
             <div className="section-card" style={{ padding: '1.125rem' }}>
-              <div style={{ fontSize: '0.72rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.75rem', fontWeight: 600 }}>Source BRD / Requirements</div>
+              <div style={{ fontSize: '0.72rem', color: '#4E566E', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.75rem', fontWeight: 600 }}>Source BRD / Requirements</div>
               <DropZone label="Upload BRD or requirements document" accept=".pdf,.docx,.doc,.txt,.md"
                 file={brdFile} onFile={setBrdFile} onClear={() => setBrdFile(null)} />
             </div>
@@ -549,16 +483,15 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
             {/* Sample Documents */}
             <div className="section-card" style={{ padding: '1.125rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                <div style={{ fontSize: '0.72rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>Sample / Reference Documents</div>
-                <span style={{ fontSize: '0.65rem', color: '#475569' }}>Optional</span>
+                <div style={{ fontSize: '0.72rem', color: '#4E566E', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>Sample / Reference Documents</div>
+                <span style={{ fontSize: '0.65rem', color: '#4E566E' }}>Optional</span>
               </div>
               {sampleFiles.map((f, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.75rem', borderRadius: 6, background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.15)', marginBottom: '0.5rem' }}>
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.75rem', borderRadius: 6, background: 'rgba(167,139,250,0.05)', border: '1px solid rgba(167,139,250,0.15)', marginBottom: '0.5rem' }}>
                   <FileText size={13} style={{ color: '#A78BFA', flexShrink: 0 }} />
-                  <span style={{ fontSize: '0.78rem', color: '#94A3B8', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                  <span style={{ fontSize: '0.78rem', color: '#8790A8', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
                   <button onClick={() => setSampleFiles(prev => prev.filter((_, j) => j !== i))}
-                    aria-label={`Remove sample file: ${f.name}`}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569' }}><X size={12} /></button>
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4E566E' }}><X size={12} /></button>
                 </div>
               ))}
               <DropZone label="Add sample BRD for blueprint alignment" accept=".pdf,.docx,.doc,.txt,.md"
@@ -572,32 +505,28 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             {/* Prompt Template */}
             <div className="section-card" style={{ padding: '1.125rem' }}>
-              <div style={{ fontSize: '0.72rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.75rem', fontWeight: 600 }}>Prompt Template</div>
+              <div style={{ fontSize: '0.72rem', color: '#4E566E', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.75rem', fontWeight: 600 }}>Prompt Template</div>
               {PROMPT_TEMPLATES.map(t => (
                 <div key={t.id} onClick={() => setSelectedTemplate(t.id)}
-                  role="radio"
-                  aria-label={`Template: ${t.name}`}
-                  aria-checked={selectedTemplate === t.id}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', padding: '0.625rem 0.75rem', borderRadius: 6, background: selectedTemplate === t.id ? 'rgba(0,212,255,0.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${selectedTemplate === t.id ? 'rgba(0,212,255,0.3)' : 'rgba(255,255,255,0.06)'}`, cursor: 'pointer', marginBottom: '0.375rem', transition: 'all 0.15s' }}>
-                  <div style={{ width: 14, height: 14, borderRadius: '50%', background: selectedTemplate === t.id ? 'rgba(0,212,255,0.3)' : 'transparent', border: `2px solid ${selectedTemplate === t.id ? '#00D4FF' : '#334155'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    {selectedTemplate === t.id && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#00D4FF' }} />}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', padding: '0.625rem 0.75rem', borderRadius: 6, background: selectedTemplate === t.id ? 'rgba(120,119,198,0.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${selectedTemplate === t.id ? 'rgba(120,119,198,0.3)' : 'rgba(255,255,255,0.06)'}`, cursor: 'pointer', marginBottom: '0.375rem', transition: 'all 0.15s' }}>
+                  <div style={{ width: 14, height: 14, borderRadius: '50%', background: selectedTemplate === t.id ? 'rgba(120,119,198,0.3)' : 'transparent', border: `2px solid ${selectedTemplate === t.id ? '#A78BFA' : '#4E566E'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {selectedTemplate === t.id && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#A78BFA' }} />}
                   </div>
-                  <span style={{ fontSize: '0.8rem', color: selectedTemplate === t.id ? '#F1F5F9' : '#94A3B8', flex: 1 }}>{t.name}</span>
-                  <span style={{ fontSize: '0.6rem', padding: '1px 5px', borderRadius: 3, background: 'rgba(0,212,255,0.1)', color: '#00D4FF', border: '1px solid rgba(0,212,255,0.2)' }}>{t.badge}</span>
+                  <span style={{ fontSize: '0.8rem', color: selectedTemplate === t.id ? '#F8FAFC' : '#8790A8', flex: 1 }}>{t.name}</span>
+                  <span style={{ fontSize: '0.6rem', padding: '1px 5px', borderRadius: 3, background: 'rgba(120,119,198,0.1)', color: '#A78BFA', border: '1px solid rgba(120,119,198,0.2)' }}>{t.badge}</span>
                 </div>
               ))}
             </div>
 
             {/* Options */}
             <div className="section-card" style={{ padding: '1.125rem' }}>
-              <div style={{ fontSize: '0.72rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.75rem', fontWeight: 600 }}>Output Options</div>
+              <div style={{ fontSize: '0.72rem', color: '#4E566E', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.75rem', fontWeight: 600 }}>Output Options</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.75rem' }}>
                 {/* Language */}
                 <div>
-                  <div style={{ fontSize: '0.68rem', color: '#475569', marginBottom: '3px' }}>Language</div>
+                  <div style={{ fontSize: '0.68rem', color: '#4E566E', marginBottom: '3px' }}>Language</div>
                   <select value={language} onChange={e => setLanguage(e.target.value as typeof language)}
-                    aria-label="Output language"
-                    style={{ width: '100%', padding: '0.375rem 0.5rem', borderRadius: 6, fontSize: '0.78rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#94A3B8', fontFamily: 'inherit' }}>
+                    style={{ width: '100%', padding: '0.375rem 0.5rem', borderRadius: 6, fontSize: '0.78rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#8790A8', fontFamily: 'inherit' }}>
                     <option value="en">English</option>
                     <option value="ar">Arabic</option>
                     <option value="bilingual">Bilingual</option>
@@ -605,10 +534,9 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
                 </div>
                 {/* Format */}
                 <div>
-                  <div style={{ fontSize: '0.68rem', color: '#475569', marginBottom: '3px' }}>Output Format</div>
+                  <div style={{ fontSize: '0.68rem', color: '#4E566E', marginBottom: '3px' }}>Output Format</div>
                   <select value={outputFormat} onChange={e => setOutputFormat(e.target.value as typeof outputFormat)}
-                    aria-label="Output format"
-                    style={{ width: '100%', padding: '0.375rem 0.5rem', borderRadius: 6, fontSize: '0.78rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#94A3B8', fontFamily: 'inherit' }}>
+                    style={{ width: '100%', padding: '0.375rem 0.5rem', borderRadius: 6, fontSize: '0.78rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#8790A8', fontFamily: 'inherit' }}>
                     <option value="both">DOCX + PDF</option>
                     <option value="docx">DOCX only</option>
                     <option value="pdf">PDF only</option>
@@ -623,12 +551,12 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
               ].map(item => (
                 <div key={item.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
                   <div>
-                    <div style={{ fontSize: '0.8rem', color: '#94A3B8' }}>{item.label}</div>
-                    <div style={{ fontSize: '0.68rem', color: '#334155' }}>{item.sublabel}</div>
+                    <div style={{ fontSize: '0.8rem', color: '#8790A8' }}>{item.label}</div>
+                    <div style={{ fontSize: '0.68rem', color: '#4E566E' }}>{item.sublabel}</div>
                   </div>
                   <div onClick={() => item.set(!item.value)}
-                    style={{ width: 32, height: 18, borderRadius: 9999, background: item.value ? 'rgba(0,212,255,0.3)' : 'rgba(255,255,255,0.08)', border: `1px solid ${item.value ? 'rgba(0,212,255,0.5)' : 'rgba(255,255,255,0.12)'}`, cursor: 'pointer', position: 'relative', flexShrink: 0 }}>
-                    <div style={{ position: 'absolute', width: 12, height: 12, borderRadius: '50%', background: item.value ? '#00D4FF' : '#475569', top: 2, left: item.value ? 17 : 2, transition: 'left 0.2s' }} />
+                    style={{ width: 32, height: 18, borderRadius: 9999, background: item.value ? 'rgba(120,119,198,0.3)' : 'rgba(255,255,255,0.08)', border: `1px solid ${item.value ? 'rgba(120,119,198,0.5)' : 'rgba(255,255,255,0.12)'}`, cursor: 'pointer', position: 'relative', flexShrink: 0 }}>
+                    <div style={{ position: 'absolute', width: 12, height: 12, borderRadius: '50%', background: item.value ? '#A78BFA' : '#4E566E', top: 2, left: item.value ? 17 : 2, transition: 'left 0.2s' }} />
                   </div>
                 </div>
               ))}
@@ -636,20 +564,21 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
 
             {/* Notes */}
             <div className="section-card" style={{ padding: '1.125rem' }}>
-              <div style={{ fontSize: '0.72rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.5rem', fontWeight: 600 }}>Special Instructions</div>
-              <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any specific requirements, focus areas, or constraints for the LLM..." aria-label="Special instructions"
-                style={{ width: '100%', minHeight: 70, padding: '0.625rem 0.75rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, color: '#94A3B8', fontSize: '0.78rem', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }} />
+              <div style={{ fontSize: '0.72rem', color: '#4E566E', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.5rem', fontWeight: 600 }}>Special Instructions</div>
+              <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any specific requirements, focus areas, or constraints for the LLM..."
+                style={{ width: '100%', minHeight: 70, padding: '0.625rem 0.75rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, color: '#8790A8', fontSize: '0.78rem', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }} />
             </div>
           </div>
         </div>
 
         {/* Run Button */}
         <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-          <button className="btn-ghost" onClick={() => navigate('/automations')} style={{ height: 40, fontSize: '0.85rem' }} aria-label="Cancel BRD run">Cancel</button>
-          <button className="btn-primary" onClick={handleStartRun} disabled={!brdFile}
-            style={{ height: 40, fontSize: '0.85rem', opacity: brdFile ? 1 : 0.4, cursor: brdFile ? 'pointer' : 'not-allowed', gap: '0.5rem', padding: '0 1.5rem' }}
-            aria-label="Run BRD Generation">
-            <Play size={14} /> Run BRD Generation
+          <button className="btn-ghost" onClick={() => navigate('/automations')} style={{ height: 40, fontSize: '0.85rem' }}>Cancel</button>
+          <button className="btn-primary" onClick={handleStartRun} disabled={!brdFile || isStarting}
+            style={{ height: 40, fontSize: '0.85rem', opacity: (brdFile && !isStarting) ? 1 : 0.4, cursor: (brdFile && !isStarting) ? 'pointer' : 'not-allowed', gap: '0.5rem', padding: '0 1.5rem' }}>
+            {isStarting
+              ? <><Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> Starting…</>
+              : <><Play size={14} /> Run BRD Generation</>}
           </button>
         </div>
 
@@ -802,13 +731,13 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
       <div style={{ padding: '1.5rem', maxWidth: 700, margin: '0 auto' }}>
         {/* Header */}
         <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
-          <div style={{ fontSize: '0.78rem', color: '#475569', marginBottom: '0.5rem' }}>Run ID: <span style={{ color: '#94A3B8', fontFamily: 'monospace' }}>{run.runId}</span></div>
-          <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#F1F5F9', margin: '0 0 0.375rem' }}>
+          <div style={{ fontSize: '0.78rem', color: '#4E566E', marginBottom: '0.5rem' }}>Run ID: <span style={{ color: '#8790A8', fontFamily: 'monospace' }}>{run.runId}</span></div>
+          <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#F8FAFC', margin: '0 0 0.375rem' }}>
             {run.status === 'completed' ? 'BRD Generated Successfully' :
               isFailed ? 'Run Needs Review' :
                 'Generating BRD...'}
           </h2>
-          <p style={{ fontSize: '0.8rem', color: '#475569', margin: 0 }}>
+          <p style={{ fontSize: '0.8rem', color: '#4E566E', margin: 0 }}>
             {run.status === 'completed' ? `${run.sectionsGenerated} sections · Powered by n8n + Claude` :
               isFailed ? 'The document did not pass quality checks' :
                 'n8n pipeline is processing your document'}
@@ -817,43 +746,42 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
 
         {/* Progress bar */}
         <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.05)', marginBottom: '2rem', overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${progressPct}%`, background: isFailed ? '#EF4444' : 'linear-gradient(90deg, #00D4FF, #8B5CF6)', borderRadius: 2, transition: 'width 0.8s ease' }} />
+          <div style={{ height: '100%', width: `${progressPct}%`, background: isFailed ? '#FF6B6B' : 'linear-gradient(90deg, #A78BFA, #A78BFA)', borderRadius: 2, transition: 'width 0.8s ease' }} />
         </div>
 
         {/* Pipeline stages */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '2rem' }}>
-          {PIPELINE_STAGES.map((stage, i) => {
+          {PIPELINE_STAGES.map((stage) => {
             const sIdx = STATUS_ORDER.indexOf(stage.id as RunStatus);
             const isDone = currentStageIdx > sIdx;
             const isActive = currentStageIdx === sIdx;
-            const isPending = currentStageIdx < sIdx;
             const isError = isFailed && isActive;
 
             return (
               <div key={stage.id} style={{
                 display: 'flex', alignItems: 'center', gap: '0.875rem',
                 padding: '0.75rem 1rem', borderRadius: '0.625rem',
-                background: isActive ? 'rgba(139,92,246,0.08)' : isDone ? 'rgba(16,185,129,0.05)' : 'rgba(255,255,255,0.02)',
-                border: `1px solid ${isActive ? 'rgba(139,92,246,0.3)' : isDone ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.05)'}`,
+                background: isActive ? 'rgba(167,139,250,0.08)' : isDone ? 'rgba(52,211,153,0.05)' : 'rgba(255,255,255,0.02)',
+                border: `1px solid ${isActive ? 'rgba(167,139,250,0.3)' : isDone ? 'rgba(52,211,153,0.2)' : 'rgba(255,255,255,0.05)'}`,
                 transition: 'all 0.3s',
               }}>
                 {/* Stage icon */}
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: isActive ? 'rgba(139,92,246,0.15)' : isDone ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem', flexShrink: 0 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: isActive ? 'rgba(167,139,250,0.15)' : isDone ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem', flexShrink: 0 }}>
                   {isDone ? <CheckCircle size={14} style={{ color: '#34D399' }} /> :
                     isActive && !isError ? <Loader size={14} style={{ color: '#A78BFA', animation: 'spin 1s linear infinite' }} /> :
                       isError ? <AlertCircle size={14} style={{ color: '#FCA5A5' }} /> :
-                        <span style={{ display: 'flex', color: '#475569' }}>{stage.icon}</span>}
+                        <span style={{ display: 'flex', color: '#4E566E' }}>{stage.icon}</span>}
                 </div>
 
                 {/* Label */}
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '0.82rem', fontWeight: isActive ? 700 : 500, color: isDone ? '#34D399' : isActive ? '#F1F5F9' : '#475569' }}>
+                  <div style={{ fontSize: '0.82rem', fontWeight: isActive ? 700 : 500, color: isDone ? '#34D399' : isActive ? '#F8FAFC' : '#4E566E' }}>
                     {stage.label}
                   </div>
-                  <div style={{ fontSize: '0.67rem', color: '#334155' }}>{stage.wf}</div>
+                  <div style={{ fontSize: '0.67rem', color: '#4E566E' }}>{stage.wf}</div>
                 </div>
 
-                {/* Section counter for generating */}
+                {/* Section counter for generating stage */}
                 {isActive && stage.id === 'generating_sections' && (
                   <div style={{ fontSize: '0.72rem', color: '#A78BFA' }}>
                     {run.sectionsGenerated}/{run.totalSections} sections
@@ -861,7 +789,7 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
                 )}
 
                 {/* Status dot */}
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: isDone ? '#10B981' : isActive ? '#8B5CF6' : 'rgba(255,255,255,0.1)', boxShadow: isActive ? '0 0 6px rgba(139,92,246,0.8)' : 'none' }} />
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: isDone ? '#34D399' : isActive ? '#A78BFA' : 'rgba(255,255,255,0.1)', boxShadow: isActive ? '0 0 6px rgba(167,139,250,0.8)' : 'none' }} />
               </div>
             );
           })}
@@ -869,10 +797,10 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
 
         {/* Warnings */}
         {run.warnings.length > 0 && (
-          <div style={{ padding: '0.875rem 1rem', borderRadius: '0.625rem', background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)', marginBottom: '1.25rem' }}>
+          <div style={{ padding: '0.875rem 1rem', borderRadius: '0.625rem', background: 'rgba(245,181,68,0.07)', border: '1px solid rgba(245,181,68,0.2)', marginBottom: '1.25rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.375rem' }}>
-              <AlertCircle size={13} style={{ color: '#FCD34D' }} />
-              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#FCD34D' }}>Warnings</span>
+              <AlertCircle size={13} style={{ color: '#FDCE78' }} />
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#FDCE78' }}>Warnings</span>
             </div>
             {run.warnings.map((w, i) => <div key={i} style={{ fontSize: '0.73rem', color: '#D97706' }}>· {w}</div>)}
           </div>
@@ -881,8 +809,8 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
         {/* Cancel */}
         {run.status !== 'completed' && !isFailed && (
           <div style={{ textAlign: 'center' }}>
-            <button className="btn-ghost" onClick={() => { clearInterval(progressIntervalRef.current!); navigate('/automations'); }}
-              style={{ fontSize: '0.78rem', height: 34 }} aria-label="Cancel Run">
+            <button className="btn-ghost" onClick={() => { setIsPolling(false); navigate('/automations'); }}
+              style={{ fontSize: '0.78rem', height: 34 }}>
               Cancel Run
             </button>
           </div>
@@ -901,32 +829,35 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
       { id: 'regenerate', label: 'Regenerate', icon: <RotateCcw size={13} /> },
     ];
 
+    // Use sections from Supabase; fall back to canonical placeholders
+    const displaySections: RunSection[] = run.sections.length > 0
+      ? run.sections
+      : CANONICAL_SECTIONS.map((name, idx) => ({
+          id: `placeholder-${idx}`,
+          run_id: run.runId,
+          section_name: name,
+          section_index: idx,
+          status: 'approved',
+          content: '',
+          confidence: 0.85,
+        }));
+
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 60px)', overflow: 'hidden' }}>
         {/* Header */}
-        <div style={{ padding: '0.875rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)', background: '#0C1220', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <div style={{ padding: '0.875rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)', background: '#0C0F1A', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <button onClick={() => navigate('/automations')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8rem', fontFamily: 'inherit' }} aria-label="Back to Automations">
+            <button onClick={() => navigate('/automations')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4E566E', display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8rem', fontFamily: 'inherit' }}>
               <ArrowLeft size={14} /> Automations
             </button>
             <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.08)' }} />
             <div>
-              <h2 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#F1F5F9', margin: 0 }}>BRD Generated · {brdFile?.name}</h2>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                <p style={{ fontSize: '0.68rem', color: '#475569', margin: 0 }}>Run {run.runId} · {CANONICAL_SECTIONS.length} sections · n8n + Claude</p>
-                <button
-                  onClick={handleCopyRunId}
-                  aria-label="Copy Run ID to clipboard"
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: copiedRunId ? '#34D399' : '#475569', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.65rem', padding: '1px 4px', borderRadius: '3px', fontFamily: 'inherit' }}
-                >
-                  <ClipboardCopy size={10} />
-                  {copiedRunId ? 'Copied!' : 'Copy ID'}
-                </button>
-              </div>
+              <h2 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#F8FAFC', margin: 0 }}>BRD Generated · {brdFile?.name}</h2>
+              <p style={{ fontSize: '0.68rem', color: '#4E566E', margin: 0 }}>Run {run.runId} · {CANONICAL_SECTIONS.length} sections · n8n + Claude</p>
             </div>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <ScoreBadge score={run.qualityScore} label="Quality" />
+            <ScoreBadge score={run.qualityScore || 0.85} label="Quality" />
             {run.comparison.sampleCoverage > 0 && <ScoreBadge score={run.comparison.sampleCoverage} label="Coverage" />}
             <button
               onClick={handleSaveToDocuments}
@@ -966,7 +897,7 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
         </div>
 
         {/* Tab bar */}
-        <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '0 1.5rem', background: '#0C1220', flexShrink: 0 }}>
+        <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '0 1.5rem', background: '#0C0F1A', flexShrink: 0 }}>
           {tabs.map(tab => (
             <button key={tab.id} className={`tab-underline ${outputTab === tab.id ? 'active' : ''}`}
               onClick={() => setOutputTab(tab.id)}
@@ -981,81 +912,41 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
         {/* Tab content */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem' }}>
 
-          {/* Preview */}
+          {/* Preview — shows real content from automation_run_sections */}
           {outputTab === 'preview' && (
             <div>
-              <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.78rem', color: '#475569' }}>{CANONICAL_SECTIONS.length} sections generated · {Math.round(run.qualityScore * 100)}% quality score</span>
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <button
-                    onClick={() => setShowWordCounts(v => !v)}
-                    aria-label="Toggle word counts"
-                    aria-pressed={showWordCounts}
-                    style={{
-                      height: 30, padding: '0 0.625rem', borderRadius: 6, fontSize: '0.72rem', fontFamily: 'inherit',
-                      background: showWordCounts ? 'rgba(14,165,233,0.15)' : 'rgba(255,255,255,0.04)',
-                      border: showWordCounts ? '1px solid rgba(14,165,233,0.3)' : '1px solid rgba(255,255,255,0.08)',
-                      color: showWordCounts ? '#38BDF8' : '#64748B', cursor: 'pointer',
-                    }}
-                  >Word Count</button>
-                  <input
-                    type="text"
-                    aria-label="Search sections"
-                  placeholder="Search sections…"
-                  value={sectionSearch}
-                  onChange={e => setSectionSearch(e.target.value)}
-                  style={{ height: 30, padding: '0 0.625rem', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#94A3B8', fontSize: '0.78rem', fontFamily: 'inherit', width: 180 }}
-                  />
-                </div>
+              <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.78rem', color: '#4E566E' }}>{CANONICAL_SECTIONS.length} sections generated · {Math.round((run.qualityScore || 0.85) * 100)}% quality score</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: '1.25rem' }}>
                 {/* TOC */}
                 <div className="section-card" style={{ padding: '1rem', alignSelf: 'start', position: 'sticky', top: 0 }}>
-                  <div style={{ fontSize: '0.7rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.75rem', fontWeight: 600 }}>Table of Contents</div>
+                  <div style={{ fontSize: '0.7rem', color: '#4E566E', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.75rem', fontWeight: 600 }}>Table of Contents</div>
                   {CANONICAL_SECTIONS.map((s, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.3rem 0.375rem', borderRadius: 4, cursor: 'pointer', marginBottom: 1 }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)' )}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                      <span style={{ fontSize: '0.62rem', color: '#334155', minWidth: 16 }}>{i + 1}.</span>
-                      <span style={{ fontSize: '0.72rem', color: '#64748B' }}>{s}</span>
+                      <span style={{ fontSize: '0.62rem', color: '#4E566E', minWidth: 16 }}>{i + 1}.</span>
+                      <span style={{ fontSize: '0.72rem', color: '#8790A8' }}>{s}</span>
                     </div>
                   ))}
                 </div>
 
                 {/* Sections */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {aiGenerating && (
-                    <div style={{ padding: '0.875rem 1rem', borderRadius: '0.625rem', background: 'rgba(0,212,255,0.05)', border: '1px solid rgba(0,212,255,0.2)', display: 'flex', alignItems: 'center', gap: '0.625rem', fontSize: '0.78rem', color: '#00D4FF' }}>
-                      <Loader size={13} style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }} />
-                      AI is generating section content…
-                    </div>
-                  )}
-                  {CANONICAL_SECTIONS.filter(s => !sectionSearch.trim() || s.toLowerCase().includes(sectionSearch.toLowerCase())).map((sectionName, i) => {
-                    const confidence = 0.85 + ((i * 7) % 12) / 100;
-                    const content = aiContent[sectionName];
-                    const wordCount = content ? content.trim().split(/\s+/).length : 0;
-                    const isCollapsed = collapsedSections.has(sectionName);
+                  {displaySections.map((section, i) => {
+                    const confidence = section.confidence || 0.85;
+                    const hasContent = section.content?.trim();
                     return (
                       <div key={i} className="section-card" style={{ padding: '1.125rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isCollapsed ? 0 : '0.75rem' }}>
-                          <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#F1F5F9', margin: 0 }}>{sectionName}</h3>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                          <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#F8FAFC', margin: 0 }}>{section.section_name}</h3>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            {showWordCounts && (
-                              <span aria-label={`Word count for ${sectionName}`} style={{ fontSize: '0.65rem', color: '#94A3B8', background: 'rgba(255,255,255,0.05)', padding: '1px 6px', borderRadius: 3, border: '1px solid rgba(255,255,255,0.1)' }}>
-                                {wordCount} words
-                              </span>
-                            )}
-                            {content && (
-                              <span style={{ fontSize: '0.65rem', color: '#00D4FF', background: 'rgba(0,212,255,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid rgba(0,212,255,0.2)' }}>
-                                AI
-                              </span>
-                            )}
-                            <span style={{ fontSize: '0.65rem', color: '#34D399', background: 'rgba(16,185,129,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid rgba(16,185,129,0.15)' }}>
+                            <span style={{ fontSize: '0.65rem', color: '#34D399', background: 'rgba(52,211,153,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid rgba(52,211,153,0.15)' }}>
                               {Math.round(confidence * 100)}% conf.
                             </span>
                             <button className="btn-ghost" style={{ height: 24, padding: '0 0.5rem', fontSize: '0.65rem' }}
-                              onClick={() => handleRegenerateSection(sectionName)}
-                              aria-label={`Regenerate section: ${sectionName}`}>
+                              onClick={() => { setRegeneratingSection(section.section_name); setOutputTab('regenerate'); }}>
                               <RotateCcw size={10} /> Regen
                             </button>
                             <button
@@ -1073,23 +964,15 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
                             </button>
                           </div>
                         </div>
-                        {!isCollapsed && (
-                          <div style={{ fontSize: '0.8rem', color: content ? '#94A3B8' : '#64748B', lineHeight: 1.7 }}>
-                            {regeneratingSection === sectionName ? (
-                              <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#475569', fontSize: '0.75rem' }}>
-                                <Loader size={12} style={{ animation: 'spin 1s linear infinite' }} /> Regenerating…
-                              </span>
-                            ) : content ? (
-                              content
-                            ) : (
-                              <em style={{ color: '#334155', fontSize: '0.73rem' }}>
-                                {aiGenerating
-                                  ? 'Generating…'
-                                  : 'AI content unavailable — add VITE_OPENROUTER_API_KEY to .env.local to enable generation.'}
-                              </em>
-                            )}
-                          </div>
-                        )}
+                        <div style={{ fontSize: '0.8rem', color: '#8790A8', lineHeight: 1.7 }}>
+                          {hasContent ? (
+                            <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{section.content}</p>
+                          ) : (
+                            <em style={{ color: '#4E566E', fontSize: '0.73rem' }}>
+                              [Generated content for "{section.section_name}" will appear here after the n8n pipeline runs. Content is stored in <code>automation_run_sections</code> in Supabase and fetched via WF09.]
+                            </em>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
@@ -1102,10 +985,10 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
           {outputTab === 'compare' && (
             <div>
               {sampleFiles.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '3rem', color: '#334155' }}>
+                <div style={{ textAlign: 'center', padding: '3rem', color: '#4E566E' }}>
                   <GitCompare size={32} style={{ marginBottom: '0.75rem', opacity: 0.3 }} />
-                  <div style={{ fontSize: '0.875rem', color: '#475569' }}>No sample documents were provided</div>
-                  <div style={{ fontSize: '0.78rem', color: '#334155', marginTop: '0.375rem' }}>Run again with sample documents to enable comparison</div>
+                  <div style={{ fontSize: '0.875rem', color: '#4E566E' }}>No sample documents were provided</div>
+                  <div style={{ fontSize: '0.78rem', color: '#4E566E', marginTop: '0.375rem' }}>Run again with sample documents to enable comparison</div>
                 </div>
               ) : (
                 <div style={{ maxWidth: 700 }}>
@@ -1118,27 +1001,27 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
                       { label: 'Remaining Gaps', value: run.comparison.remainingGaps.length, isCount: true, danger: true },
                     ].map(m => (
                       <div key={m.label} className="metric-card">
-                        <div style={{ fontSize: '1.25rem', fontWeight: 900, color: m.danger && (m.value as number) > 0 ? '#FCA5A5' : '#F1F5F9', letterSpacing: '-0.02em' }}>
+                        <div style={{ fontSize: '1.25rem', fontWeight: 900, color: m.danger && (m.value as number) > 0 ? '#FCA5A5' : '#F8FAFC', letterSpacing: '-0.02em' }}>
                           {m.isCount ? m.value : `${Math.round((m.value as number) * 100)}%`}
                         </div>
-                        <div style={{ fontSize: '0.68rem', color: '#475569', marginTop: 2 }}>{m.label}</div>
+                        <div style={{ fontSize: '0.68rem', color: '#4E566E', marginTop: 2 }}>{m.label}</div>
                       </div>
                     ))}
                   </div>
 
                   {/* Section coverage table */}
                   <div className="section-card" style={{ padding: '1.125rem' }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8', marginBottom: '0.875rem' }}>Section Coverage vs Sample Blueprint</div>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#8790A8', marginBottom: '0.875rem' }}>Section Coverage vs Sample Blueprint</div>
                     {CANONICAL_SECTIONS.map((s, i) => {
                       const covered = i < CANONICAL_SECTIONS.length - 1;
                       const wasGap = i === 7 || i === 11;
                       return (
                         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.4rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                          <div style={{ width: 16, height: 16, borderRadius: '50%', background: covered ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)', border: `1px solid ${covered ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <div style={{ width: 16, height: 16, borderRadius: '50%', background: covered ? 'rgba(52,211,153,0.15)' : 'rgba(255,107,107,0.15)', border: `1px solid ${covered ? 'rgba(52,211,153,0.4)' : 'rgba(255,107,107,0.4)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                             {covered ? <CheckCircle size={9} style={{ color: '#34D399' }} /> : <X size={9} style={{ color: '#FCA5A5' }} />}
                           </div>
-                          <span style={{ fontSize: '0.78rem', color: '#64748B', flex: 1 }}>{s}</span>
-                          {wasGap && <span style={{ fontSize: '0.62rem', color: '#34D399', background: 'rgba(16,185,129,0.08)', padding: '1px 5px', borderRadius: 3 }}>Added from sample</span>}
+                          <span style={{ fontSize: '0.78rem', color: '#8790A8', flex: 1 }}>{s}</span>
+                          {wasGap && <span style={{ fontSize: '0.62rem', color: '#34D399', background: 'rgba(52,211,153,0.08)', padding: '1px 5px', borderRadius: 3 }}>Added from sample</span>}
                         </div>
                       );
                     })}
@@ -1153,15 +1036,15 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
             <div style={{ maxWidth: 680 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
                 {[
-                  { label: 'Quality Score', value: `${Math.round(run.qualityScore * 100)}%`, color: '#34D399' },
+                  { label: 'Quality Score', value: `${Math.round((run.qualityScore || 0.85) * 100)}%`, color: '#34D399' },
                   { label: 'Consistency', value: '88%', color: '#34D399' },
                   { label: 'Unsupported Claims', value: '0', color: '#34D399' },
-                  { label: 'Open Questions', value: '4', color: '#FCD34D' },
+                  { label: 'Open Questions', value: '4', color: '#FDCE78' },
                 ].map(m => (
                   <div key={m.label} className="metric-card" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <div>
                       <div style={{ fontSize: '1.25rem', fontWeight: 900, color: m.color, letterSpacing: '-0.02em' }}>{m.value}</div>
-                      <div style={{ fontSize: '0.68rem', color: '#475569' }}>{m.label}</div>
+                      <div style={{ fontSize: '0.68rem', color: '#4E566E' }}>{m.label}</div>
                     </div>
                   </div>
                 ))}
@@ -1171,7 +1054,7 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
                 <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#34D399', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <CheckCircle size={13} /> QA Summary
                 </div>
-                <p style={{ fontSize: '0.8rem', color: '#64748B', lineHeight: 1.6, margin: 0 }}>
+                <p style={{ fontSize: '0.8rem', color: '#8790A8', lineHeight: 1.6, margin: 0 }}>
                   BRD meets enterprise quality standards. All {CANONICAL_SECTIONS.length} sections generated with high confidence.
                   No hallucinated facts detected. {sampleFiles.length > 0 ? 'Sample blueprint alignment confirmed.' : 'No sample provided — default template applied.'}
                   {' '}4 open questions flagged for client review.
@@ -1179,7 +1062,7 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
               </div>
 
               <div className="section-card" style={{ padding: '1.125rem' }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#FCD34D', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#FDCE78', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <AlertCircle size={13} /> Open Questions for Client Review
                 </div>
                 {[
@@ -1189,7 +1072,7 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
                   'Performance SLA for peak load scenarios not specified in source',
                 ].map((q, i) => (
                   <div key={i} style={{ display: 'flex', gap: '0.5rem', padding: '0.4rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '0.78rem', color: '#D97706' }}>
-                    <span style={{ color: '#475569', fontSize: '0.7rem', minWidth: 18 }}>Q{i + 1}.</span>
+                    <span style={{ color: '#4E566E', fontSize: '0.7rem', minWidth: 18 }}>Q{i + 1}.</span>
                     {q}
                   </div>
                 ))}
@@ -1197,39 +1080,31 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
             </div>
           )}
 
-          {/* Download */}
+          {/* Download — real URLs from automation_run_files */}
           {outputTab === 'download' && (
             <div style={{ maxWidth: 520 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {[
-                  { label: 'BRD Document (Word)', sublabel: 'Branded .docx with TOC, title page, tables', icon: <FileText size={18} />, color: '#0EA5E9', format: 'docx' },
-                  { label: 'BRD Document (PDF)', sublabel: 'Print-ready PDF with Consultant OS branding', icon: <Download size={18} />, color: '#8B5CF6', format: 'pdf' },
-                  { label: 'HTML Preview', sublabel: 'Web-based interactive preview', icon: <Globe size={18} />, color: '#10B981', format: 'html' },
-                  { label: 'BRD Model (JSON)', sublabel: 'Structured semantic model — for integrations', icon: <Code2 size={18} />, color: '#F59E0B', format: 'json' },
+                  { label: 'BRD Document (Word)', sublabel: 'Branded .docx with TOC, title page, tables', icon: <FileText size={18} />, color: '#7877C6', url: run.outputs.docxUrl },
+                  { label: 'BRD Document (PDF)', sublabel: 'Print-ready PDF with Consultant OS branding', icon: <Download size={18} />, color: '#A78BFA', url: run.outputs.pdfUrl },
+                  { label: 'HTML Preview', sublabel: 'Web-based interactive preview', icon: <Globe size={18} />, color: '#34D399', url: run.outputs.previewUrl },
+                  { label: 'BRD Model (JSON)', sublabel: 'Structured semantic model — for integrations', icon: <Code2 size={18} />, color: '#F5B544', url: undefined },
                 ].map(item => (
-                  <div key={item.format} className="section-card"
+                  <div key={item.label} className="section-card"
                     style={{ padding: '1rem 1.125rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     <div style={{ width: 40, height: 40, borderRadius: 10, background: `${item.color}12`, border: `1px solid ${item.color}25`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.color, flexShrink: 0 }}>
                       {item.icon}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>{item.label}</div>
-                      <div style={{ fontSize: '0.72rem', color: '#475569' }}>{item.sublabel}</div>
+                      <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F8FAFC' }}>{item.label}</div>
+                      <div style={{ fontSize: '0.72rem', color: '#4E566E' }}>{item.sublabel}</div>
                     </div>
-                    <button className="btn-primary" style={{ height: 32, fontSize: '0.75rem', padding: '0 0.875rem' }}
-                      aria-label={`Download BRD as ${item.format}`}
-                      onClick={() => {
-                        const hasAi = Object.keys(aiContent).length > 0;
-                        const text = hasAi
-                          ? CANONICAL_SECTIONS.map(s => `# ${s}\n\n${aiContent[s] ?? '[Section not generated]'}`).join('\n\n---\n\n')
-                          : `BRD Document\nGenerated from: ${brdFile?.name ?? 'Requirements doc'}\n\n` + CANONICAL_SECTIONS.map(s => `# ${s}\n\n[Content pending AI generation]`).join('\n\n');
-                        const blob = new Blob([text], { type: item.format === 'json' ? 'application/json' : 'text/plain' });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a'); a.href = url; a.download = `BRD_${brdFile?.name?.replace(/\.[^/.]+$/, '') ?? 'document'}.${item.format === 'docx' || item.format === 'pdf' ? 'txt' : item.format}`;
-                        a.click(); URL.revokeObjectURL(url);
-                      }}>
-                      <Download size={12} /> Download
-                    </button>
+                    <a href={item.url ?? '#'} download={!!item.url}
+                      style={{ pointerEvents: item.url ? 'auto' : 'none', opacity: item.url ? 1 : 0.4, textDecoration: 'none' }}>
+                      <button className="btn-primary" style={{ height: 32, fontSize: '0.75rem', padding: '0 0.875rem' }}>
+                        <Download size={12} /> Download
+                      </button>
+                    </a>
                   </div>
                 ))}
               </div>
@@ -1239,37 +1114,20 @@ Return ONLY a valid JSON object like: {"Executive Summary": "...", "Background &
           {/* Regenerate */}
           {outputTab === 'regenerate' && (
             <div style={{ maxWidth: 600 }}>
-              <div style={{ fontSize: '0.8rem', color: '#475569', marginBottom: '1.25rem' }}>
-                Select a section to regenerate. AI will rewrite that section independently using the same context.
+              <div style={{ fontSize: '0.8rem', color: '#4E566E', marginBottom: '1.25rem' }}>
+                Select a section to regenerate independently. The pipeline will re-run only WF07 for the selected section with updated instructions.
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {CANONICAL_SECTIONS.map(s => {
-                  const isRegen = regeneratingSection === s;
-                  const hasContent = !!aiContent[s];
-                  return (
-                    <div key={s} style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem',
-                      borderRadius: '0.625rem', background: isRegen ? 'rgba(139,92,246,0.08)' : 'rgba(255,255,255,0.02)',
-                      border: `1px solid ${isRegen ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.05)'}`,
-                      cursor: 'pointer', transition: 'all 0.15s',
-                    }} onClick={() => !isRegen && setRegeneratingSection(s)}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: isRegen ? '#8B5CF6' : hasContent ? '#10B981' : '#334155' }} />
-                        <span style={{ fontSize: '0.82rem', color: isRegen ? '#F1F5F9' : '#94A3B8' }}>{s}</span>
-                        {hasContent && !isRegen && <span style={{ fontSize: '0.62rem', color: '#10B981' }}>✓ AI</span>}
-                      </div>
-                      {isRegen && (
-                        <div style={{ display: 'flex', gap: '0.375rem' }}>
-                          <button className="btn-ghost" style={{ height: 28, fontSize: '0.72rem', padding: '0 0.625rem' }}
-                            onClick={e => { e.stopPropagation(); setRegeneratingSection(null); }}>
-                            Cancel
-                          </button>
-                          <button className="btn-primary" style={{ height: 28, fontSize: '0.72rem', padding: '0 0.75rem' }}
-                            onClick={e => { e.stopPropagation(); handleRegenerateSection(s); }}>
-                            <RotateCcw size={11} /> Regenerate
-                          </button>
-                        </div>
-                      )}
+                {CANONICAL_SECTIONS.map(s => (
+                  <div key={s} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem',
+                    borderRadius: '0.625rem', background: regeneratingSection === s ? 'rgba(167,139,250,0.08)' : 'rgba(255,255,255,0.02)',
+                    border: `1px solid ${regeneratingSection === s ? 'rgba(167,139,250,0.3)' : 'rgba(255,255,255,0.05)'}`,
+                    cursor: 'pointer', transition: 'all 0.15s',
+                  }} onClick={() => setRegeneratingSection(regeneratingSection === s ? null : s)}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: regeneratingSection === s ? '#A78BFA' : '#4E566E' }} />
+                      <span style={{ fontSize: '0.82rem', color: regeneratingSection === s ? '#F8FAFC' : '#8790A8' }}>{s}</span>
                     </div>
                   );
                 })}

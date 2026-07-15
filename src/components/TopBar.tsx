@@ -1,10 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Search, Bell, Sparkles, Plus, ChevronDown, Menu, X, FileText, Video, CheckSquare, BarChart3, Zap } from 'lucide-react';
+import {
+  Search, Bell, Sparkles, Plus, ChevronDown, Menu, X,
+  FileText, Video, CheckSquare, BarChart3, Zap, Command,
+} from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useLayout } from '../hooks/useLayout';
+import { cn } from './ui/cn';
 
 const pageMeta: Record<string, { title: string; sub: string }> = {
-  '/':            { title: 'Command Center',    sub: 'Good morning, Khalil — here\'s what needs your attention' },
+  '/':            { title: 'Command Center',    sub: "Good morning, Khalil — here's what needs your attention" },
   '/workspaces':  { title: 'Workspaces',         sub: '8 active workspaces across 6 clients' },
   '/automations': { title: 'Automations',        sub: '14 automations · 1,284 runs this month' },
   '/documents':   { title: 'Documents',          sub: 'All workspace documents in one place' },
@@ -16,19 +21,28 @@ const pageMeta: Record<string, { title: string; sub: string }> = {
 };
 
 const newMenuItems = [
-  { icon: FileText,    label: 'New Document',   path: '/documents' },
-  { icon: Video,       label: 'New Meeting',    path: '/meetings' },
-  { icon: CheckSquare, label: 'New Task',       path: '/tasks' },
-  { icon: BarChart3,   label: 'New Report',     path: '/reports' },
-  { icon: Zap,         label: 'Run Automation', path: '/automations' },
+  { icon: FileText,    label: 'New Document',   path: '/documents',  accent: 'from-[#7877C6] to-[#A78BFA]' },
+  { icon: Video,       label: 'New Meeting',    path: '/meetings',   accent: 'from-[#38BDF8] to-[#7DD3FC]' },
+  { icon: CheckSquare, label: 'New Task',       path: '/tasks',      accent: 'from-[#34D399] to-[#63E6BE]' },
+  { icon: BarChart3,   label: 'New Report',     path: '/reports',    accent: 'from-[#F5B544] to-[#FDCE78]' },
+  { icon: Zap,         label: 'Run Automation', path: '/automations',accent: 'from-[#A78BFA] to-[#63E6BE]' },
 ];
 
-const notifications = [
-  { id: 1, title: 'BRD Generator completed',     detail: 'NCA Digital Transformation · 3 outputs',         time: '2h ago',  color: '#10B981', read: false },
-  { id: 2, title: 'Risk Alert: Smart City PMO',  detail: '2 unmitigated critical risks flagged',            time: '4h ago',  color: '#EF4444', read: false },
-  { id: 3, title: 'Approval needed',             detail: 'SC-10 Budget SAR 2.4M awaiting review',          time: '5h ago',  color: '#F59E0B', read: false },
-  { id: 4, title: 'Meeting minutes ready',        detail: 'Banking Core Transformation · Generated',         time: '1d ago',  color: '#8B5CF6', read: true },
-  { id: 5, title: 'Weekly digest ready',          detail: '4 workspaces · Executive summary',               time: '1d ago',  color: '#0EA5E9', read: true },
+interface NotificationItem {
+  id: number;
+  title: string;
+  detail: string;
+  time: string;
+  color: string;
+  read: boolean;
+}
+
+const notifications: NotificationItem[] = [
+  { id: 1, title: 'BRD Generator completed',    detail: 'NCA Digital Transformation · 3 outputs',    time: '2h ago', color: '#34D399', read: false },
+  { id: 2, title: 'Risk Alert: Smart City PMO', detail: '2 unmitigated critical risks flagged',      time: '4h ago', color: '#FF6B6B', read: false },
+  { id: 3, title: 'Approval needed',            detail: 'SC-10 Budget SAR 2.4M awaiting review',     time: '5h ago', color: '#F5B544', read: false },
+  { id: 4, title: 'Meeting minutes ready',       detail: 'Banking Core Transformation · Generated',   time: '1d ago', color: '#A78BFA', read: true },
+  { id: 5, title: 'Weekly digest ready',         detail: '4 workspaces · Executive summary',         time: '1d ago', color: '#63E6BE', read: true },
 ];
 
 export default function TopBar() {
@@ -38,8 +52,28 @@ export default function TopBar() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showNewMenu, setShowNewMenu] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const [readIds, setReadIds] = useState<number[]>([4, 5]);
   const [showSearch, setShowSearch] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Cmd-K to focus search
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        if (isMobile) setShowSearch(true);
+        setTimeout(() => searchInputRef.current?.focus(), 50);
+      }
+      if (e.key === 'Escape') {
+        setShowNotifications(false);
+        setShowNewMenu(false);
+        setShowUserMenu(false);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isMobile]);
 
   const getTitle = () => {
     const p = location.pathname;
@@ -59,46 +93,32 @@ export default function TopBar() {
   const unread = notifications.filter(n => !readIds.includes(n.id)).length;
 
   return (
-    <header style={{
-      height: isMobile ? '56px' : '60px',
-      background: 'rgba(8,12,24,0.95)',
-      backdropFilter: 'blur(20px)',
-      borderBottom: '1px solid rgba(255,255,255,0.05)',
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: isMobile ? '0 0.875rem' : '0 1.375rem',
-      position: 'sticky', top: 0, zIndex: 40, flexShrink: 0, gap: '0.75rem',
-    }}>
-
+    <header
+      className={cn(
+        'sticky top-0 z-40 flex items-center justify-between gap-3 flex-shrink-0',
+        'h-[68px] px-4 md:px-6',
+        'bg-[rgba(7,8,15,0.72)] backdrop-blur-xl backdrop-saturate-[140%]',
+        'border-b border-white/[0.06]',
+        isMobile && 'h-[58px]',
+      )}
+    >
       {/* Left */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0, flex: 1 }}>
+      <div className="flex items-center gap-3 min-w-0 flex-1">
         {isTablet && (
           <button
             onClick={() => setSidebarOpen(true)}
-            style={{
-              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
-              borderRadius: '9px', width: '34px', height: '34px', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#94A3B8',
-              transition: 'all 0.15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; }}
+            className="w-9 h-9 rounded-lg bg-white/[0.04] border border-white/[0.08] flex items-center justify-center flex-shrink-0 text-[color:var(--text-muted)] hover:bg-white/[0.08] hover:text-[color:var(--text-primary)] transition-colors"
           >
             <Menu size={16} />
           </button>
         )}
         {(!isMobile || !showSearch) && (
-          <div style={{ minWidth: 0 }}>
-            <h1 style={{
-              fontSize: isMobile ? '0.9rem' : '0.975rem', fontWeight: 700, color: '#F1F5F9',
-              margin: 0, lineHeight: 1.2, letterSpacing: '-0.01em',
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-            }}>
+          <div className="min-w-0">
+            <h1 className={cn('font-bold text-[color:var(--text-primary)] tracking-tight leading-tight truncate', isMobile ? 'text-[0.95rem]' : 'text-[1.05rem]')}>
               {getTitle()}
             </h1>
             {!isTablet && getSubtitle() && (
-              <p style={{ fontSize: '0.7rem', color: '#334155', margin: 0, marginTop: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {getSubtitle()}
-              </p>
+              <p className="text-[0.72rem] text-[color:var(--text-muted)] truncate mt-0.5">{getSubtitle()}</p>
             )}
           </div>
         )}
@@ -106,235 +126,237 @@ export default function TopBar() {
 
       {/* Center search */}
       {!isMobile ? (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '0.5rem',
-          padding: '0 0.75rem', borderRadius: '10px',
-          background: searchFocused ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)',
-          border: searchFocused ? '1px solid rgba(0,212,255,0.3)' : '1px solid rgba(255,255,255,0.06)',
-          transition: 'all 0.2s',
-          width: isTablet ? '180px' : '280px', height: '34px', flexShrink: 0,
-          boxShadow: searchFocused ? '0 0 0 3px rgba(0,212,255,0.07)' : 'none',
-        }}>
-          <Search size={13} style={{ color: searchFocused ? '#64748B' : '#334155', flexShrink: 0, transition: 'color 0.2s' }} />
+        <div
+          className={cn(
+            'relative flex items-center gap-2 rounded-full transition-all flex-shrink-0 backdrop-blur-md',
+            'w-[300px] md:w-[360px] h-[38px] px-3.5',
+            searchFocused
+              ? 'bg-[rgba(120,119,198,0.07)] border border-[rgba(120,119,198,0.4)] shadow-[0_0_0_3px_rgba(120,119,198,0.12),0_8px_24px_rgba(120,119,198,0.12)]'
+              : 'bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.055]',
+          )}
+        >
+          <Search size={14} className={cn('flex-shrink-0 transition-colors', searchFocused ? 'text-[#A78BFA]' : 'text-[color:var(--text-muted)]')} />
           <input
-            type="text" placeholder="Search workspaces, docs, tasks…"
+            ref={searchInputRef}
+            type="text"
+            placeholder="Search workspaces, docs, tasks…"
             onFocus={() => setSearchFocused(true)}
             onBlur={() => setSearchFocused(false)}
-            style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: '0.78rem', color: '#F1F5F9', width: '100%', fontFamily: 'inherit' }}
+            className="flex-1 bg-transparent border-0 outline-none text-[0.83rem] text-[color:var(--text-primary)] placeholder:text-[color:var(--text-faint)] min-w-0"
           />
-          {!isTablet && (
-            <kbd style={{
-              fontSize: '0.6rem', color: '#334155',
-              background: 'rgba(255,255,255,0.04)', padding: '1px 5px', borderRadius: '4px',
-              flexShrink: 0, border: '1px solid rgba(255,255,255,0.06)',
-              fontFamily: 'inherit', letterSpacing: '0.02em',
-            }}>⌘K</kbd>
-          )}
+          <kbd className="flex items-center gap-1 text-[0.62rem] font-semibold text-[color:var(--text-muted)] bg-white/[0.05] px-1.5 py-0.5 rounded border border-white/[0.08] flex-shrink-0">
+            <Command size={9} />K
+          </kbd>
         </div>
       ) : showSearch ? (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '0.5rem',
-          padding: '0 0.75rem', borderRadius: '10px', flex: 1,
-          background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(0,212,255,0.3)', height: '34px',
-        }}>
-          <Search size={13} style={{ color: '#64748B' }} />
-          <input autoFocus type="text" placeholder="Search…"
+        <div className="flex items-center gap-2 rounded-full flex-1 bg-[rgba(120,119,198,0.07)] border border-[rgba(120,119,198,0.4)] h-[38px] px-3.5">
+          <Search size={14} className="text-[#A78BFA]" />
+          <input
+            autoFocus ref={searchInputRef}
+            type="text" placeholder="Search…"
             onBlur={() => setShowSearch(false)}
-            style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: '0.78rem', color: '#F1F5F9', width: '100%', fontFamily: 'inherit' }}
+            className="flex-1 bg-transparent border-0 outline-none text-[0.83rem] text-[color:var(--text-primary)] placeholder:text-[color:var(--text-faint)]"
           />
-          <button onClick={() => setShowSearch(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: 0 }}>
-            <X size={14} />
+          <button onClick={() => setShowSearch(false)} className="text-[color:var(--text-muted)]">
+            <X size={15} />
           </button>
         </div>
       ) : null}
 
-      {/* Right */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', flexShrink: 0 }}>
+      {/* Right actions */}
+      <div className="flex items-center gap-1.5 flex-shrink-0">
         {isMobile && !showSearch && (
-          <button onClick={() => setShowSearch(true)} style={{
-            width: '34px', height: '34px', borderRadius: '9px',
-            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
-            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8',
-          }}>
-            <Search size={14} />
+          <button
+            onClick={() => setShowSearch(true)}
+            className="w-9 h-9 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-[color:var(--text-muted)]"
+          >
+            <Search size={15} />
           </button>
         )}
 
         {/* New menu */}
-        <div style={{ position: 'relative' }}>
-          <button
-            onClick={() => { setShowNewMenu(v => !v); setShowNotifications(false); }}
-            style={{
-              height: '34px', padding: isMobile ? '0 0.5rem' : '0 0.75rem',
-              fontSize: '0.78rem', fontWeight: 500, cursor: 'pointer',
-              background: showNewMenu ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.04)',
-              color: '#94A3B8', border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: '9px', display: 'flex', alignItems: 'center', gap: '0.375rem',
-              transition: 'all 0.15s', fontFamily: 'inherit',
-            }}
-            onMouseEnter={e => { if (!showNewMenu) { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = '#F1F5F9'; } }}
-            onMouseLeave={e => { if (!showNewMenu) { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = '#94A3B8'; } }}
+        <div className="relative">
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={() => { setShowNewMenu(v => !v); setShowNotifications(false); setShowUserMenu(false); }}
+            className={cn(
+              'h-[38px] flex items-center gap-1.5 px-3 md:px-4 rounded-full border text-[0.81rem] font-medium transition-colors',
+              showNewMenu
+                ? 'bg-white/[0.09] border-white/[0.15] text-[color:var(--text-primary)]'
+                : 'bg-white/[0.04] border-white/[0.08] text-[color:var(--text-secondary)] hover:bg-white/[0.07] hover:text-[color:var(--text-primary)]',
+            )}
           >
             <Plus size={14} />
-            {!isMobile && <><span>New</span><ChevronDown size={11} style={{ opacity: 0.6 }} /></>}
-          </button>
-          {showNewMenu && (
-            <div style={{
-              position: 'absolute', right: 0, top: 'calc(100% + 8px)', width: '196px',
-              background: '#0C1220', border: '1px solid rgba(255,255,255,0.09)',
-              borderRadius: '12px', padding: '0.375rem', zIndex: 100,
-              boxShadow: '0 16px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,0,0,0.1)',
-              animation: 'scaleIn 0.15s ease-out forwards',
-            }}>
-              {newMenuItems.map(item => {
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.label}
-                    onClick={() => { navigate(item.path); setShowNewMenu(false); }}
-                    style={{
-                      width: '100%', display: 'flex', alignItems: 'center', gap: '0.625rem',
-                      padding: '0.5rem 0.75rem', borderRadius: '8px',
-                      background: 'none', border: 'none', cursor: 'pointer',
-                      color: '#64748B', fontSize: '0.8rem', fontFamily: 'inherit',
-                      transition: 'all 0.12s', textAlign: 'left',
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = '#F1F5F9'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = '#64748B'; }}
-                  >
-                    <div style={{ width: '24px', height: '24px', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Icon size={12} />
-                    </div>
-                    {item.label}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+            {!isMobile && <>New<ChevronDown size={11} className={cn('opacity-60 transition-transform', showNewMenu && 'rotate-180')} /></>}
+          </motion.button>
+          <AnimatePresence>
+            {showNewMenu && (
+              <motion.div
+                initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -4, scale: 0.97 }}
+                transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                className="absolute right-0 top-[calc(100%+10px)] w-[240px] rounded-2xl p-2 z-[100] glass-elevated shadow-[var(--shadow-lg)]"
+              >
+                {newMenuItems.map(item => {
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.label}
+                      onClick={() => { navigate(item.path); setShowNewMenu(false); }}
+                      className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-[0.82rem] text-[color:var(--text-secondary)] hover:bg-white/[0.05] hover:text-white transition-colors group"
+                    >
+                      <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br text-white shadow-sm', item.accent)}>
+                        <Icon size={13} strokeWidth={2.4} />
+                      </div>
+                      <span className="flex-1 text-left font-medium">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Ask AI */}
-        <button
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          whileHover={{ y: -1 }}
           onClick={() => navigate('/ask-ai')}
-          style={{
-            height: '34px', padding: isMobile ? '0 0.625rem' : '0 0.875rem',
-            fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', border: 'none',
-            background: 'linear-gradient(135deg, #7C3AED, #8B5CF6)',
-            color: '#F5F3FF', borderRadius: '9px',
-            display: 'flex', alignItems: 'center', gap: '0.375rem',
-            boxShadow: '0 0 16px rgba(139,92,246,0.25)',
-            transition: 'all 0.15s', fontFamily: 'inherit',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 0 24px rgba(139,92,246,0.4)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-          onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 0 16px rgba(139,92,246,0.25)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+          className="h-[38px] flex items-center gap-1.5 px-3 md:px-4 rounded-full font-semibold text-[0.82rem] text-white relative overflow-hidden bg-gradient-to-br from-[#7877C6] via-[#A78BFA] to-[#63E6BE] shadow-[0_4px_16px_rgba(120,119,198,0.4),inset_0_1px_0_rgba(255,255,255,0.25)] ring-1 ring-white/20 hover:shadow-[0_8px_28px_rgba(120,119,198,0.55),inset_0_1px_0_rgba(255,255,255,0.35)] transition-shadow"
         >
-          <Sparkles size={13} />
-          {!isMobile && <span>Ask AI</span>}
-        </button>
+          <Sparkles size={13} className="drop-shadow-sm" />
+          {!isMobile && <span className="relative">Ask AI</span>}
+        </motion.button>
 
         {/* Notifications */}
-        <div style={{ position: 'relative' }}>
-          <button
-            onClick={() => { setShowNotifications(v => !v); setShowNewMenu(false); }}
-            style={{
-              width: '34px', height: '34px', borderRadius: '9px',
-              background: showNotifications ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all 0.15s', position: 'relative',
-            }}
-            onMouseEnter={e => { if (!showNotifications) e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; }}
-            onMouseLeave={e => { if (!showNotifications) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
-          >
-            <Bell size={14} style={{ color: '#94A3B8' }} />
-            {unread > 0 && (
-              <div style={{
-                position: 'absolute', top: '6px', right: '6px',
-                width: '7px', height: '7px', borderRadius: '9999px',
-                background: '#EF4444', border: '2px solid #080C18',
-                boxShadow: '0 0 6px rgba(239,68,68,0.6)',
-              }} />
+        <div className="relative">
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={() => { setShowNotifications(v => !v); setShowNewMenu(false); setShowUserMenu(false); }}
+            className={cn(
+              'w-[38px] h-[38px] rounded-full border flex items-center justify-center transition-colors relative',
+              showNotifications
+                ? 'bg-white/[0.09] border-white/[0.15]'
+                : 'bg-white/[0.04] border-white/[0.08] hover:bg-white/[0.07]',
             )}
-          </button>
-
-          {showNotifications && (
-            <div style={{
-              position: 'absolute', right: 0, top: 'calc(100% + 8px)', width: '340px',
-              background: '#0C1220', border: '1px solid rgba(255,255,255,0.09)',
-              borderRadius: '14px', zIndex: 100,
-              boxShadow: '0 20px 56px rgba(0,0,0,0.65)',
-              overflow: 'hidden', maxWidth: 'calc(100vw - 1rem)',
-              animation: 'scaleIn 0.15s ease-out forwards',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.875rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#F1F5F9' }}>Notifications</span>
-                  {unread > 0 && (
-                    <span style={{ fontSize: '0.62rem', padding: '1px 6px', borderRadius: '9999px', background: 'rgba(239,68,68,0.15)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.25)', fontWeight: 600 }}>
-                      {unread} new
-                    </span>
-                  )}
-                </div>
-                <button
-                  onClick={() => setReadIds(notifications.map(n => n.id))}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.72rem', color: '#0EA5E9', fontFamily: 'inherit', fontWeight: 500 }}
-                >
-                  Mark all read
-                </button>
-              </div>
-              <div style={{ maxHeight: '360px', overflowY: 'auto' }}>
-                {notifications.map((n, i) => (
-                  <div
-                    key={n.id}
-                    onClick={() => setReadIds(prev => [...prev, n.id])}
-                    style={{
-                      display: 'flex', gap: '0.875rem', padding: '0.8125rem 1rem', cursor: 'pointer',
-                      borderBottom: i < notifications.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                      background: readIds.includes(n.id) ? 'transparent' : 'rgba(14,165,233,0.03)',
-                      transition: 'background 0.12s',
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = readIds.includes(n.id) ? 'transparent' : 'rgba(14,165,233,0.03)')}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'flex-start', paddingTop: '3px' }}>
-                      <div style={{ width: '8px', height: '8px', borderRadius: '9999px', background: n.color, flexShrink: 0, boxShadow: `0 0 6px ${n.color}60` }} />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '0.8rem', fontWeight: readIds.includes(n.id) ? 400 : 600, color: '#F1F5F9', marginBottom: '2px', lineHeight: 1.3 }}>{n.title}</div>
-                      <div style={{ fontSize: '0.72rem', color: '#475569', marginBottom: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.detail}</div>
-                      <div style={{ fontSize: '0.67rem', color: '#2D3B55', fontWeight: 500 }}>{n.time}</div>
-                    </div>
-                    {!readIds.includes(n.id) && (
-                      <div style={{ width: '6px', height: '6px', borderRadius: '9999px', background: '#0EA5E9', flexShrink: 0, marginTop: '4px' }} />
+          >
+            <Bell size={15} className="text-[color:var(--text-muted)]" />
+            {unread > 0 && (
+              <motion.span
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="absolute top-[7px] right-[7px] w-2 h-2 rounded-full bg-[#FF6B6B] ring-2 ring-[#07080F] shadow-[0_0_8px_rgba(255,107,107,0.8)]"
+              />
+            )}
+          </motion.button>
+          <AnimatePresence>
+            {showNotifications && (
+              <motion.div
+                initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -4, scale: 0.97 }}
+                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                className="absolute right-0 top-[calc(100%+10px)] w-[380px] max-w-[calc(100vw-1rem)] rounded-2xl z-[100] glass-elevated overflow-hidden shadow-[var(--shadow-xl)]"
+              >
+                <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[0.9rem] font-bold text-[color:var(--text-primary)]">Notifications</span>
+                    {unread > 0 && (
+                      <span className="text-[0.62rem] font-bold px-1.5 py-0.5 rounded-full bg-[rgba(255,107,107,0.15)] text-[#FCA5A5] border border-[rgba(255,107,107,0.25)]">
+                        {unread} new
+                      </span>
                     )}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
+                  <button
+                    onClick={() => setReadIds(notifications.map(n => n.id))}
+                    className="text-[0.72rem] font-semibold text-[#A78BFA] hover:text-[#C4B5FD] transition-colors"
+                  >
+                    Mark all read
+                  </button>
+                </div>
+                <div className="max-h-[400px] overflow-y-auto">
+                  {notifications.map((n, i) => {
+                    const isRead = readIds.includes(n.id);
+                    return (
+                      <motion.button
+                        key={n.id}
+                        onClick={() => setReadIds(prev => [...prev, n.id])}
+                        whileHover={{ backgroundColor: 'rgba(120,119,198,0.06)' }}
+                        className={cn(
+                          'w-full flex gap-3 px-4 py-3 text-left transition-colors',
+                          i < notifications.length - 1 && 'border-b border-white/[0.04]',
+                          !isRead && 'bg-[rgba(120,119,198,0.04)]',
+                        )}
+                      >
+                        <div className="pt-1 flex-shrink-0">
+                          <div className="w-2 h-2 rounded-full" style={{ background: n.color, boxShadow: `0 0 8px ${n.color}80` }} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className={cn('text-[0.82rem] text-[color:var(--text-primary)] leading-snug mb-0.5', !isRead ? 'font-semibold' : 'font-normal')}>{n.title}</div>
+                          <div className="text-[0.72rem] text-[color:var(--text-muted)] truncate mb-0.5">{n.detail}</div>
+                          <div className="text-[0.65rem] text-[color:var(--text-faint)] font-medium">{n.time}</div>
+                        </div>
+                        {!isRead && <div className="w-1.5 h-1.5 rounded-full bg-[#A78BFA] flex-shrink-0 mt-1.5" />}
+                      </motion.button>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* User avatar */}
         {!isMobile && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '0.5rem',
-            padding: '0.25rem 0.4375rem 0.25rem 0.25rem',
-            borderRadius: '9999px', cursor: 'pointer', transition: 'all 0.15s',
-            border: '1px solid transparent',
-          }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; }}
-          >
-            <div style={{
-              width: '27px', height: '27px', borderRadius: '9999px', flexShrink: 0,
-              background: 'linear-gradient(135deg, #0EA5E9, #8B5CF6)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '0.6rem', fontWeight: 800, color: 'white',
-              boxShadow: '0 0 0 2px rgba(14,165,233,0.2)',
-            }}>
-              KA
-            </div>
-            <ChevronDown size={11} style={{ color: '#334155' }} />
+          <div className="relative">
+            <motion.button
+              whileTap={{ scale: 0.96 }}
+              onClick={() => { setShowUserMenu(v => !v); setShowNotifications(false); setShowNewMenu(false); }}
+              className={cn(
+                'flex items-center gap-2 pl-1 pr-3 py-1 rounded-full transition-colors border',
+                showUserMenu
+                  ? 'bg-white/[0.08] border-white/[0.12]'
+                  : 'border-transparent hover:bg-white/[0.04] hover:border-white/[0.08]',
+              )}
+            >
+              <div className="w-[30px] h-[30px] rounded-full bg-gradient-to-br from-[#7877C6] to-[#63E6BE] flex items-center justify-center text-[0.66rem] font-bold text-white ring-2 ring-[rgba(120,119,198,0.35)] shadow-[0_2px_8px_rgba(120,119,198,0.4)]">KA</div>
+              <ChevronDown size={12} className={cn('text-[color:var(--text-muted)] transition-transform', showUserMenu && 'rotate-180')} />
+            </motion.button>
+            <AnimatePresence>
+              {showUserMenu && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -4, scale: 0.97 }}
+                  transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                  className="absolute right-0 top-[calc(100%+10px)] w-[260px] rounded-2xl z-[100] glass-elevated overflow-hidden shadow-[var(--shadow-lg)]"
+                >
+                  <div className="p-4 border-b border-white/[0.06] flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#7877C6] to-[#63E6BE] flex items-center justify-center text-[0.82rem] font-bold text-white ring-2 ring-[rgba(120,119,198,0.35)]">KA</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[0.85rem] font-bold text-[color:var(--text-primary)] truncate">Khalil Abu Mushref</div>
+                      <div className="text-[0.7rem] text-[color:var(--text-muted)] truncate">Sr. Business Analyst</div>
+                    </div>
+                  </div>
+                  <div className="p-1.5">
+                    {[
+                      { label: 'Settings', path: '/admin' },
+                      { label: 'Keyboard shortcuts', path: '#' },
+                      { label: 'Help & support', path: '#' },
+                    ].map(item => (
+                      <button
+                        key={item.label}
+                        onClick={() => { if (item.path !== '#') navigate(item.path); setShowUserMenu(false); }}
+                        className="w-full text-left px-3 py-2 rounded-xl text-[0.82rem] text-[color:var(--text-secondary)] hover:bg-white/[0.05] hover:text-white transition-colors"
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         )}
       </div>

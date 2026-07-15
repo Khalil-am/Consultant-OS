@@ -4,53 +4,54 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
 // ── Mocks ─────────────────────────────────────────────────────
-const mockNavigate = vi.fn();
-
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
-  return { ...actual, useNavigate: () => mockNavigate };
-});
+const { mockGetAutomations, mockUpdateAutomation } = vi.hoisted(() => ({
+  mockGetAutomations: vi.fn(),
+  mockUpdateAutomation: vi.fn(),
+}));
 
 vi.mock('../hooks/useLayout', () => ({
   useLayout: () => ({ width: 1200, isMobile: false, isTablet: false }),
 }));
 
 vi.mock('../lib/db', () => ({
-  insertAutomationRun: vi.fn().mockResolvedValue({}),
-  insertActivity: vi.fn().mockResolvedValue(undefined),
-  getAutomationRuns: vi.fn().mockResolvedValue([]),
+  getAutomations: mockGetAutomations,
+  updateAutomation: mockUpdateAutomation,
 }));
 
-vi.mock('../data/mockData', () => ({
-  automations: [
-    {
-      id: 'auto-001',
-      name: 'BRD Generator',
-      category: 'BA & Requirements',
-      status: 'Active',
-      lastRun: '1h ago',
-      runCount: 10,
-      successRate: 97,
-      description: 'Generates Business Requirements Documents from raw inputs',
-      inputType: 'Document',
-      outputType: 'BRD',
-      starred: false,
-    },
-    {
-      id: 'auto-002',
-      name: 'Meeting Minutes',
-      category: 'Meetings',
-      status: 'Active',
-      lastRun: '2h ago',
-      runCount: 5,
-      successRate: 95,
-      description: 'Generates meeting minutes from transcripts',
-      inputType: 'Audio',
-      outputType: 'Minutes',
-      starred: true,
-    },
-  ],
-}));
+const mockAutomations = [
+  {
+    id: 'auto-001',
+    name: 'BRD Generator',
+    category: 'BA & Requirements',
+    category_color: '#0EA5E9',
+    status: 'Active',
+    last_run: '1h ago',
+    run_count: 10,
+    success_rate: 97,
+    description: 'Generates Business Requirements Documents from raw inputs',
+    input_type: 'Document',
+    output_type: 'BRD',
+    starred: false,
+    created_at: '',
+    updated_at: '',
+  },
+  {
+    id: 'auto-002',
+    name: 'Meeting Minutes',
+    category: 'Meetings',
+    category_color: '#8B5CF6',
+    status: 'Active',
+    last_run: '2h ago',
+    run_count: 5,
+    success_rate: 95,
+    description: 'Generates meeting minutes from transcripts',
+    input_type: 'Audio',
+    output_type: 'Minutes',
+    starred: true,
+    created_at: '',
+    updated_at: '',
+  },
+];
 
 import Automations from '../screens/Automations';
 
@@ -62,6 +63,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockNavigate.mockReset();
   localStorage.clear();
+  mockGetAutomations.mockResolvedValue(mockAutomations);
+  mockUpdateAutomation.mockResolvedValue({});
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -153,10 +156,10 @@ describe('Automations – Star persistence', () => {
     }
   });
 
-  it('defaults to mockData starred state when localStorage is empty', async () => {
+  it('defaults to DB starred state when localStorage is empty', async () => {
     renderAutomations();
     await screen.findByText('Meeting Minutes');
-    // auto-002 has starred: true in mock data — should be starred by default
+    // auto-002 has starred: true in DB data — should be starred by default
     // Just verify the component renders without errors
     expect(screen.getByText('Meeting Minutes')).toBeInTheDocument();
   });
@@ -183,17 +186,16 @@ describe('Automations – Run button', () => {
     expect(screen.getAllByRole('button', { name: /run now/i }).length).toBeGreaterThan(0);
   });
 
-  it('shows Running state immediately when Run Now clicked', async () => {
+  it('shows "no webhook configured" toast when Run Now clicked on non-BRD automation', async () => {
     renderAutomations();
     await screen.findByText('BRD Generator');
 
     const runButtons = screen.getAllByRole('button', { name: /run now/i });
-    // Click second card (auto-002 Meeting Minutes) to avoid navigation from auto-001
+    // Click second card (auto-002 Meeting Minutes) which has no webhook configured
     await userEvent.click(runButtons[1]);
 
-    // Immediately after click, "Running" text should appear in that button
     await waitFor(() => {
-      expect(screen.getByText('Running')).toBeInTheDocument();
+      expect(screen.getByText(/no webhook url configured/i)).toBeInTheDocument();
     });
   }, 10000);
 });
