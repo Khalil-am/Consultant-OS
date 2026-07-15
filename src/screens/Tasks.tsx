@@ -64,58 +64,6 @@ export default function Tasks() {
   const [error, setError] = useState('');
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
   const [syncing, setSyncing] = useState(false);
-  const [taskSummaryCopied, setTaskSummaryCopied] = useState(false);
-  const [tasksTxtExported, setTasksTxtExported] = useState(false);
-
-  // Local tasks (created without Trello)
-  const [localTasks, setLocalTasks] = useState<LocalTask[]>(() => {
-    try { return JSON.parse(localStorage.getItem(LOCAL_TASKS_KEY) ?? 'null') ?? []; } catch { return []; }
-  });
-  const [showNewTaskModal, setShowNewTaskModal] = useState(false);
-  const [newTaskForm, setNewTaskForm] = useState<NewTaskForm>({
-    name: '', client: '', priority: 'Medium', status: 'Backlog', dueDate: '', assignee: '',
-  });
-
-  function handleAddLocalTask() {
-    if (!newTaskForm.name.trim()) return;
-    const task: LocalTask = {
-      id: `local-${Date.now()}`,
-      name: newTaskForm.name.trim(),
-      client: newTaskForm.client.trim(),
-      priority: newTaskForm.priority,
-      status: newTaskForm.status,
-      dueDate: newTaskForm.dueDate,
-      assignee: newTaskForm.assignee.trim(),
-      createdAt: new Date().toISOString(),
-    };
-    const updated = [task, ...localTasks];
-    setLocalTasks(updated);
-    try { localStorage.setItem(LOCAL_TASKS_KEY, JSON.stringify(updated)); } catch { /* ignore */ }
-    setShowNewTaskModal(false);
-    setNewTaskForm({ name: '', client: '', priority: 'Medium', status: 'Backlog', dueDate: '', assignee: '' });
-  }
-
-  function handleDeleteLocalTask(id: string) {
-    const updated = localTasks.filter(t => t.id !== id);
-    setLocalTasks(updated);
-    try { localStorage.setItem(LOCAL_TASKS_KEY, JSON.stringify(updated)); } catch { /* ignore */ }
-  }
-
-  // Starred tasks
-  const [starredTasks, setStarredTasks] = useState<Set<string>>(() => {
-    try { return new Set(JSON.parse(localStorage.getItem(STARRED_TASKS_KEY) ?? '[]')); } catch { return new Set(); }
-  });
-  const [starredOnly, setStarredOnly] = useState(false);
-  const [overdueOnly, setOverdueOnly] = useState(false);
-
-  function handleToggleStarTask(id: string) {
-    setStarredTasks(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      try { localStorage.setItem(STARRED_TASKS_KEY, JSON.stringify([...next])); } catch { /* ignore */ }
-      return next;
-    });
-  }
 
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<string>('All');
@@ -340,24 +288,6 @@ export default function Tasks() {
                       <ExternalLink size={12} className="text-[color:var(--text-faint)] group-hover:text-white transition-colors justify-self-end" />
                     </>
                   )}
-                </>
-              );
-
-              return card.local ? (
-                <div key={card.id} style={{ ...rowStyle, cursor: 'default' }} onMouseEnter={onEnter} onMouseLeave={onLeave}>
-                  {cardContent}
-                </div>
-              ) : (
-                <a
-                  key={card.id}
-                  href={card.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ ...rowStyle, cursor: 'pointer' }}
-                  onMouseEnter={onEnter}
-                  onMouseLeave={onLeave}
-                >
-                  {cardContent}
                 </a>
               );
             })}

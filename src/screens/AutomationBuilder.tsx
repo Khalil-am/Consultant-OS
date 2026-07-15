@@ -35,7 +35,7 @@ const flowNodes: FlowNode[] = [
   { id: 'n8', label: 'Notify',       type: 'notify',  icon: <AlertCircle size={14} />, color: '#F5B544', status: 'idle',   description: 'Email/Slack notification' },
 ];
 
-const rightPanelTabs = ['Prompt', 'Schema', 'Destinations', 'Notifications', 'Logs', 'Notes'];
+const rightPanelTabs = ['Prompt', 'Schema', 'Destinations', 'Notifications', 'Logs'];
 
 const DEFAULT_PROMPT = `You are a senior business analyst specializing in government digital transformation projects.
 
@@ -98,10 +98,6 @@ export default function AutomationBuilder() {
   const [runOutput, setRunOutput]       = useState('');
   const [runError, setRunError]         = useState('');
   const fileInputRef = useRef<HTMLTextAreaElement>(null);
-  const [exportToast, setExportToast] = useState<string | null>(null);
-  const [configCopied, setConfigCopied] = useState(false);
-  const [nodeListCopied, setNodeListCopied] = useState(false);
-  const [nodeListTxtExported, setNodeListTxtExported] = useState(false);
 
   const [auto, setAuto]               = useState<AutomationRow | null>(null);
   const [workspaces, setWorkspaces]   = useState<WorkspaceRow[]>([]);
@@ -121,87 +117,6 @@ export default function AutomationBuilder() {
     sharePoint: false,
     jira: false,
   });
-  const [automationNotes, setAutomationNotes] = useState<string>(() => {
-    try { return JSON.parse(localStorage.getItem(storageKey) ?? 'null')?.notes ?? ''; } catch { return ''; }
-  });
-  const [notesSaved, setNotesSaved] = useState(false);
-  const [logFilter, setLogFilter] = useState<'All' | 'Success' | 'Warning' | 'Error'>('All');
-  const [logSearch, setLogSearch] = useState('');
-  const [logSort, setLogSort] = useState<'default' | 'status' | 'duration' | 'input'>('default');
-  const [nodeTypeFilter, setNodeTypeFilter] = useState<string>('All');
-  const [nodeSearch, setNodeSearch] = useState('');
-
-  // ── Interactive destinations ────────────────────────────────
-  const DEST_KEY = `ab_destinations_${id ?? 'default'}`;
-  const defaultDestinations = [
-    { id: 'workspace', label: 'Save to Workspace', detail: 'Documents library', checked: true, color: '#0EA5E9' },
-    { id: 'word', label: 'Export as Word', detail: 'Microsoft Word .docx', checked: true, color: '#0EA5E9' },
-    { id: 'pdf', label: 'Export as PDF', detail: 'PDF with Consultant OS branding', checked: true, color: '#8B5CF6' },
-    { id: 'sharepoint', label: 'Sync to SharePoint', detail: 'NCA Programme folder', checked: false, color: '#F59E0B' },
-    { id: 'jira', label: 'Push to Jira', detail: 'Create requirements tickets', checked: false, color: '#10B981' },
-  ];
-  const [destinations, setDestinations] = useState(() => {
-    try {
-      const saved = localStorage.getItem(DEST_KEY);
-      if (saved) return JSON.parse(saved) as typeof defaultDestinations;
-    } catch { /* ignore */ }
-    return defaultDestinations;
-  });
-
-  function toggleDestination(destId: string) {
-    setDestinations(prev => {
-      const next = prev.map(d => d.id === destId ? { ...d, checked: !d.checked } : d);
-      try { localStorage.setItem(DEST_KEY, JSON.stringify(next)); } catch { /* ignore */ }
-      return next;
-    });
-  }
-
-  // ── Interactive notifications ──────────────────────────────
-  const NOTIF_KEY = `ab_notifications_${id ?? 'default'}`;
-  const defaultNotifications = [
-    { id: 'email_success', label: 'Email on Success', detail: 'Send to assigned consultant', enabled: true },
-    { id: 'email_error', label: 'Email on Error', detail: 'Alert to workspace admin', enabled: true },
-    { id: 'slack', label: 'Slack Notification', detail: '#automation-runs channel', enabled: false },
-    { id: 'teams', label: 'Teams Message', detail: 'Project team channel', enabled: true },
-    { id: 'in_app', label: 'In-App Alert', detail: 'Show in notification centre', enabled: true },
-  ];
-  const [notifications, setNotifications] = useState(() => {
-    try {
-      const saved = localStorage.getItem(NOTIF_KEY);
-      if (saved) return JSON.parse(saved) as typeof defaultNotifications;
-    } catch { /* ignore */ }
-    return defaultNotifications;
-  });
-
-  function toggleNotification(notifId: string) {
-    setNotifications(prev => {
-      const next = prev.map(n => n.id === notifId ? { ...n, enabled: !n.enabled } : n);
-      try { localStorage.setItem(NOTIF_KEY, JSON.stringify(next)); } catch { /* ignore */ }
-      return next;
-    });
-  }
-
-  // ── Run statistics ─────────────────────────────────────────
-  const runStats = {
-    total: recentLogs.length,
-    success: recentLogs.filter(l => l.status === 'Success').length,
-    warning: recentLogs.filter(l => l.status === 'Warning').length,
-    error: recentLogs.filter(l => l.status === 'Error').length,
-    successRate: recentLogs.length > 0 ? Math.round(recentLogs.filter(l => l.status === 'Success').length / recentLogs.length * 100) : 0,
-    avgDuration: (() => {
-      const durations = recentLogs.map(l => parseInt(l.duration)).filter(n => !isNaN(n));
-      return durations.length > 0 ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) : 0;
-    })(),
-  };
-
-  function handleSaveNotes() {
-    try {
-      const existing = JSON.parse(localStorage.getItem(storageKey) ?? '{}');
-      localStorage.setItem(storageKey, JSON.stringify({ ...existing, notes: automationNotes }));
-    } catch { /* ignore */ }
-    setNotesSaved(true);
-    setTimeout(() => setNotesSaved(false), 2000);
-  }
 
   // Notification toggles
   const [notifToggles, setNotifToggles] = useState({
@@ -259,40 +174,6 @@ export default function AutomationBuilder() {
     } finally {
       setSavingConfig(false);
     }
-  }
-
-  function handleExportConfig() {
-    const config = {
-      id: auto.id,
-      name: auto.name,
-      category: auto.category,
-      nodes: flowNodes.map(n => ({ id: n.id, label: n.label, type: n.type, status: n.status })),
-      prompt: promptTemplate,
-      exportedAt: new Date().toISOString(),
-    };
-    const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${auto.name.replace(/\s+/g, '_')}_config.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    setExportToast(`Config exported as ${a.download}`);
-    setTimeout(() => setExportToast(null), 3000);
-  }
-
-  function handleCopyConfig() {
-    const config = {
-      id: auto.id,
-      name: auto.name,
-      category: auto.category,
-      nodes: flowNodes.map(n => ({ id: n.id, label: n.label, type: n.type })),
-      prompt: promptTemplate,
-    };
-    navigator.clipboard.writeText(JSON.stringify(config, null, 2)).then(() => {
-      setConfigCopied(true);
-      setTimeout(() => setConfigCopied(false), 2000);
-    }).catch(() => {});
   }
 
   const handleRun = async () => {
@@ -427,21 +308,6 @@ export default function AutomationBuilder() {
     }
   };
 
-  const handleTestRun = async () => {
-    if (testRunning || running) return;
-    setTestRunning(true);
-    setTestRunDone(false);
-    setTestRunStep(null);
-    for (const node of flowNodes) {
-      setTestRunStep(node.id);
-      await new Promise(res => setTimeout(res, 400));
-    }
-    setTestRunStep(null);
-    setTestRunDone(true);
-    setTestRunning(false);
-    setTimeout(() => setTestRunDone(false), 3000);
-  };
-
   const getNodeBg = (node: FlowNode) => {
     if (node.id === selectedNode)    return `${node.color}20`;
     if (node.status === 'done')      return 'rgba(52,211,153,0.08)';
@@ -495,16 +361,6 @@ export default function AutomationBuilder() {
             {savedAt ? `Saved ${savedAt}` : 'Save'}
           </button>
           <button
-            className="btn-ghost"
-            style={{ height: '32px', fontSize: '0.78rem', opacity: testRunning || running ? 0.6 : 1 }}
-            onClick={handleTestRun}
-            disabled={testRunning || running}
-            aria-label={testRunning ? 'Testing…' : testRunDone ? 'Test passed' : 'Test Run'}
-          >
-            {testRunning ? <Settings size={13} style={{ animation: 'spin 1s linear infinite' }} /> : testRunDone ? <Check size={13} /> : <Settings size={13} />}
-            {testRunning ? 'Testing…' : testRunDone ? 'Test passed' : 'Test Run'}
-          </button>
-          <button
             className="btn-primary"
             style={{ height: '32px', fontSize: '0.78rem' }}
             onClick={handleRun}
@@ -517,38 +373,6 @@ export default function AutomationBuilder() {
           </button>
         </div>
       </div>
-      {/* Test run status toast */}
-      {testRunDone && (
-        <div
-          role="status"
-          aria-live="polite"
-          style={{
-            position: 'fixed', bottom: 24, right: 24, zIndex: 100,
-            background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)',
-            borderRadius: 10, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8,
-            color: '#34D399', fontSize: '0.82rem', fontWeight: 600,
-            boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-          }}
-        >
-          <Check size={14} /> All nodes passed – test run complete
-        </div>
-      )}
-      {/* Export toast */}
-      {exportToast && (
-        <div
-          role="status"
-          aria-live="polite"
-          style={{
-            position: 'fixed', bottom: 24, left: 24, zIndex: 100,
-            background: 'rgba(14,165,233,0.15)', border: '1px solid rgba(14,165,233,0.3)',
-            borderRadius: 10, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8,
-            color: '#38BDF8', fontSize: '0.82rem', fontWeight: 600,
-            boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-          }}
-        >
-          <Download size={14} /> {exportToast}
-        </div>
-      )}
 
       {/* Three Panel Layout */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
@@ -628,12 +452,9 @@ export default function AutomationBuilder() {
         {/* ── Center Canvas ── */}
         <div style={{ flex: 1, overflow: 'auto', background: '#07080F', padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0, minWidth: '280px' }}>
-            {flowNodes.filter(node => (nodeTypeFilter === 'All' || node.type === nodeTypeFilter) && (!nodeSearch.trim() || node.label.toLowerCase().includes(nodeSearch.toLowerCase()))).map((node, i, arr) => (
+            {flowNodes.map((node, i) => (
               <div key={node.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <div
-                  role="button"
-                  aria-label={`Flow node: ${node.label}`}
-                  aria-pressed={selectedNode === node.id}
                   onClick={() => setSelectedNode(node.id)}
                   style={{
                     padding: '0.875rem 1.25rem', borderRadius: '0.75rem',
@@ -695,8 +516,6 @@ export default function AutomationBuilder() {
                 key={tab}
                 className={`tab-underline ${activeTab === tab ? 'active' : ''}`}
                 onClick={() => setActiveTab(tab)}
-                aria-label={`Builder tab: ${tab}`}
-                aria-pressed={activeTab === tab}
                 style={{ fontSize: '0.78rem', padding: '0.625rem 0.5rem', marginRight: '0.75rem' }}
               >
                 {tab}
@@ -758,7 +577,7 @@ export default function AutomationBuilder() {
                   />
                 </div>
                 <div style={{ marginTop: '0.875rem', display: 'flex', gap: '0.5rem' }}>
-                  <select aria-label="AI model" style={{
+                  <select style={{
                     flex: 1, padding: '0.375rem 0.625rem', borderRadius: '6px', fontSize: '0.78rem',
                     background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
                     color: '#8790A8', fontFamily: 'inherit',
@@ -767,7 +586,7 @@ export default function AutomationBuilder() {
                     <option>GPT-4 Turbo</option>
                     <option>Claude 3.5 Sonnet</option>
                   </select>
-                  <select aria-label="Temperature setting" style={{
+                  <select style={{
                     width: '80px', padding: '0.375rem 0.625rem', borderRadius: '6px', fontSize: '0.78rem',
                     background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
                     color: '#8790A8', fontFamily: 'inherit',
@@ -918,19 +737,6 @@ export default function AutomationBuilder() {
             {/* ── LOGS TAB ── */}
             {activeTab === 'Logs' && (
               <div>
-                {/* Run statistics */}
-                <div aria-label="Run statistics" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginBottom: '1rem' }}>
-                  {[
-                    { label: 'Total Runs', value: runStats.total, color: '#94A3B8' },
-                    { label: 'Success Rate', value: `${runStats.successRate}%`, color: '#10B981' },
-                    { label: 'Avg Duration', value: `${runStats.avgDuration}s`, color: '#0EA5E9' },
-                  ].map(stat => (
-                    <div key={stat.label} aria-label={`Stat: ${stat.label}`} style={{ padding: '0.5rem 0.625rem', borderRadius: '6px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>
-                      <div style={{ fontSize: '1rem', fontWeight: 700, color: stat.color }}>{stat.value}</div>
-                      <div style={{ fontSize: '0.62rem', color: '#475569', marginTop: '1px' }}>{stat.label}</div>
-                    </div>
-                  ))}
-                </div>
                 {/* Live run output */}
                 {(running || runOutput || runError) && (
                   <div style={{ marginBottom: '1rem', padding: '0.875rem', borderRadius: '0.5rem', background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.2)' }}>
@@ -985,40 +791,6 @@ export default function AutomationBuilder() {
                     );
                   })
                 )}
-              </div>
-            )}
-
-            {/* Notes */}
-            {activeTab === 'Notes' && (
-              <div>
-                <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#94A3B8', marginBottom: '0.875rem' }}>Automation Notes</div>
-                <textarea
-                  aria-label="Automation notes"
-                  value={automationNotes}
-                  onChange={e => setAutomationNotes(e.target.value)}
-                  placeholder="Add notes about this automation..."
-                  rows={10}
-                  style={{
-                    width: '100%', boxSizing: 'border-box',
-                    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                    borderRadius: '0.5rem', color: '#CBD5E1', fontSize: '0.8rem',
-                    padding: '0.75rem', resize: 'vertical', fontFamily: 'inherit',
-                    lineHeight: 1.6,
-                  }}
-                />
-                <button
-                  onClick={handleSaveNotes}
-                  aria-label="Save automation notes"
-                  style={{
-                    marginTop: '0.75rem', padding: '0.5rem 1.25rem',
-                    background: notesSaved ? 'rgba(16,185,129,0.15)' : 'rgba(0,212,255,0.1)',
-                    border: `1px solid ${notesSaved ? 'rgba(16,185,129,0.4)' : 'rgba(0,212,255,0.3)'}`,
-                    borderRadius: '0.375rem', color: notesSaved ? '#6EE7B7' : '#00D4FF',
-                    fontSize: '0.8rem', cursor: 'pointer', fontWeight: 500,
-                  }}
-                >
-                  {notesSaved ? 'Saved!' : 'Save Notes'}
-                </button>
               </div>
             )}
           </div>

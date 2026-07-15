@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, Upload, FileText, Download, ExternalLink, Trash2,
@@ -298,7 +298,6 @@ export default function Documents() {
                           type="button" onClick={() => navigate(`/documents/${doc.id}`)}
                           className="p-1.5 rounded-lg text-[color:var(--text-muted)] hover:text-white hover:bg-white/[0.05] transition-colors"
                           title="Open"
-                          aria-label={`Open ${doc.name}`}
                         >
                           <ExternalLink size={12} />
                         </button>
@@ -306,17 +305,8 @@ export default function Documents() {
                           type="button" onClick={() => downloadFile(doc)}
                           className={cn('p-1.5 rounded-lg hover:bg-white/[0.05] transition-colors', doc.file_url ? 'text-[#A78BFA] hover:text-white' : 'text-[color:var(--text-faint)]')}
                           title={doc.file_url ? 'Download file' : 'No file attached'}
-                          aria-label={`Download ${doc.name}`}
                         >
                           <Download size={12} />
-                        </button>
-                        <button
-                          onClick={() => { setMovingDoc(doc); setMoveTargetWsId(doc.workspace_id ?? ''); }}
-                          style={{ padding: '0.25rem', background: 'none', border: 'none', cursor: 'pointer', color: '#A78BFA', borderRadius: '4px' }}
-                          title="Move to workspace"
-                          aria-label={`Move ${doc.name} to workspace`}
-                        >
-                          <FolderInput size={12} />
                         </button>
                         {confirmDelete === doc.id ? (
                           <>
@@ -340,7 +330,6 @@ export default function Documents() {
                             type="button" onClick={() => setConfirmDelete(doc.id)}
                             className="p-1.5 rounded-lg text-[color:var(--text-muted)] hover:text-[#FCA5A5] hover:bg-[rgba(255,107,107,0.08)] transition-colors"
                             title="Delete"
-                            aria-label={`Delete ${doc.name}`}
                           >
                             <Trash2 size={12} />
                           </button>

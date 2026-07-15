@@ -249,11 +249,6 @@ export default function Dashboard() {
                 </motion.button>
               );
             })}
-            {workspaceHealthData.length === 0 && (
-              <div style={{ padding: '2rem', textAlign: 'center', color: '#334155', fontSize: '0.78rem', gridColumn: '1 / -1' }}>
-                No active workspaces to display
-              </div>
-            )}
           </div>
         </motion.section>
       </div>

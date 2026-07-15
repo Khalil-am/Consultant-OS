@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Search, Star, Play, Settings2, TrendingUp, Clock, Zap, CheckCircle,
   ArrowRight, Loader2, ClipboardList, Video, Monitor, Building2,
-  BarChart2, Brain, History, ClipboardCopy, Download, FileText,
+  BarChart2, Brain,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useLayout } from '../hooks/useLayout';
@@ -55,16 +55,6 @@ export default function Automations() {
   const [runTimer, setRunTimer] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [recentRuns, setRecentRuns] = useState<AutomationRunRow[]>([]);
-  const [showRunHistory, setShowRunHistory] = useState(false);
-  const [starredOnly, setStarredOnly] = useState(false);
-  const [neverRunOnly, setNeverRunOnly] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<'All' | 'Active' | 'Inactive'>('All');
-  const [highSuccessOnly, setHighSuccessOnly] = useState(false);
-  const [minRunsFilter, setMinRunsFilter] = useState<0 | 1 | 5 | 10>(0);
-  const [summaryCopied, setSummaryCopied] = useState(false);
-  const [automationsCsvExported, setAutomationsCsvExported] = useState(false);
-  const [automationsTxtExported, setAutomationsTxtExported] = useState(false);
 
   useEffect(() => {
     getAutomations().then((data) => {
@@ -83,11 +73,6 @@ export default function Automations() {
     setRunTimer(0);
     if (timerRef.current) clearInterval(timerRef.current);
   }, [runningId]);
-
-  // Load recent runs from DB on mount
-  useEffect(() => {
-    getAutomationRuns().then(runs => setRecentRuns(runs)).catch(() => {});
-  }, []);
 
   const handleRun = useCallback((id: string) => {
     if (id === 'auto-001') { navigate('/automations/brd/run'); return; }

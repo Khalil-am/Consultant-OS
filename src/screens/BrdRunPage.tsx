@@ -6,7 +6,6 @@ import {
   ChevronRight, Download, Eye, RefreshCw, BarChart2, X, Loader,
   Zap, Shield, GitCompare, RotateCcw, Play,
   Inbox, Search, Brain, PenLine, Package, Trophy, Globe, Code2,
-  ClipboardCopy,
 } from 'lucide-react';
 import {
   uploadFileToStorage, createRunRecord, saveRunFile,
@@ -56,31 +55,6 @@ interface RunState {
     remainingGaps: string[];
   };
   sections: RunSection[];
-}
-
-// ─── Run History ──────────────────────────────────────────────────────────────
-
-const RUN_HISTORY_KEY = 'brd_run_history';
-
-interface RunHistoryEntry {
-  id: string;
-  date: string;
-  fileName: string;
-  template: string;
-  qualityScore: number;
-  coverageScore: number;
-  sectionsGenerated: number;
-}
-
-function loadRunHistory(): RunHistoryEntry[] {
-  try {
-    const raw = localStorage.getItem(RUN_HISTORY_KEY);
-    return raw ? JSON.parse(raw) as RunHistoryEntry[] : [];
-  } catch { return []; }
-}
-
-function saveRunHistory(entries: RunHistoryEntry[]) {
-  try { localStorage.setItem(RUN_HISTORY_KEY, JSON.stringify(entries.slice(0, 10))); } catch { /* ignore */ }
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -215,9 +189,6 @@ export default function BrdRunPage() {
   const [compareMode, setCompareMode] = useState(true);
   const [strictMatch, setStrictMatch] = useState(false);
   const [notes, setNotes] = useState('');
-
-  // Run history
-  const [runHistory, setRunHistory] = useState<RunHistoryEntry[]>(() => loadRunHistory());
 
   // Run state
   const [screen, setScreen] = useState<'config' | 'progress' | 'output'>('config');
@@ -581,142 +552,6 @@ export default function BrdRunPage() {
               : <><Play size={14} /> Run BRD Generation</>}
           </button>
         </div>
-
-        {/* Recent Run History */}
-        {runHistory.length > 0 && (
-          <div style={{ marginTop: '2rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '1.25rem' }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Clock size={12} /> Recent Runs</span>
-              <div style={{ display: 'flex', gap: '0.3rem' }}>
-                <button
-                  className="btn-ghost"
-                  aria-label="Export run history to CSV"
-                  onClick={() => handleExportRunHistoryCSV(runHistory)}
-                  style={{ fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.3rem', height: '26px', padding: '0 0.5rem' }}
-                >
-                  <Download size={11} /> {runHistoryExported ? 'Exported!' : 'Export CSV'}
-                </button>
-                <button
-                  className="btn-ghost"
-                  aria-label="Export run history to TXT"
-                  onClick={() => handleExportRunHistoryTxt(runHistory)}
-                  style={{ fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.3rem', height: '26px', padding: '0 0.5rem' }}
-                >
-                  <FileText size={11} /> {runHistoryTxtExported ? 'Exported!' : 'Export TXT'}
-                </button>
-              </div>
-            </div>
-            {/* Run history sort */}
-            <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '0.5rem' }}>
-              {(['date', 'quality', 'coverage', 'filename', 'sections', 'template'] as const).map(s => (
-                <button
-                  key={s}
-                  onClick={() => setRunHistorySort(s)}
-                  aria-label={`Sort run history by ${s}`}
-                  aria-pressed={runHistorySort === s}
-                  style={{
-                    fontSize: '0.62rem', fontWeight: 600, padding: '2px 7px', borderRadius: '5px', textTransform: 'capitalize',
-                    background: runHistorySort === s ? 'rgba(0,212,255,0.1)' : 'rgba(255,255,255,0.04)',
-                    color: runHistorySort === s ? '#00D4FF' : '#475569',
-                    border: runHistorySort === s ? '1px solid rgba(0,212,255,0.25)' : '1px solid rgba(255,255,255,0.08)',
-                    cursor: 'pointer', fontFamily: 'inherit',
-                  }}
-                >
-                  {s === 'date' ? 'Latest' : s === 'quality' ? 'Quality' : s === 'coverage' ? 'Coverage' : s === 'filename' ? 'Filename' : s === 'sections' ? 'Sections' : 'Template'}
-                </button>
-              ))}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.375rem' }}>
-              <span style={{ fontSize: '0.62rem', color: '#475569' }}>Min coverage:</span>
-              {([0, 50, 70, 90] as const).map(pct => (
-                <button
-                  key={pct}
-                  onClick={() => setCoverageMin(pct)}
-                  aria-label={`Coverage threshold: ${pct}%`}
-                  aria-pressed={coverageMin === pct}
-                  style={{
-                    fontSize: '0.6rem', fontWeight: 600, padding: '2px 6px', borderRadius: '5px',
-                    background: coverageMin === pct ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.04)',
-                    color: coverageMin === pct ? '#34D399' : '#475569',
-                    border: coverageMin === pct ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,255,255,0.08)',
-                    cursor: 'pointer', fontFamily: 'inherit',
-                  }}
-                >{pct}%</button>
-              ))}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.375rem' }}>
-              <span style={{ fontSize: '0.62rem', color: '#475569' }}>Min quality:</span>
-              {([0, 50, 70, 90] as const).map(pct => (
-                <button
-                  key={pct}
-                  onClick={() => setQualityMin(pct)}
-                  aria-label={`Quality threshold: ${pct}%`}
-                  aria-pressed={qualityMin === pct}
-                  style={{
-                    fontSize: '0.6rem', fontWeight: 600, padding: '2px 6px', borderRadius: '5px',
-                    background: qualityMin === pct ? 'rgba(0,212,255,0.12)' : 'rgba(255,255,255,0.04)',
-                    color: qualityMin === pct ? '#00D4FF' : '#475569',
-                    border: qualityMin === pct ? '1px solid rgba(0,212,255,0.3)' : '1px solid rgba(255,255,255,0.08)',
-                    cursor: 'pointer', fontFamily: 'inherit',
-                  }}
-                >{pct}%</button>
-              ))}
-            </div>
-            {runHistory.length > 3 && (
-              <div style={{ position: 'relative', marginBottom: '0.5rem' }}>
-                <Search size={11} style={{ position: 'absolute', left: '0.5rem', top: '50%', transform: 'translateY(-50%)', color: '#475569', pointerEvents: 'none' }} />
-                <input
-                  type="text"
-                  aria-label="Search run history"
-                  placeholder="Search runs…"
-                  value={runHistorySearch}
-                  onChange={e => setRunHistorySearch(e.target.value)}
-                  style={{ width: '100%', boxSizing: 'border-box', paddingLeft: '1.75rem', paddingRight: '0.5rem', height: '28px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: '6px', color: '#CBD5E1', fontSize: '0.72rem', fontFamily: 'inherit', outline: 'none' }}
-                />
-              </div>
-            )}
-            <div style={{ display: 'flex', gap: '0.3rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
-              {(['All', 'High', 'Medium', 'Low'] as const).map(tier => (
-                <button key={tier} onClick={() => setRunQualityTier(tier)} aria-label={`Filter run history by quality: ${tier}`} aria-pressed={runQualityTier === tier}
-                  style={{ fontSize: '0.68rem', padding: '0.12rem 0.45rem', borderRadius: '0.25rem', border: `1px solid ${runQualityTier === tier ? 'rgba(0,212,255,0.3)' : 'rgba(255,255,255,0.08)'}`, background: runQualityTier === tier ? 'rgba(0,212,255,0.1)' : 'transparent', color: runQualityTier === tier ? '#00D4FF' : '#475569', cursor: 'pointer', fontFamily: 'inherit' }}>
-                  {tier === 'All' ? 'All Quality' : `${tier} Quality`}
-                </button>
-              ))}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }} aria-label="Run history list">
-              {(showAllRunHistory
-                ? [...runHistory]
-                : [...runHistory].slice(0, 5)
-              )
-              .sort((a, b) => runHistorySort === 'quality' ? b.qualityScore - a.qualityScore : runHistorySort === 'coverage' ? b.coverageScore - a.coverageScore : runHistorySort === 'filename' ? a.fileName.localeCompare(b.fileName) : runHistorySort === 'sections' ? b.sectionsGenerated - a.sectionsGenerated : runHistorySort === 'template' ? a.template.localeCompare(b.template) : 0)
-              .filter(entry => entry.coverageScore >= coverageMin)
-              .filter(entry => entry.qualityScore >= qualityMin)
-              .filter(entry => runQualityTier === 'All' ? true : runQualityTier === 'High' ? entry.qualityScore >= 80 : runQualityTier === 'Medium' ? entry.qualityScore >= 50 && entry.qualityScore < 80 : entry.qualityScore < 50)
-              .filter(entry => !runHistorySearch.trim() || entry.fileName.toLowerCase().includes(runHistorySearch.toLowerCase()) || entry.template.toLowerCase().includes(runHistorySearch.toLowerCase())).map(entry => (
-                <div key={entry.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.625rem 0.875rem', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <CheckCircle size={13} style={{ color: '#10B981', flexShrink: 0 }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#CBD5E1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.fileName}</div>
-                    <div style={{ fontSize: '0.68rem', color: '#475569', marginTop: '0.125rem' }}>{entry.template} · {entry.date}</div>
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
-                    <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(16,185,129,0.1)', color: '#34D399' }}>Q: {entry.qualityScore}%</span>
-                    <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(0,212,255,0.08)', color: '#00D4FF' }}>C: {entry.coverageScore}%</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            {runHistory.length > 5 && (
-              <button
-                aria-label={showAllRunHistory ? 'Show fewer run history entries' : 'Show all run history entries'}
-                onClick={() => setShowAllRunHistory(v => !v)}
-                style={{ marginTop: '0.5rem', fontSize: '0.7rem', background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}
-              >
-                {showAllRunHistory ? '▲ Show less' : `▼ Show all ${runHistory.length} runs`}
-              </button>
-            )}
-          </div>
-        )}
       </div>
     );
   }
@@ -859,38 +694,7 @@ export default function BrdRunPage() {
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <ScoreBadge score={run.qualityScore || 0.85} label="Quality" />
             {run.comparison.sampleCoverage > 0 && <ScoreBadge score={run.comparison.sampleCoverage} label="Coverage" />}
-            <button
-              onClick={handleSaveToDocuments}
-              disabled={savingToDocuments || savedToDocuments}
-              style={{
-                height: 34, padding: '0 0.875rem', borderRadius: '8px', border: 'none', cursor: savingToDocuments || savedToDocuments ? 'default' : 'pointer',
-                display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.78rem', fontWeight: 600, fontFamily: 'inherit',
-                background: savedToDocuments ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.06)',
-                color: savedToDocuments ? '#34D399' : '#94A3B8',
-                border: `1px solid ${savedToDocuments ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.08)'}`,
-                opacity: savingToDocuments ? 0.7 : 1,
-              }}
-              aria-label={savedToDocuments ? 'Saved to Docs' : 'Save to Docs'}
-            >
-              {savedToDocuments ? <><CheckCircle size={12} /> Saved</> : savingToDocuments ? <>Saving…</> : <><FileText size={12} /> Save to Docs</>}
-            </button>
-            <button
-              onClick={handleCopyBrdStats}
-              className="btn-ghost"
-              style={{ height: 34, fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}
-              aria-label="Copy BRD stats to clipboard"
-            >
-              <ClipboardCopy size={12} /> {brdStatsCopied ? 'Copied!' : 'Copy Stats'}
-            </button>
-            <button
-              onClick={handleExportSectionTitlesCSV}
-              className="btn-ghost"
-              style={{ height: 34, fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}
-              aria-label="Export BRD section titles to CSV"
-            >
-              <Download size={12} /> {sectionsCsvExported ? 'Exported!' : 'Sections CSV'}
-            </button>
-            <button className="btn-primary" style={{ height: 34, fontSize: '0.78rem', marginLeft: '0.5rem' }} onClick={() => setScreen('config')} aria-label="New Run">
+            <button className="btn-primary" style={{ height: 34, fontSize: '0.78rem', marginLeft: '0.5rem' }} onClick={() => setScreen('config')}>
               <Play size={12} /> New Run
             </button>
           </div>
@@ -901,9 +705,7 @@ export default function BrdRunPage() {
           {tabs.map(tab => (
             <button key={tab.id} className={`tab-underline ${outputTab === tab.id ? 'active' : ''}`}
               onClick={() => setOutputTab(tab.id)}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.78rem', padding: '0.625rem 0.625rem', marginRight: '1rem' }}
-              aria-label={`Output tab: ${tab.label}`}
-              aria-pressed={outputTab === tab.id}>
+              style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.78rem', padding: '0.625rem 0.625rem', marginRight: '1rem' }}>
               {tab.icon}{tab.label}
             </button>
           ))}
@@ -948,19 +750,6 @@ export default function BrdRunPage() {
                             <button className="btn-ghost" style={{ height: 24, padding: '0 0.5rem', fontSize: '0.65rem' }}
                               onClick={() => { setRegeneratingSection(section.section_name); setOutputTab('regenerate'); }}>
                               <RotateCcw size={10} /> Regen
-                            </button>
-                            <button
-                              className="btn-ghost"
-                              style={{ height: 24, padding: '0 0.5rem', fontSize: '0.65rem' }}
-                              onClick={() => setCollapsedSections(prev => {
-                                const next = new Set(prev);
-                                if (next.has(sectionName)) next.delete(sectionName);
-                                else next.add(sectionName);
-                                return next;
-                              })}
-                              aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} section: ${sectionName}`}
-                              aria-expanded={!isCollapsed}>
-                              <ChevronRight size={10} style={{ transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)', transition: 'transform 0.15s' }} />
                             </button>
                           </div>
                         </div>
@@ -1129,8 +918,13 @@ export default function BrdRunPage() {
                       <div style={{ width: 8, height: 8, borderRadius: '50%', background: regeneratingSection === s ? '#A78BFA' : '#4E566E' }} />
                       <span style={{ fontSize: '0.82rem', color: regeneratingSection === s ? '#F8FAFC' : '#8790A8' }}>{s}</span>
                     </div>
-                  );
-                })}
+                    {regeneratingSection === s && (
+                      <button className="btn-primary" style={{ height: 28, fontSize: '0.72rem', padding: '0 0.75rem' }}>
+                        <RotateCcw size={11} /> Regenerate
+                      </button>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           )}

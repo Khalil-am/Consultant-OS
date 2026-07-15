@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, FileText, Sparkles, Check,
   Download, Clock, User, Calendar, Tag, Link as LinkIcon,
-  Send, Loader2, ExternalLink, RefreshCw, AlertCircle, ClipboardCopy,
+  Send, Loader2, ExternalLink, RefreshCw, AlertCircle,
 } from 'lucide-react';
 import { getDocument, updateDocument, getTasks, updateTask } from '../lib/db';
 import type { DocumentRow, TaskRow } from '../lib/db';
@@ -80,167 +80,6 @@ export default function DocumentDetail() {
 
   // AI Summarize
   const [summarizing, setSummarizing] = useState(false);
-
-  // Copy summary
-  const [summaryCopied, setSummaryCopied] = useState(false);
-  function handleCopySummary() {
-    if (!doc) return;
-    const text = doc.summary || 'No summary available.';
-    navigator.clipboard.writeText(text).then(() => {
-      setSummaryCopied(true);
-      setTimeout(() => setSummaryCopied(false), 2000);
-    }).catch(() => {});
-  }
-
-  // Document star rating (persisted to localStorage)
-  const ratingKey = `doc_rating_${id ?? 'unknown'}`;
-  const [docRating, setDocRating] = useState<number>(() => {
-    try { return Number(localStorage.getItem(ratingKey) ?? '0'); } catch { return 0; }
-  });
-  const [ratingHover, setRatingHover] = useState(0);
-
-  function handleSetRating(stars: number) {
-    const next = docRating === stars ? 0 : stars;
-    setDocRating(next);
-    try { localStorage.setItem(ratingKey, String(next)); } catch { /* ignore */ }
-  }
-
-  // Version changelog (persisted to localStorage)
-  const changelogKey = `doc_changelog_${id ?? 'unknown'}`;
-  interface ChangelogEntry { id: string; note: string; author: string; date: string; }
-  const [changelog, setChangelog] = useState<ChangelogEntry[]>(() => {
-    try {
-      const raw = localStorage.getItem(`doc_changelog_${id ?? 'unknown'}`);
-      return raw ? JSON.parse(raw) as ChangelogEntry[] : [];
-    } catch { return []; }
-  });
-  const [newChangeNote, setNewChangeNote] = useState('');
-  const [newChangeAuthor, setNewChangeAuthor] = useState('');
-  const [changelogExported, setChangelogExported] = useState(false);
-  const [changelogTxtExported, setChangelogTxtExported] = useState(false);
-  const [docInfoCopied, setDocInfoCopied] = useState(false);
-  const [taskPriorityFilter, setTaskPriorityFilter] = useState<'All' | 'High' | 'Medium' | 'Low'>('All');
-  const [taskSearch, setTaskSearch] = useState('');
-  const [taskSort, setTaskSort] = useState<'default' | 'title' | 'priority'>('default');
-  const [changelogSort, setChangelogSort] = useState<'newest' | 'oldest' | 'author'>('newest');
-
-  const reviewerCommentsKey = `doc_comments_${id ?? 'unknown'}`;
-  interface ReviewerComment { id: string; text: string; reviewer: string; resolved: boolean; }
-  const [reviewerComments, setReviewerComments] = useState<ReviewerComment[]>(() => {
-    try { return JSON.parse(localStorage.getItem(reviewerCommentsKey) ?? 'null') ?? []; } catch { return []; }
-  });
-  const [newCommentText, setNewCommentText] = useState('');
-  const [newCommentReviewer, setNewCommentReviewer] = useState('');
-  const [unresolvedCommentsOnly, setUnresolvedCommentsOnly] = useState(false);
-  const [commentSearch, setCommentSearch] = useState('');
-  const [commentSort, setCommentSort] = useState<'default' | 'reviewer' | 'unresolved'>('default');
-
-  function handleAddComment() {
-    if (!newCommentText.trim()) return;
-    const entry: ReviewerComment = { id: `cmt-${Date.now()}`, text: newCommentText.trim(), reviewer: newCommentReviewer.trim(), resolved: false };
-    const updated = [entry, ...reviewerComments];
-    setReviewerComments(updated);
-    try { localStorage.setItem(reviewerCommentsKey, JSON.stringify(updated)); } catch { /* ignore */ }
-    setNewCommentText('');
-    setNewCommentReviewer('');
-  }
-
-  function handleToggleCommentResolved(cmtId: string) {
-    const updated = reviewerComments.map(c => c.id === cmtId ? { ...c, resolved: !c.resolved } : c);
-    setReviewerComments(updated);
-    try { localStorage.setItem(reviewerCommentsKey, JSON.stringify(updated)); } catch { /* ignore */ }
-  }
-
-  function handleDeleteComment(cmtId: string) {
-    const updated = reviewerComments.filter(c => c.id !== cmtId);
-    setReviewerComments(updated);
-    try { localStorage.setItem(reviewerCommentsKey, JSON.stringify(updated)); } catch { /* ignore */ }
-  }
-
-  function handleCopyDocInfo() {
-    if (!doc) return;
-    const lines = [
-      `Document: ${doc.name}`,
-      `Type: ${doc.type}`,
-      `Status: ${doc.status}`,
-      `Workspace: ${doc.workspace}`,
-      `Author: ${doc.author ?? 'Unknown'}`,
-      `Language: ${doc.language}`,
-      `Tags: ${Array.isArray(doc.tags) ? doc.tags.join(', ') : doc.tags ?? 'None'}`,
-    ].join('\n');
-    navigator.clipboard.writeText(lines).then(() => {
-      setDocInfoCopied(true);
-      setTimeout(() => setDocInfoCopied(false), 2000);
-    }).catch(() => {});
-  }
-
-  function handleExportChangelog() {
-    if (changelog.length === 0) return;
-    const headers = ['Date', 'Author', 'Note'];
-    const rows = changelog.map(e => [
-      `"${e.date}"`,
-      `"${e.author.replace(/"/g, '""')}"`,
-      `"${e.note.replace(/"/g, '""')}"`,
-    ].join(','));
-    const csv = [headers.join(','), ...rows].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `changelog_${doc?.title?.replace(/\s+/g, '_') ?? 'document'}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    setChangelogExported(true);
-    setTimeout(() => setChangelogExported(false), 2000);
-  }
-
-  function handleExportChangelogTxt() {
-    if (changelog.length === 0) return;
-    const lines = [
-      `Change Log – ${doc?.name ?? 'Document'}`,
-      `Total Entries: ${changelog.length}`,
-      ``,
-      ...changelog.map(e => `  [${e.date}] ${e.author}: ${e.note}`),
-    ].join('\n');
-    const blob = new Blob([lines], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `changelog_${doc?.name?.replace(/\s+/g, '_') ?? 'document'}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    setChangelogTxtExported(true);
-    setTimeout(() => setChangelogTxtExported(false), 2000);
-  }
-
-  function handleAddChangelogEntry() {
-    if (!newChangeNote.trim()) return;
-    const entry: ChangelogEntry = {
-      id: crypto.randomUUID(),
-      note: newChangeNote.trim(),
-      author: newChangeAuthor.trim() || 'Anonymous',
-      date: new Date().toLocaleDateString('en-GB'),
-    };
-    setChangelog(prev => {
-      const next = [entry, ...prev];
-      try { localStorage.setItem(changelogKey, JSON.stringify(next)); } catch { /* ignore */ }
-      return next;
-    });
-    setNewChangeNote('');
-    setNewChangeAuthor('');
-  }
-
-  function handleDeleteChangelogEntry(entryId: string) {
-    setChangelog(prev => {
-      const next = prev.filter(e => e.id !== entryId);
-      try { localStorage.setItem(changelogKey, JSON.stringify(next)); } catch { /* ignore */ }
-      return next;
-    });
-  }
 
   async function load() {
     if (!id) return;
@@ -443,7 +282,6 @@ export default function DocumentDetail() {
               style={{ fontSize: '0.78rem', height: '32px', background: doc.status === 'Approved' ? 'rgba(52,211,153,0.15)' : undefined }}
               onClick={() => handleStatusChange('Approved')}
               disabled={statusSaving || doc.status === 'Approved'}
-              aria-label="Mark Approved"
             >
               {statusSaving ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} />}
               {doc.status === 'Approved' ? 'Approved ✓' : 'Mark Approved'}
@@ -454,20 +292,11 @@ export default function DocumentDetail() {
               onClick={handleDownload}
               disabled={downloading || !doc.file_url}
               title={doc.file_url ? 'Download attached file' : 'No file attached'}
-              aria-label={doc.file_url ? 'Download file' : 'No file attached'}
             >
               {downloading ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Download size={13} />}
               {doc.file_url ? 'Download' : 'No File'}
             </button>
-            <button
-              className="btn-ghost"
-              style={{ fontSize: '0.78rem', height: '32px', padding: '0 0.625rem', display: 'flex', alignItems: 'center', gap: '0.3rem', color: docInfoCopied ? '#10B981' : undefined }}
-              onClick={handleCopyDocInfo}
-              aria-label="Copy document info to clipboard"
-            >
-              <ClipboardCopy size={13} /> {docInfoCopied ? 'Copied!' : 'Copy Info'}
-            </button>
-            <button className="btn-ghost" style={{ fontSize: '0.78rem', height: '32px', padding: '0 0.5rem' }} onClick={load} title="Refresh" aria-label="Refresh document">
+            <button className="btn-ghost" style={{ fontSize: '0.78rem', height: '32px', padding: '0 0.5rem' }} onClick={load} title="Refresh">
               <RefreshCw size={13} />
             </button>
           </div>
@@ -481,8 +310,6 @@ export default function DocumentDetail() {
             key={tab}
             className={`tab-underline ${activeTab === tab ? 'active' : ''}`}
             onClick={() => setActiveTab(tab)}
-            aria-label={`Document tab: ${tab}`}
-            aria-pressed={activeTab === tab}
             style={{ marginRight: '1.25rem', fontSize: '0.82rem' }}
           >
             {tab === 'AI Chat' && <Sparkles size={12} style={{ marginRight: '0.25rem', color: activeTab === tab ? '#A78BFA' : '#4E566E' }} />}
@@ -513,19 +340,9 @@ export default function DocumentDetail() {
                       style={{ fontSize: '0.72rem', height: '26px', padding: '0 0.625rem' }}
                       onClick={handleAiSummarize}
                       disabled={summarizing}
-                      aria-label="AI Summarize document"
                     >
                       {summarizing ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <Sparkles size={11} />}
                       {summarizing ? 'Generating…' : 'AI Summarize'}
-                    </button>
-                    <button
-                      className="btn-ghost"
-                      style={{ fontSize: '0.72rem', height: '26px', padding: '0 0.625rem', display: 'flex', alignItems: 'center', gap: '4px', color: summaryCopied ? '#34D399' : undefined }}
-                      onClick={handleCopySummary}
-                      aria-label="Copy summary to clipboard"
-                    >
-                      <ClipboardCopy size={11} />
-                      {summaryCopied ? 'Copied!' : 'Copy'}
                     </button>
                   </div>
                 </div>
@@ -565,116 +382,6 @@ export default function DocumentDetail() {
                   </div>
                 </div>
               )}
-              {/* Reviewer Comments */}
-              <div className="section-card">
-                <div className="section-card-header">
-                  <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F1F5F9' }}>Reviewer Comments</span>
-                  {reviewerComments.length > 0 && (
-                    <span style={{ fontSize: '0.65rem', color: '#475569' }}>{reviewerComments.filter(c => c.resolved).length}/{reviewerComments.length} resolved</span>
-                  )}
-                  <button
-                    onClick={() => setUnresolvedCommentsOnly(p => !p)}
-                    aria-label="Show unresolved comments only"
-                    aria-pressed={unresolvedCommentsOnly}
-                    style={{ marginLeft: 'auto', fontSize: '0.7rem', padding: '2px 8px', borderRadius: '0.25rem', border: `1px solid ${unresolvedCommentsOnly ? 'rgba(0,212,255,0.5)' : 'rgba(255,255,255,0.1)'}`, background: unresolvedCommentsOnly ? 'rgba(0,212,255,0.1)' : 'transparent', color: unresolvedCommentsOnly ? '#00D4FF' : '#475569', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}
-                  >
-                    Unresolved
-                  </button>
-                </div>
-                <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <input
-                      className="input-field"
-                      aria-label="New reviewer comment"
-                      placeholder="Add a review comment..."
-                      value={newCommentText}
-                      onChange={e => setNewCommentText(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') handleAddComment(); }}
-                      style={{ flex: 2, minWidth: '140px', height: '34px', fontSize: '0.78rem' }}
-                    />
-                    <input
-                      className="input-field"
-                      aria-label="Reviewer name"
-                      placeholder="Reviewer"
-                      value={newCommentReviewer}
-                      onChange={e => setNewCommentReviewer(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') handleAddComment(); }}
-                      style={{ flex: 1, minWidth: '80px', height: '34px', fontSize: '0.78rem' }}
-                    />
-                    <button
-                      onClick={handleAddComment}
-                      aria-label="Add reviewer comment"
-                      disabled={!newCommentText.trim()}
-                      style={{ padding: '0 0.875rem', height: '34px', borderRadius: '0.375rem', background: 'rgba(0,212,255,0.08)', border: '1px solid rgba(0,212,255,0.25)', color: '#00D4FF', fontSize: '0.78rem', cursor: newCommentText.trim() ? 'pointer' : 'default', fontFamily: 'inherit', fontWeight: 500 }}
-                    >
-                      Add
-                    </button>
-                  </div>
-                  {reviewerComments.length > 0 && (
-                    <>
-                      <input
-                        className="input-field"
-                        type="text"
-                        aria-label="Search comments"
-                        placeholder="Search comments…"
-                        value={commentSearch}
-                        onChange={e => setCommentSearch(e.target.value)}
-                        style={{ height: '32px', fontSize: '0.75rem' }}
-                      />
-                      <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '0.25rem' }}>
-                        {(['default', 'reviewer', 'unresolved'] as const).map(s => (
-                          <button
-                            key={s}
-                            onClick={() => setCommentSort(s)}
-                            aria-label={`Sort comments by ${s}`}
-                            aria-pressed={commentSort === s}
-                            style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: '0.25rem', border: `1px solid ${commentSort === s ? 'rgba(0,212,255,0.5)' : 'rgba(255,255,255,0.1)'}`, background: commentSort === s ? 'rgba(0,212,255,0.1)' : 'transparent', color: commentSort === s ? '#00D4FF' : '#475569', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}
-                          >
-                            {s === 'default' ? 'Default' : s === 'reviewer' ? 'Reviewer' : 'Unresolved First'}
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                  {reviewerComments.length === 0 ? (
-                    <div style={{ fontSize: '0.78rem', color: '#334155', textAlign: 'center', padding: '0.5rem 0' }}>No comments yet.</div>
-                  ) : (
-                    <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      {(() => {
-                        const filtered = reviewerComments.filter(cmt =>
-                          (!unresolvedCommentsOnly || !cmt.resolved) &&
-                          (!commentSearch.trim() || cmt.text.toLowerCase().includes(commentSearch.toLowerCase()) || cmt.reviewer.toLowerCase().includes(commentSearch.toLowerCase()))
-                        );
-                        if (commentSort === 'reviewer') filtered.sort((a, b) => (a.reviewer ?? '').localeCompare(b.reviewer ?? ''));
-                        else if (commentSort === 'unresolved') filtered.sort((a, b) => (a.resolved ? 1 : 0) - (b.resolved ? 1 : 0));
-                        return filtered;
-                      })().map(cmt => (
-                        <li key={cmt.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', padding: '0.5rem 0.75rem', borderRadius: '0.375rem', background: cmt.resolved ? 'rgba(16,185,129,0.04)' : 'rgba(255,255,255,0.03)', border: `1px solid ${cmt.resolved ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.07)'}` }}>
-                          <button
-                            onClick={() => handleToggleCommentResolved(cmt.id)}
-                            aria-label={`${cmt.resolved ? 'Reopen' : 'Resolve'} comment: ${cmt.text}`}
-                            aria-pressed={cmt.resolved}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: cmt.resolved ? '#34D399' : '#475569', padding: 0, display: 'flex', alignItems: 'center', flexShrink: 0, marginTop: '2px' }}
-                          >
-                            <Check size={13} />
-                          </button>
-                          <span style={{ flex: 1, fontSize: '0.78rem', color: cmt.resolved ? '#475569' : '#94A3B8', textDecoration: cmt.resolved ? 'line-through' : 'none' }}>{cmt.text}</span>
-                          {cmt.reviewer && (
-                            <span style={{ fontSize: '0.65rem', color: '#475569', background: 'rgba(255,255,255,0.04)', padding: '1px 5px', borderRadius: 3, border: '1px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>{cmt.reviewer}</span>
-                          )}
-                          <button
-                            onClick={() => handleDeleteComment(cmt.id)}
-                            aria-label={`Delete comment: ${cmt.text}`}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#334155', padding: 0, display: 'flex', alignItems: 'center', flexShrink: 0 }}
-                          >
-                            <AlertCircle size={11} style={{ transform: 'rotate(45deg)' }} />
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
             </div>
 
             {/* Right meta */}
@@ -719,12 +426,11 @@ export default function DocumentDetail() {
                     style={{ width: '100%', justifyContent: 'center', fontSize: '0.78rem', opacity: doc.file_url ? 1 : 0.5 }}
                     onClick={handleDownload}
                     disabled={downloading || !doc.file_url}
-                    aria-label="Download document file"
                   >
                     {downloading ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Download size={13} />}
                     {doc.file_url ? 'Download File' : 'No File Attached'}
                   </button>
-                  <button className="btn-ai" style={{ width: '100%', justifyContent: 'center', fontSize: '0.78rem' }} onClick={() => setActiveTab('AI Chat')} aria-label="Ask AI about this document">
+                  <button className="btn-ai" style={{ width: '100%', justifyContent: 'center', fontSize: '0.78rem' }} onClick={() => setActiveTab('AI Chat')}>
                     <Sparkles size={13} /> Ask AI About This Doc
                   </button>
                   <button
@@ -732,36 +438,9 @@ export default function DocumentDetail() {
                     style={{ width: '100%', justifyContent: 'center', fontSize: '0.78rem', background: doc.status === 'Approved' ? 'rgba(52,211,153,0.08)' : undefined, borderColor: doc.status === 'Approved' ? 'rgba(52,211,153,0.2)' : undefined, color: doc.status === 'Approved' ? '#34D399' : undefined }}
                     onClick={() => handleStatusChange('Approved')}
                     disabled={doc.status === 'Approved' || statusSaving}
-                    aria-label="Mark document as approved"
                   >
                     <Check size={13} /> {doc.status === 'Approved' ? 'Already Approved' : 'Mark Approved'}
                   </button>
-                </div>
-                {/* Star Rating */}
-                <div style={{ marginTop: '0.875rem', paddingTop: '0.875rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div style={{ fontSize: '0.68rem', fontWeight: 600, color: '#475569', marginBottom: '0.375rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Your Rating</div>
-                  <div style={{ display: 'flex', gap: '0.25rem' }} aria-label="Document star rating">
-                    {[1, 2, 3, 4, 5].map(star => (
-                      <button
-                        key={star}
-                        aria-label={`Rate ${star} star${star > 1 ? 's' : ''}`}
-                        aria-pressed={docRating >= star}
-                        onClick={() => handleSetRating(star)}
-                        onMouseEnter={() => setRatingHover(star)}
-                        onMouseLeave={() => setRatingHover(0)}
-                        style={{
-                          background: 'none', border: 'none', cursor: 'pointer', padding: '2px',
-                          fontSize: '1.1rem', color: (ratingHover || docRating) >= star ? '#F59E0B' : '#334155',
-                          transition: 'color 0.15s', lineHeight: 1,
-                        }}
-                      >
-                        ★
-                      </button>
-                    ))}
-                  </div>
-                  {docRating > 0 && (
-                    <div style={{ fontSize: '0.68rem', color: '#F59E0B', marginTop: '2px' }}>{docRating}/5 stars</div>
-                  )}
                 </div>
               </div>
             </div>
@@ -783,7 +462,6 @@ export default function DocumentDetail() {
                   style={{ fontSize: '0.72rem', height: '26px', padding: '0 0.625rem' }}
                   onClick={handleAiSummarize}
                   disabled={summarizing}
-                  aria-label="Generate AI document summary"
                 >
                   {summarizing ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <Sparkles size={11} />}
                   {summarizing ? 'Generating…' : doc.summary ? 'Regenerate' : 'AI Generate Summary'}
@@ -819,33 +497,6 @@ export default function DocumentDetail() {
               <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#F8FAFC' }}>Linked Tasks</span>
               <span style={{ fontSize: '0.72rem', color: '#4E566E' }}>{tasks.length} task{tasks.length !== 1 ? 's' : ''}</span>
             </div>
-            {tasks.length > 0 && (
-              <>
-                <div style={{ padding: '0.5rem 1.25rem', display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                  {(['All', 'High', 'Medium', 'Low'] as const).map(p => (
-                    <button
-                      key={p}
-                      onClick={() => setTaskPriorityFilter(p)}
-                      aria-label={`Filter tasks by priority: ${p}`}
-                      aria-pressed={taskPriorityFilter === p}
-                      style={{ padding: '0.2rem 0.6rem', fontSize: '0.7rem', borderRadius: '4px', border: `1px solid ${taskPriorityFilter === p ? '#00D4FF' : 'rgba(255,255,255,0.1)'}`, background: taskPriorityFilter === p ? 'rgba(0,212,255,0.1)' : 'transparent', color: taskPriorityFilter === p ? '#00D4FF' : '#94A3B8', cursor: 'pointer', fontFamily: 'inherit' }}
-                    >{p}</button>
-                  ))}
-                </div>
-                <div style={{ padding: '0 1.25rem 0.5rem' }}>
-                  <input type="text" aria-label="Search tasks" placeholder="Search tasks…" value={taskSearch} onChange={e => setTaskSearch(e.target.value)}
-                    style={{ width: '100%', height: '28px', fontSize: '0.72rem', padding: '0 0.5rem', borderRadius: '5px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#F1F5F9', fontFamily: 'inherit', outline: 'none' }} />
-                </div>
-                <div style={{ padding: '0 1.25rem 0.5rem', display: 'flex', gap: '0.3rem' }}>
-                  {(['default', 'title', 'priority'] as const).map(s => (
-                    <button key={s} onClick={() => setTaskSort(s)} aria-label={`Sort tasks by ${s}`} aria-pressed={taskSort === s}
-                      style={{ fontSize: '0.62rem', padding: '1px 7px', borderRadius: '4px', background: taskSort === s ? 'rgba(0,212,255,0.1)' : 'transparent', color: taskSort === s ? '#00D4FF' : '#475569', border: taskSort === s ? '1px solid rgba(0,212,255,0.25)' : '1px solid transparent', cursor: 'pointer', fontFamily: 'inherit' }}>
-                      {s === 'default' ? 'Default' : s === 'title' ? 'Title A–Z' : 'Priority'}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
             {tasks.length === 0 ? (
               <div style={{ padding: '2.5rem', textAlign: 'center', color: '#4E566E', fontSize: '0.82rem', lineHeight: 1.6 }}>
                 No tasks are linked to this document.<br />
@@ -878,7 +529,6 @@ export default function DocumentDetail() {
                       onClick={() => navigate(`/workspaces/${task.workspace_id}`)}
                       style={{ padding: '0.25rem', background: 'none', border: 'none', cursor: 'pointer', color: '#4E566E', borderRadius: '4px', flexShrink: 0 }}
                       title="Open workspace"
-                      aria-label="Open workspace"
                     >
                       <ExternalLink size={12} />
                     </button>
@@ -923,91 +573,6 @@ export default function DocumentDetail() {
               <p style={{ fontSize: '0.75rem', color: '#4E566E', marginTop: '1.5rem', textAlign: 'center' }}>
                 Version history will appear here as new versions are uploaded.
               </p>
-              {/* ── Changelog ── */}
-              <div style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '1.25rem' }}>
-                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#94A3B8', marginBottom: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'space-between' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><RefreshCw size={13} /> Change Log</span>
-                  <div style={{ display: 'flex', gap: '0.4rem' }}>
-                    <button
-                      onClick={handleExportChangelog}
-                      disabled={changelog.length === 0}
-                      aria-label="Export change log to CSV"
-                      style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '2px 8px', background: changelogExported ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.04)', border: changelogExported ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', color: changelogExported ? '#34D399' : '#475569', cursor: changelog.length === 0 ? 'not-allowed' : 'pointer', fontFamily: 'inherit', fontSize: '0.7rem', opacity: changelog.length === 0 ? 0.4 : 1 }}
-                    >
-                      <Download size={11} /> {changelogExported ? 'Exported!' : 'Export CSV'}
-                    </button>
-                    <button
-                      onClick={handleExportChangelogTxt}
-                      disabled={changelog.length === 0}
-                      aria-label="Export change log to TXT"
-                      style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '2px 8px', background: changelogTxtExported ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.04)', border: changelogTxtExported ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', color: changelogTxtExported ? '#34D399' : '#475569', cursor: changelog.length === 0 ? 'not-allowed' : 'pointer', fontFamily: 'inherit', fontSize: '0.7rem', opacity: changelog.length === 0 ? 0.4 : 1 }}
-                    >
-                      <FileText size={11} /> {changelogTxtExported ? 'Exported!' : 'Export TXT'}
-                    </button>
-                  </div>
-                </div>
-                {/* Add entry form */}
-                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.875rem', flexWrap: 'wrap' }}>
-                  <input
-                    type="text"
-                    aria-label="Change log note"
-                    placeholder="Describe the change…"
-                    value={newChangeNote}
-                    onChange={e => setNewChangeNote(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleAddChangelogEntry()}
-                    style={{ flex: '2 1 200px', padding: '0.4rem 0.625rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: '#F1F5F9', fontSize: '0.78rem', fontFamily: 'inherit', outline: 'none' }}
-                  />
-                  <input
-                    type="text"
-                    aria-label="Change log author"
-                    placeholder="Author"
-                    value={newChangeAuthor}
-                    onChange={e => setNewChangeAuthor(e.target.value)}
-                    style={{ flex: '1 1 100px', padding: '0.4rem 0.625rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: '#F1F5F9', fontSize: '0.78rem', fontFamily: 'inherit', outline: 'none' }}
-                  />
-                  <button
-                    onClick={handleAddChangelogEntry}
-                    disabled={!newChangeNote.trim()}
-                    aria-label="Add change log entry"
-                    style={{ padding: '0.4rem 0.875rem', background: 'rgba(0,212,255,0.08)', border: '1px solid rgba(0,212,255,0.2)', borderRadius: '6px', color: '#00D4FF', fontSize: '0.78rem', cursor: newChangeNote.trim() ? 'pointer' : 'not-allowed', opacity: newChangeNote.trim() ? 1 : 0.5, fontFamily: 'inherit' }}
-                  >
-                    Add
-                  </button>
-                </div>
-                {/* Sort */}
-                {changelog.length > 1 && (
-                  <div style={{ display: 'flex', gap: '0.3rem', marginBottom: '0.5rem' }}>
-                    {(['newest', 'oldest', 'author'] as const).map(s => (
-                      <button key={s} onClick={() => setChangelogSort(s)} aria-label={`Sort changelog by ${s}`} aria-pressed={changelogSort === s}
-                        style={{ fontSize: '0.7rem', padding: '0.15rem 0.5rem', borderRadius: '0.25rem', border: '1px solid rgba(255,255,255,0.08)', background: changelogSort === s ? 'rgba(0,212,255,0.1)' : 'transparent', color: changelogSort === s ? '#00D4FF' : '#475569', cursor: 'pointer', fontFamily: 'inherit' }}>
-                        {s === 'newest' ? 'Newest' : s === 'oldest' ? 'Oldest' : 'Author A–Z'}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {/* Entries */}
-                {changelog.length === 0 ? (
-                  <p style={{ fontSize: '0.75rem', color: '#334155', margin: 0 }}>No change notes yet. Add one above.</p>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {(changelogSort === 'oldest' ? [...changelog].reverse() : changelogSort === 'author' ? [...changelog].sort((a, b) => a.author.localeCompare(b.author)) : changelog).map(entry => (
-                      <div key={entry.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.625rem', padding: '0.625rem 0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)' }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '0.8rem', color: '#CBD5E1' }}>{entry.note}</div>
-                          <div style={{ fontSize: '0.68rem', color: '#475569', marginTop: '0.25rem' }}>{entry.author} · {entry.date}</div>
-                        </div>
-                        <button
-                          onClick={() => handleDeleteChangelogEntry(entry.id)}
-                          aria-label={`Delete change log entry: ${entry.note}`}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#334155', padding: '2px', borderRadius: '4px', flexShrink: 0 }}
-                        >
-                          <AlertCircle size={12} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
             </div>
           </div>
         )}
@@ -1089,7 +654,6 @@ export default function DocumentDetail() {
                   style={{ height: '38px', padding: '0 1rem', flexShrink: 0 }}
                   onClick={handleSendMessage}
                   disabled={aiLoading || !chatInput.trim()}
-                  aria-label="Send message"
                 >
                   <Send size={14} />
                 </button>

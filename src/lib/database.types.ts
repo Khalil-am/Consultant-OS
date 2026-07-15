@@ -169,39 +169,6 @@ export interface ActivityRow {
   created_at: string;
 }
 
-export interface ApprovalRow {
-  id: string;
-  title: string;
-  requester: string;
-  type: string;
-  urgency: 'High' | 'Medium' | 'Low';
-  status: 'pending' | 'approved' | 'rejected';
-  created_at: string;
-  updated_at: string;
-}
-
-export interface AutomationRunRow {
-  id: string;
-  automation_id: string;
-  automation_name: string;
-  status: 'success' | 'failed' | 'running';
-  duration_ms: number | null;
-  run_at: string;
-  created_at: string;
-}
-
-export interface UserRow {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  workspaces: number;
-  status: 'Active' | 'Inactive';
-  initials: string;
-  created_at: string;
-  updated_at: string;
-}
-
 // ── Insert types ─────────────────────────────────────────────
 export type WorkspaceInsert = Omit<WorkspaceRow, 'created_at' | 'updated_at'>;
 export type WorkspaceFinancialInsert = Omit<WorkspaceFinancialRow, 'created_at' | 'updated_at'>;
