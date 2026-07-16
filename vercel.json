@@ -1,7 +1,8 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-"rewrites": [
+  "nodeVersion": "22.x",
+  "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
